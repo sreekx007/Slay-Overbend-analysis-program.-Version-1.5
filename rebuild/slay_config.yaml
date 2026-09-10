@@ -1,0 +1,109 @@
+# slay_config.yaml -- the single source of truth for every default in the
+# toolchain. Edit values here; nothing else needs to change to pick up an
+# edit. config.py only reads this file, validates it's complete, and
+# re-exposes each value as the same named constant every module already
+# imports (e.g. N_VR, D_O_DEF) -- so this file's structure is internal to
+# config.py itself, not something other modules need to know about.
+
+reference_pipeline:
+  OD_pipe_m: 0.4064        # 16in reference pipeline
+  t_wall_m: 0.021          # 21mm wall
+  R_default_m: 85.0        # stinger radius default (70/100m also validated, not default)
+  E_Pa: 210.0e9            # pipe-wide steel modulus, settled 30 Aug 2026.
+                           # Deliberately NOT materials.j2.E_Pa (210e9) or
+                           # materials.ro.E_Pa (207e9): this is the pipe-wide
+                           # answer that predates any material-nonlinearity
+                           # choice. It coincides with j2 numerically; that is
+                           # a coincidence, not a link.
+
+stinger_rollers:
+  spacing_m: 8.0
+  n_sr: 6                  # stinger rollers
+  n_vr: 3                  # vessel rollers -- confirmed correct default this session
+  roller_radius_default_m: 0.30   # fallback only; per-roller OD lookup lives in slay_geometry.py
+  # One-sided (unilateral) contact: rollers riding the stinger arc can only
+  # PUSH the pipe along the curve, never hold it down against it -- so every
+  # SR roller is one-sided, regardless of how many there are (n_sr is
+  # configurable, so this is expressed as a rule, not a fixed list that would
+  # go stale the moment n_sr changes). VR1 and VR2, nearest the stinger, are
+  # also one-sided. Every OTHER vessel roller (VR3 onward, further toward the
+  # vessel interior) is bilateral -- can both push and hold.
+  # Corrected 12 Aug 2026: an earlier draft of this file had only VR1/VR2 as
+  # one-sided and every SR roller as bilateral -- the opposite of correct.
+  one_sided_rollers_default:
+    stinger: all              # every SR roller, whatever n_sr is
+    vessel: [VR1, VR2]        # nearest the stinger -- also one-sided.
+                               # every OTHER vessel roller (VR3 onward) is bilateral.
+
+mesh:
+  od_multiple: 2.0         # element length = 2 x OD, matches the reference paper's own mesh
+
+materials:
+  j2:
+    # Verified against the project's own original Abaqus benchmark model
+    # (BM_Test_B), confirmed by direct screenshot of the keyword editor.
+    # 360 MPa yield -- NOT 385 MPa, a similarly-shaped but wrong table
+    # exists elsewhere and must not be confused with this one.
+    E_Pa: 210.0e9
+    yield_plastic_strain_table:
+      # [yield stress Pa, plastic strain]
+      - [360.0e6, 0.0]
+      - [385.0e6, 0.000263]
+      - [390.0e6, 0.000340]
+      - [395.0e6, 0.000428]
+      - [400.0e6, 0.000531]
+      - [405.0e6, 0.000652]
+      - [410.0e6, 0.000795]
+      - [415.0e6, 0.000963]
+      - [420.0e6, 0.001163]
+      - [425.0e6, 0.001400]
+      - [430.0e6, 0.001682]
+      - [435.0e6, 0.002017]
+      - [440.0e6, 0.002416]
+      - [445.0e6, 0.002892]
+      - [450.0e6, 0.003458]
+      - [455.0e6, 0.004130]
+      - [460.0e6, 0.004930]
+      - [465.0e6, 0.005878]
+      - [470.0e6, 0.007003]
+      - [475.0e6, 0.008336]
+      - [480.0e6, 0.009912]
+      - [485.0e6, 0.011774]
+      - [490.0e6, 0.013971]
+      - [495.0e6, 0.016559]
+      - [500.0e6, 0.019603]
+      - [505.0e6, 0.023179]
+      - [510.0e6, 0.027375]
+      - [515.0e6, 0.032289]
+      - [520.0e6, 0.038037]
+      - [525.0e6, 0.044752]
+      - [530.0e6, 0.052585]
+  ro:
+    # FFS 579-1 / DNV Grade 450. alpha_DNV verified by direct calculation
+    # during review (12 Aug 2026) -- the engine file itself states two
+    # different values (2.278 and 1.300) in two separate docstrings for
+    # the same formula; 1.300 is the arithmetically correct one and is
+    # what's used here. E is deliberately different from J2's -- not an
+    # inconsistency, the two materials have different reference sources.
+    E_Pa: 207.0e9
+    sig_ys_Pa: 450.0e6
+    N_RO: 20.59
+    alpha_DNV: 1.300
+
+physical_constants:
+  rho_steel_kg_m3: 7850.0
+  g_m_s2: 9.81
+
+section:
+  default_type: polar      # matches Abaqus B31/PIPE's own default
+  n_points_polar_default: 8
+  n_fibres_default: 20     # only used if section='fibre' is explicitly chosen
+
+solver:
+  pen_step0: 1.0e8
+  pen_shift: 1.0e4
+  n_increments_step0: 40
+  n_increments_shift: 20
+  reg_mult_default: 0.0
+  # k_spring intentionally has no entry: tested, rejected, removed 12 Aug
+  # 2026. Not being reintroduced as a default with any value, including 0.
