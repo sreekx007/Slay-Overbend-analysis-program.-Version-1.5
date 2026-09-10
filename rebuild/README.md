@@ -18,6 +18,18 @@ duplicated here.
 `ils_plotter.py` / `component_plotter.py` (the drawing layer) were left in
 the source repo, not mirrored -- nothing here needs them yet.
 
+`slay_mesh.py` is NOT mirrored -- it's this repo's own, recovered after
+being thought lost (built 20-27 Aug 2026, found again 10 Sep 2026 via chat
+history rather than any backup). It discretises a component's structural
+lines into beam elements: arc-length coordinates throughout (never x/y
+projection, which silently zeroed or foreshortened sloped/vertical members
+in an earlier draft), snap-before-grade ordering, and per-segment
+`MeshAdvice` honoured exactly (a taper asking for `min_elements=2` gets 2,
+never averaged against the rest of the component). Verified against the
+current `component_spec.py`: GD-TT's taper grading, GD-ST's closed-loop
+frame, and GD-VLV's branching stem all mesh correctly with no changes
+needed.
+
 This repo's own job, per `ils_plotter.py`'s own stated scope boundary in the
 source repo ("does NOT draw the lay pipeline, the stinger, the rollers, or a
 passage sequence -- those belong to a SLAY-tier plotter"), is the layer the
@@ -34,7 +46,10 @@ of them.
 
 ## What's next
 
-No mesher or solver exists yet on this architecture, in either repo. That is
-the actual next piece of work: stinger arc geometry, arc-length node
-placement (tracker item 16), the sliding-contact penalty formulation, and a
-mesh that honours each component's `MeshAdvice`/`ContactAdvice`.
+The mesher (`slay_mesh.py`) exists and works, but it meshes one component's
+own structural line in isolation -- it has no notion of the stinger, rollers,
+or a full assembly's contact envelope. No solver exists yet on this
+architecture, in either repo. The next piece of work is stitching an
+`Assembly`'s components onto one full pipeline mesh (stinger side +
+vessel side), stinger arc-length node placement (tracker item 16), and the
+sliding-contact penalty formulation feeding off `Assembly.contact_at()`.
