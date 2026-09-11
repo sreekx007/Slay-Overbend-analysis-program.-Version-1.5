@@ -44,12 +44,61 @@ against the source repo's `plotters/` directory when it moves, not by editing
 them here directly unless the change is genuinely specific to this repo's use
 of them.
 
+## The solver-side architecture plan (recovered 11 Sep 2026)
+
+`docs/SLAY_ARCHITECTURE_AND_RESTRUCTURING_PLAN.md`, `docs/SLAY_FRESH_BUILD_SPEC.md`
+and `docs/SLAY_FRESH_BUILD_TASKLIST.md` are the actual planning documents for
+exactly this repo's job -- dated 12 Aug 2026, so they predate `component_spec.py`
+(13 Aug onward) and were written before the ILS/solver split became explicit,
+but the architecture they define IS this repo's side of that split. Read
+`SLAY_FRESH_BUILD_SPEC.md` first.
+
+**Resolved decisions worth knowing before writing more code here:**
+- Solver rebuilds from `_solve_state_sliding` only (interpolated/sliding
+  contact); the node-snapped path is retired, not reproduced.
+- Two sweep modes, not the old code's three: **Mode A** (`slay_passage.py`,
+  chained passage, plastic state carried step to step, J2 only -- "what does
+  the component actually experience along one continuous path") and **Mode B**
+  (`slay_check.py`, independent position check, no history, J2 or RO, full
+  exhaustive sweep -- "what is the worst position anywhere, regardless of
+  whether a real lay would ever traverse it"). `slay_landing.py` is a thin
+  wrapper over Mode B.
+- The solver only implements F-type EA-ST connectors (F1/F2). P/S/D are
+  defined in `component_spec.py`'s `ConnectionSystem` but the solver isn't
+  built for them yet -- `docs/reference/slay_case.py` refuses those cases
+  explicitly rather than silently substituting F.
+- `docs/SLAY_ARCHITECTURE_AND_RESTRUCTURING_PLAN.md` §6 has a **real
+  regression baseline table** (A1/B1/plain-pipe/EA-ST F1/F2 cases with actual
+  expected strain percentages) -- the authoritative target once a solver
+  exists here to check against.
+
+**Already satisfied by files already in this directory:**
+- `config.py`'s spec (`docs/modules/config_py_spec_FINAL.docx`,
+  `docs/diagrams/slay_config_loader_flow.mermaid`) is fully met by the
+  mirrored `config.py`/`slay_config.yaml` above -- same loader algorithm,
+  same one-sided-roller rule, same `n_vr=3`/`alpha_DNV=1.300` corrections.
+  Stage 1.1 of the task list is done.
+- `docs/reference/slay_case.py` is real, working case-validation code (not a
+  stub) and is meant to become `slay_spec.py` per the task list's Stage 5.1
+  -- deliberately left un-renamed and un-integrated for now, matching its own
+  upload map's instruction not to mix reference code into the built package
+  before its stage comes up.
+
+**One thing to reconcile, not yet decided:** the plan's `MeshTopology`
+(§2.3 of the architecture doc -- a single chain-of-node/chain-of-element
+dict distinguishing the pipe chain from an EA-ST frame chain) predates
+`slay_mesh.py`, which solves the same problem differently: each structural
+line meshes independently (`LineMesh` per `line_id`, `MeshElement.owner`
+already tracks which component an element belongs to) and lines are joined
+only at explicitly declared `junctions()`. This may make a literal
+`MeshTopology` object redundant rather than a prerequisite -- worth deciding
+before `slay_geometry.py`/`slay_contact.py` are written, not after.
+
 ## What's next
 
-The mesher (`slay_mesh.py`) exists and works, but it meshes one component's
-own structural line in isolation -- it has no notion of the stinger, rollers,
-or a full assembly's contact envelope. No solver exists yet on this
-architecture, in either repo. The next piece of work is stitching an
-`Assembly`'s components onto one full pipeline mesh (stinger side +
-vessel side), stinger arc-length node placement (tracker item 16), and the
-sliding-contact penalty formulation feeding off `Assembly.contact_at()`.
+Per the task list, `slay_geometry.py` is next (Stage 1.2): stinger/roller
+reference geometry, arc-length node placement (tracker item 16), and
+per-roller contact offset resolved by ownership -- feeding `slay_mesh.py`
+rather than reinventing meshing inside it. After that: `slay_contact.py` and
+`slay_solver.py` (Stage 2), built from `_solve_state_sliding` in
+`slay_sliding_v0_4.py`, then `slay_passage.py`/`slay_check.py` (Stage 3).

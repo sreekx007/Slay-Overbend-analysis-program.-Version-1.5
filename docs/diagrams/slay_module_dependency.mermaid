@@ -1,0 +1,55 @@
+flowchart TB
+    nlfea["nlfea_v4.py<br/>(external, unchanged)<br/>assemble, Model, PlasticState"]
+
+    subgraph L2["Layer 2 — Solver Core"]
+        geom["slay_geometry.py<br/>build_geometry, MeshTopology,<br/>shroud_offset_at, EA-ST frame"]
+        contact["slay_contact.py<br/>sliding slots, envelope_at,<br/>connector slots"]
+        solver["slay_solver.py<br/>Newton + contact loop<br/>(no k_spring)"]
+    end
+
+    subgraph L3["Layer 3 — Orchestration"]
+        passage["slay_passage.py<br/>Mode A: chained passage<br/>(J2 only, state carried)"]
+        check["slay_check.py<br/>Mode B: independent check<br/>(no history)"]
+        landing["slay_landing.py<br/>landing-check wrapper"]
+    end
+
+    subgraph SC["Sidecars"]
+        post["slay_postprocess.py<br/>strain / moment / curvature"]
+        plot["slay_plot.py<br/>all plotting"]
+        io["slay_io.py<br/>checkpoint, save/load"]
+        cfg["config.py<br/>constants, one value each"]
+    end
+
+    subgraph L45["Layers 4-5"]
+        spec["slay_spec.py<br/>case validation, provenance"]
+        cli["slay_cli.py<br/>entry point"]
+    end
+
+    nlfea --> solver
+    cfg --> geom
+    cfg --> contact
+    cfg --> solver
+    geom --> contact
+    geom -->|MeshTopology| post
+    geom -->|MeshTopology| plot
+    contact --> solver
+    solver --> passage
+    solver --> check
+    check --> landing
+    passage --> post
+    check --> post
+    post --> plot
+    passage --> io
+    check --> io
+    spec --> passage
+    spec --> check
+    cli --> spec
+    cli --> io
+
+    style nlfea fill:#2d2d2d,color:#fff
+    style geom fill:#1e3a5f,color:#fff
+    style contact fill:#1e3a5f,color:#fff
+    style solver fill:#1e3a5f,color:#fff
+    style passage fill:#3d2e5c,color:#fff
+    style check fill:#3d2e5c,color:#fff
+    style landing fill:#3d2e5c,color:#fff

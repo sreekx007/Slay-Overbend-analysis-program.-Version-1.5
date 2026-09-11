@@ -1,0 +1,29 @@
+flowchart TD
+    start(["another module writes:<br/>from config import N_VR, D_O_DEF, ..."])
+    locate["locate slay_config.yaml<br/>(same folder as config.py itself,<br/>not the working directory)"]
+    exists{"file found?"}
+    parse["parse as YAML"]
+    parseok{"parsed OK?"}
+    validate["check every expected section is present:<br/>reference_pipeline, stinger_rollers, mesh,<br/>materials (j2 + ro), physical_constants,<br/>section, solver"]
+    allpresent{"all sections<br/>present?"}
+    unpack["unpack most values directly --<br/>D_O_DEF, N_VR, MATERIAL_J2_TABLE, etc.<br/>are straight 1:1 copies from the YAML"]
+    resolve["RESOLVE the one-sided-roller RULE<br/>(the one value that needs real logic,<br/>not a direct copy):<br/>expand stinger: all into SR1..SRn<br/>using n_sr already unpacked above,<br/>union with the explicit vessel list [VR1, VR2]<br/>-&gt; ONE_SIDED_ROLLERS_DEFAULT as a concrete set"]
+    expose(["constants available for import,<br/>identical names to before this change"])
+    failMissing(["FAIL LOUDLY:<br/>'slay_config.yaml not found at &lt;path&gt;'"])
+    failParse(["FAIL LOUDLY:<br/>YAML parse error, with the parser's<br/>own message shown, not swallowed"])
+    failSection(["FAIL LOUDLY:<br/>'missing section: &lt;name&gt;' --<br/>names the specific gap, never guesses a value"])
+
+    start --> locate --> exists
+    exists -->|no| failMissing
+    exists -->|yes| parse --> parseok
+    parseok -->|no| failParse
+    parseok -->|yes| validate --> allpresent
+    allpresent -->|no| failSection
+    allpresent -->|yes| unpack --> resolve --> expose
+
+    style failMissing fill:#5c1e1e,color:#fff
+    style failParse fill:#5c1e1e,color:#fff
+    style failSection fill:#5c1e1e,color:#fff
+    style resolve fill:#3d2e5c,color:#fff
+    style expose fill:#1e3a5f,color:#fff
+    style start fill:#2d2d2d,color:#fff

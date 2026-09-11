@@ -1,0 +1,51 @@
+flowchart TB
+    case["slay_spec.py<br/>validate_case()<br/>case.yaml -> kwargs + provenance"]
+
+    case --> modeSplit{"mode?"}
+
+    subgraph modeA["MODE A -- slay_passage.py (chained)"]
+        direction TB
+        a1["build geometry + MeshTopology<br/>(slay_geometry.py, once)"]
+        a2["shift = 0: build contact slots<br/>(slay_contact.py)"]
+        a3["solve from VIRGIN state<br/>(slay_solver.py)"]
+        a4["record step 0<br/>U, th, ps SAVED for next shift"]
+        a5["shift = shift + 1<br/>slots re-evaluated at new position"]
+        a6["solve CONTINUING from<br/>previous U, th, ps"]
+        a7["record step<br/>(plastic state now carries history)"]
+        a8{"more shifts?<br/>(capped at ~1 roller<br/>spacing from anchor)"}
+
+        a1 --> a2 --> a3 --> a4 --> a5 --> a6 --> a7 --> a8
+        a8 -->|yes| a5
+    end
+
+    subgraph modeB["MODE B -- slay_check.py (independent)"]
+        direction TB
+        b1["build geometry + MeshTopology<br/>(slay_geometry.py, once)"]
+        b2["position i: build contact slots<br/>at this position only"]
+        b3["solve from VIRGIN state<br/>EVERY time -- no carryover"]
+        b4["record position i<br/>(no history to save)"]
+        b5{"more positions?<br/>(no anchor limit --<br/>full exhaustive sweep)"}
+
+        b1 --> b2 --> b3 --> b4 --> b5
+        b5 -->|yes| b2
+    end
+
+    modeSplit -->|"A: real pipelay path"| a1
+    modeSplit -->|"B: worst-case search"| b1
+
+    a8 -->|no| post["slay_postprocess.py<br/>strain / moment / region peaks"]
+    b5 -->|no| post
+
+    post --> plot["slay_plot.py"]
+    post --> io["slay_io.py -- save with provenance"]
+
+    note1["Mode A answers: what does the component\nactually experience along ONE continuous path?\n(paper Sec.III.C)"]
+    note2["Mode B answers: what IS the worst position\nANYWHERE in the sweep, independent of path?\n(paper Sec.III.D -- can find a governing position\na real pipelay would never traverse, e.g. S2-8)"]
+
+    a4 -.-> note1
+    b4 -.-> note2
+
+    style modeA fill:#1e3a5f,color:#fff
+    style modeB fill:#3d2e5c,color:#fff
+    style note1 fill:#2d2d2d,color:#ccc
+    style note2 fill:#2d2d2d,color:#ccc
