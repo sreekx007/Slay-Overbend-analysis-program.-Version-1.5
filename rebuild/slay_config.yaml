@@ -58,7 +58,20 @@ stinger_rollers:
                             # this is an off-by-one waiting to happen if the two
                             # are ever mixed. Raise n_vr when a longer component
                             # needs more sweep room.
-  roller_radius_default_m: 0.30   # fallback only; per-roller OD lookup lives in slay_geometry.py
+  roller_radius_default_m: 0.30   # applies to EVERY roller, stinger and vessel
+                                   # alike, unless the case overrides it (ruling
+                                   # 12 Sep 2026). Overrides arrive with the lay
+                                   # configuration as a name-keyed mapping, e.g.
+                                   # {SR3: 0.35, VR2: 0.25}; anything absent takes
+                                   # this value. Per-case, so it does not belong
+                                   # in this file beyond the default.
+                                   #
+                                   # R is measured to the roller CENTRELINE, so a
+                                   # roller's radius is what stands between that
+                                   # locus and the surface the pipe meets. Scene
+                                   # stores it; the contact offset it implies is
+                                   # the physics layer's to compute, since that
+                                   # needs the contact surface too.
   # One-sided (unilateral) contact: rollers riding the stinger arc can only
   # PUSH the pipe along the curve, never hold it down against it -- so every
   # SR roller is one-sided, regardless of how many there are (n_sr is

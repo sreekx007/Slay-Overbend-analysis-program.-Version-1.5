@@ -376,11 +376,17 @@ VR1 and VR2 are one-sided, VR3 and VR4 bidirectional, and `VR{n_vr}` is
 outside this classification entirely because it is fixed rather than
 contacting.
 
-**Roller radius** is per station, defaulting to `config.ROLLER_RADIUS_DEF`
-and overridable per name. The fresh-build spec's decision 1 is explicit
-that roller OD is not assumed uniform, and that a single global constant
-cannot express it. Scene stores the radius; it does not compute a contact
-offset from it — that needs the contact surface, which is L5's business.
+**Roller radius** defaults to `config.ROLLER_RADIUS_DEF` = 0.30 m for
+**every** roller, stinger and vessel alike (ruling 12 Sep 2026). A case may
+override individual rollers through a name-keyed mapping arriving with the
+lay configuration — `{'SR3': 0.35, 'VR2': 0.25}` — with anything absent
+taking the default. The override is per-case, so it does not live in config
+beyond that default.
+
+The fresh-build spec's decision 1 is explicit that roller OD is not assumed
+uniform and that a single global constant cannot express it; the mapping is
+what it proposed. Scene stores the radius but computes no contact offset
+from it — that needs the contact surface as well, which is L5's business.
 
 **Extent** runs from beyond the anchor to beyond the last stinger station,
 with buffer on both sides so the assembly can travel the full sweep without
