@@ -29,7 +29,7 @@ anything in §9 — raise it.
 | Component geometry model (GD-TP/TT/SH/PIP/VLV/B/ST/SB/Con/HdPipe/BrPipe) | `rebuild/component_spec.py` | **MIRRORED** from `Slay-ILS-Designer-V1.0`. Never edit here. |
 | Config loader + defaults | `rebuild/config.py`, `rebuild/slay_config.yaml` | **MIRRORED.** Never edit here. |
 | ILS assembly/validation layer | `rebuild/ils_builder.py` | **MIRRORED.** Never edit here. |
-| Line mesher (arc-length, grading, snapping) | `rebuild/slay_mesh.py` | **OURS.** Working. Extend, don't rewrite. |
+| Line mesher (arc-length, grading, snapping) | `rebuild/slay/model/mesh.py` | **OURS.** Working. Extend, don't rewrite. |
 | Old monolithic implementation | `slay_overbend_v1_50.py`, `slay_sliding_v0_4.py` | REFERENCE ONLY. Read for behaviour being reproduced. Never import. |
 | Case validation gate | `docs/reference/slay_case.py` | Working code, not yet integrated. Becomes `entry/spec.py` at T8. |
 | Geometry prototype (arc-length stations) | `docs/reference/build_geometry_model_STALE.py` | STALE — imports modules that no longer exist. Read for the **arc-length station formulae only**. |
@@ -167,18 +167,18 @@ would yield no checkable number until the final layer, against a project
 whose stated review rule (G8) requires a number per change. Each layer is
 then thickened in a second pass.
 
-| Task | Layer | Builds | Milestone |
-|---|---|---|---|
-| T0 | — | package scaffold, import linter, test harness | — |
-| T1 | L1 | `material()` accessor | — |
-| T2 | L3 | stinger arc, roller stations, deck | — |
-| T3 | L4 | header polyline, junction merge, global numbering | — |
-| T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — |
-| T5 | L6 | `solve()` — Newton + active set + increments | **M1** |
-| T6 | L7 | Mode A, Mode B, landing, coverage | **M5** |
-| T7 | L8 | strains, peaks, DNV check, plots, IO | — |
-| T8 | Entry | `spec.py`, `run()`, CLI | — |
-| T9 | L3/L5 | thicken: ILS placement, component contact ownership | **M2–M4** |
+| Task | Layer | Builds | Milestone | Status |
+|---|---|---|---|---|
+| T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
+| T1 | L1 | `material()` accessor | — | next |
+| T2 | L3 | stinger arc, roller stations, deck | — | |
+| T3 | L4 | header polyline, junction merge, global numbering | — | |
+| T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
+| T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
+| T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
+| T7 | L8 | strains, peaks, DNV check, plots, IO | — | |
+| T8 | Entry | `spec.py`, `run()`, CLI | — | |
+| T9 | L3/L5 | thicken: ILS placement, component contact ownership | **M2–M4** | |
 
 ---
 
@@ -507,10 +507,13 @@ A card is complete when **all** hold:
 
 ## 9. Open decisions — do not silently resolve
 
-**D1 — Layer directory naming.** Numbered (`L3_scene/`) makes the
-dependency rule mechanically checkable by the T0 linter. Plain
-(`scene/`) reads better but is enforceable only by review, which is how
-the old code drifted. *Recommendation: numbered.* **Awaiting user.**
+**D1 — Layer directory naming. RESOLVED 12 Sep 2026: plain names.**
+`rebuild/slay/scene/`, `.../physics/`, and so on. Because layer membership
+is no longer visible in the path, it is declared in `slay/_layers.py` and
+enforced by `tools/check_layers.py` — the linter is not optional under this
+choice, it is the entire compensation for it. A permanent test
+(`test_layer_linter_catches_violation`) asserts the linter can still fail,
+so it cannot quietly become a no-op.
 
 **D2 — Is `MeshTopology` needed?** The 12 Aug architecture plan
 (§2.3) specifies a chain-of-node/chain-of-element object to distinguish
@@ -537,3 +540,4 @@ out of scope. Confirm it stays out before T9.
 | Date | Change |
 |---|---|
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
+| 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |

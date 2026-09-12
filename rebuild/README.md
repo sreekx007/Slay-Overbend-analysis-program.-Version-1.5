@@ -18,7 +18,7 @@ duplicated here.
 `ils_plotter.py` / `component_plotter.py` (the drawing layer) were left in
 the source repo, not mirrored -- nothing here needs them yet.
 
-`slay_mesh.py` is NOT mirrored -- it's this repo's own, recovered after
+`slay/model/mesh.py` is NOT mirrored -- it's this repo's own, recovered after
 being thought lost (built 20-27 Aug 2026, found again 10 Sep 2026 via chat
 history rather than any backup). It discretises a component's structural
 lines into beam elements: arc-length coordinates throughout (never x/y
