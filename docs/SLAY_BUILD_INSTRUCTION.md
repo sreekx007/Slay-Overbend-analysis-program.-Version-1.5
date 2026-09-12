@@ -170,8 +170,8 @@ then thickened in a second pass.
 | Task | Layer | Builds | Milestone | Status |
 |---|---|---|---|---|
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
-| T1 | L1 | `material()` accessor | — | next |
-| T2 | L3 | stinger arc, roller stations, deck | — | |
+| T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
+| T2 | L3 | stinger arc, roller stations, deck | — | next — full §3 process applies |
 | T3 | L4 | header polyline, junction merge, global numbering | — | |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
