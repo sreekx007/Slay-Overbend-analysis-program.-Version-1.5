@@ -148,7 +148,7 @@ Each rule below exists because it was violated once and cost real work.
 | G3 | **Envelope combination is `max`, never `sum`.** | `sum` double-counts where a thick body and shroud overlap; measured +7.9%. `sum` is retained only to reproduce pre-v0.5 numbers, never as a default. |
 | G4 | **Never drop a MANDATORY station.** | Slivers from snap-vs-regular collisions made one case fail to converge outright and shifted another's peak by +30% on pure numerical artefact. |
 | G5 | **No `k_spring`.** | Tested, rejected 12 Aug 2026 (NaN on a shroud contact-release case). Not reintroduced with any value, including 0. |
-| G6 | **Never edit `nlfea_v4.py`.** | Frozen, independently validated. Work around it, never in it. |
+| G6 | **Never edit `nlfea_v4.py`.** ⚠ **AMENDMENT PROPOSED — not adopted.** | Frozen, independently validated. Work around it, never in it. *The kernel merges coincident nodes unconditionally, which is wrong for models this program must build; the ruling of 12 Sep 2026 is that it must be fixed. Proposed wording, the three implementation options and the regression cost are in `docs/modules/T3_mesher_test_plan.md` §7. Nothing in `nlfea_v4.py` changes until that is confirmed.* |
 | G7 | **Never edit the mirrored files** — `component_spec.py`, `ils_builder.py`. | They belong to `Slay-ILS-Designer-V1.0` and are actively developed there. Local edits desync silently. Needed change → raise it upstream, don't patch. **`config.py` / `slay_config.yaml` came OUT of the mirror on 12 Sep 2026 and are ours to edit** — the mirrored code reads only five constants from them (OD_PIPE_DEF, T_WALL_DEF, STEEL_E, G, RHO_STEEL), guarded by `tests/test_config_ownership.py`. |
 | G8 | **"It ran without error" is not verification.** | This codebase has a documented silent-failure mode (`phase1_peak=0.0`, no exception). Every card requires a *number*. |
 | G9 | **Never substitute F for P/S/D connectors.** | The solver implements F only. A P/S/D case must be refused, not approximated — it would silently answer a different question. |
@@ -173,7 +173,7 @@ then thickened in a second pass.
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
 | T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
 | T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
-| T3 | L4 | header polyline, junction merge, global numbering | — | next — full §3 process; **D2 comes due here** |
+| T3 | L4 | header polyline, junction merge, global numbering | — | spec + test plan drafted, awaiting review; **D2 comes due here** |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
@@ -290,13 +290,26 @@ correct and is what `config.py` carries.
    connectivity, and per-element `line_id` + `owner`.
 4. Insert `Connector` elements as 2-node elements at connection points.
 
-**VERIFY**
+**VERIFY** — full plan in `docs/modules/T3_mesher_test_plan.md`, whose
+figures are reproduced by `tools/spike_mesher_rig.py`. In outline:
 - Plain pipe at 2×OD over the default extent gives the expected element
   count; record it.
 - An ILS case: every component's mandatory stations appear as nodes;
   `mesh.warnings` is empty.
 - Chain identity is recoverable from `owner`/`line_id` without any
   separate topology object (see §9-D2).
+- **The mesher rig**: each archetype centred with 6 m of plain pipe beyond
+  each end, the pipeline section applied throughout, both ends fixed in all
+  DOF, a point load at the component body centre. One section everywhere
+  makes the beam prismatic, so the closed form is exact and *anything the
+  mesher does must be invisible in the result*. Run at 20 kN (absolute
+  check against the closed form) and at 200 kN (the specified rig; exact
+  invariances plus a pinned 2.95e-05 mesh sensitivity).
+- **Solver settings are part of the fixture.** `tol = 1e-6`, never the
+  default 5e-4 (under-converged, and drifts with increment count) and never
+  tighter than 1e-7 (unreachable — `solve_step` then halves the increment and
+  retries without bound, raising nothing; a 0.02 s solve ran 15 min).
+  Every rig solve needs a harness timeout, because the kernel has none.
 
 **WORKFLOW AUDIT** Grading loop only (algorithmic, pre-existing). No
 sweep loop.
@@ -590,6 +603,7 @@ from EDES.
 |---|---|
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
+| 12 Sep 2026 | T3 mesher test plan drafted (`docs/modules/T3_mesher_test_plan.md`) with `tools/spike_mesher_rig.py` as its measuring instrument. **G6 flagged for amendment** — the kernel merges coincident nodes and the ruling is that it must be fixed; wording and options are in the plan §7, and nothing is edited until confirmed. |
 | 12 Sep 2026 | T1 complete. EDAS layouts vendored as L2 fixtures; second verification source (published anchors) recorded in §7; D5 raised on which source gates the ladder. EDES noted as not a build input. |
 | 12 Sep 2026 | T2 complete. Layout diagram generated from Scene (SVG, to scale). Model extent left at the station span for now — the end zones therefore cover SR5/SR6; deferred, see T2 spec §9. |
 | 12 Sep 2026 | Elastic end zones ruled in (16 m both ends, fully elastic) — NEW behaviour, needs per-element material binding at L5 and a MANDATORY station at L4; may shift §6 baselines if any peak sat in an end zone. `n_sr` ruled to exclude the tip station. |
