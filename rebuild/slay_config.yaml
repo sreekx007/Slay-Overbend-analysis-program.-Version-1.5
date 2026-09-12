@@ -21,8 +21,9 @@ stinger_rollers:
   n_sr: 6                  # stinger rollers, EXCLUDING the tip station.
                             # SR1 sits at theta=0, ON the deck tangent line, and
                             # IS counted; SR2 is the first station on the curve.
-                            # A further station SR{n_sr+1} exists beyond SR6: it
-                            # is a contact slot AND the point the lay tension is
+                            # A further station SR{n_sr+1} exists beyond SR6. It
+                            # is NOT a contact slot -- no roller acts there. It
+                            # exists solely as the point the lay tension is
                             # applied at, using ITS OWN tangent. Taking that
                             # tangent from SR6 instead put a spurious transverse
                             # force on the tip and reported 2.46% strain at SR6
@@ -34,10 +35,14 @@ stinger_rollers:
                             # off-by-one waiting to happen:
                             #     n_vr INCLUDES its terminal station (fixed VR5)
                             #     n_sr EXCLUDES its terminal station (tip SR7)
-                            # So n_vr=5, n_sr=6 means 5 vessel stations and 7
-                            # stinger stations. Neither count is "stations", and
-                            # neither is "contact slots" -- read each one's own
-                            # rule, do not generalise from the other.
+                            # Each end has ONE terminal station that carries no
+                            # contact -- VR5 restrains, SR7 is loaded -- so the
+                            # layout is symmetric in structure and asymmetric
+                            # only in what the count covers:
+                            #     vessel : 5 stations = 4 contact + 1 fixed
+                            #     stinger: 7 stations = 6 contact + 1 load point
+                            # Read each count's own rule; do not generalise from
+                            # the other.
   n_vr: 5                  # vessel rollers, counting ALL vessel stations --
                             # the fixed one included. VR1 is the first roller
                             # inboard of SR1; numbering increases away from the

@@ -106,9 +106,10 @@ def test_stinger_roller_count():
     """n_sr counts SR1 (the tangency station) but EXCLUDES the tip station.
 
     So n_sr=6 means SR1..SR6 plus a further SR7 that this count does not
-    include. SR7 is a contact slot and is where lay tension is applied,
-    using its own tangent -- taking that tangent from SR6 instead reported
-    2.46% strain there against a ~0.83% reference.
+    include. SR7 carries NO contact -- no roller acts there. It exists only
+    as the point lay tension is applied at, using its own tangent; taking
+    that tangent from SR6 instead reported 2.46% strain there against a
+    ~0.83% reference.
     """
     assert config.N_SR == 6
 
@@ -119,17 +120,19 @@ def test_terminal_station_counting_is_asymmetric_and_that_is_deliberate():
         n_vr INCLUDES its terminal station (fixed VR5)
         n_sr EXCLUDES its terminal station (tip SR7)
 
-    So the defaults describe 5 vessel stations and 7 stinger stations.
-    Neither count means "stations" and neither means "contact slots" —
-    reading one from the other is an off-by-one in the model's supports.
+    Each end carries exactly one terminal station that is NOT a contact
+    slot — VR5 restrains, SR7 is where tension is applied — so the layout
+    is symmetric in structure and asymmetric only in what the count covers.
+    Reading one count's rule from the other is an off-by-one in the model's
+    supports.
     """
     n_vessel_stations = config.N_VR
     n_stinger_stations = config.N_SR + 1
     assert (n_vessel_stations, n_stinger_stations) == (5, 7)
 
     vessel_contact = config.N_VR - 1        # VR5 is fixed, not contacting
-    stinger_contact = config.N_SR + 1       # the tip IS a contact slot
-    assert (vessel_contact, stinger_contact) == (4, 7)
+    stinger_contact = config.N_SR           # SR7 is a load point, not contact
+    assert (vessel_contact, stinger_contact) == (4, 6)
 
 
 def test_elastic_end_zone():

@@ -443,8 +443,9 @@ number of supports if I have read it the wrong way.
 it.** So `n_sr = 6` means SR1..SR6 and a further SR7 exists that the count
 does not include. Scene emits it.
 
-It is not a buffer. SR7 is a contact slot **and** the point lay tension is
-applied at, using its own tangent. The old code carries a comment recording
+It is not a buffer, and it is **not a contact slot** — no roller acts
+there. It exists solely as the point lay tension is applied at, using its
+own tangent. The old code carries a comment recording
 what happens otherwise: taking the departure tangent from SR6 put a spurious
 transverse force on the tip and reported **2.46% strain at SR6 against a
 ~0.83% reference** — a 3x error, caught in first validation.
@@ -454,11 +455,13 @@ transverse force on the tip and reported **2.46% strain at SR6 against a
 |  | terminal station | counted? | stations | contact slots |
 |---|---|---|---|---|
 | `n_vr = 5` | VR5, all DOF fixed | **included** | 5 | 4 |
-| `n_sr = 6` | SR7, tip + tension | **excluded** | 7 | 7 |
+| `n_sr = 6` | SR7, tension load point | **excluded** | 7 | 6 |
 
-Neither count means "stations" and neither means "contact slots". Reading
-one rule from the other is an off-by-one in the model's supports, so both
-are written into the YAML beside their values and pinned by
+Each end carries exactly one terminal station that bears no contact — VR5
+restrains, SR7 is loaded — so the layout is symmetric in *structure* and
+asymmetric only in *what the count covers*. Reading one rule from the other
+is an off-by-one in the model's supports, so both are written into the YAML
+beside their values and pinned by
 `test_terminal_station_counting_is_asymmetric_and_that_is_deliberate`.
 
 **4. Diagram substitution (§7)** — coordinate layout instead of a flowchart?
