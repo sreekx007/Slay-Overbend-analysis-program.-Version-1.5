@@ -1,0 +1,2712 @@
+{
+ "schema_version": 2,
+ "title": "Standard ILS Layouts",
+ "source_semantics": {
+  "PAPER": "stated in the source publication",
+  "DERIVED": "computed from an equation, not stated in the source",
+  "ASSUMED": "chosen to fill a gap the source leaves open -- VERIFY",
+  "DEFAULT": "omitted, so component_spec supplies it at build time"
+ },
+ "archetypes": [
+  {
+   "id": "ILS-TP",
+   "title": "Thick pipe body -- square-shouldered",
+   "purpose": "A local wall build-up with NO transition. Stiffens the pipe over its length and presents a step where it ends.",
+   "source": "IJRASET Vol 14 Issue VII, July 2026 -- TABLE XIX (Study 1)",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-TP",
+     "frame": "local",
+     "ownership": "strict"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.0,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-TP",
+      "id": "TP",
+      "centre_x": 0.0,
+      "t_comp": 0.042,
+      "L_comp": 1.0,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [],
+    "associationsNote": "Empty, and correctly so: this archetype has a single component, so there is no component-to-component relation to declare. Present rather than omitted to show the layer was considered."
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "16 in line pipe",
+     "note": ""
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "parent wall",
+     "note": ""
+    },
+    {
+     "name": "t_comp",
+     "value": 0.042,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "reference point = anchor A2, the 2.0x case. Not privileged -- the anchors sit at 1.5x, 2.0x and 2.5x.",
+     "note": ""
+    },
+    {
+     "name": "L_comp",
+     "value": 1.0,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "~2.5 D, fixed across Study 1",
+     "note": ""
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "t_comp",
+     "rule": "t_comp > t_pipe",
+     "why": "The section must thicken."
+    },
+    {
+     "applies_to": "taper",
+     "rule": "NONE -- square shoulder",
+     "why": "GD-TP has no transition, so it does NOT meet the DNV-ST-F101 Sec.5.6 taper rule. For a compliant transition the component is GD-TT, not a variant of this one."
+    },
+    {
+     "applies_to": "header",
+     "rule": "auto-extends beyond L_comp = 7.8 m",
+     "why": "Study 2's 8 m case pushes the header to +/-6.100 m and reports header_auto = True, so it is NOT on a 12 m header like the 1 m and 4 m cases."
+    }
+   ],
+   "variables": [
+    {
+     "name": "t_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.032,
+      0.042,
+      0.053
+     ],
+     "bounds": "t_comp > t_pipe",
+     "part": "TP",
+     "note": "Study 1 axis: 1.5x, 2.0x, 2.5x parent wall. Declare it as a RATIO when the pipe also varies."
+    },
+    {
+     "name": "L_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      1.0,
+      4.0,
+      8.0
+     ],
+     "bounds": "> 0",
+     "part": "TP",
+     "note": "Study 2 axis (Fig 36): 2.5 D, 10 D, 20 D. The wall Study 2 held fixed is not on the pages supplied."
+    },
+    {
+     "name": "OD_pipe",
+     "scope": "pipeline",
+     "unit": "m",
+     "studied": [
+      0.4064
+     ],
+     "bounds": "",
+     "part": null,
+     "note": "Changing the pipe changes what t_comp MEANS."
+    },
+    {
+     "name": "t_pipe",
+     "scope": "pipeline",
+     "unit": "m",
+     "studied": [
+      0.021
+     ],
+     "bounds": "",
+     "part": null,
+     "note": "Denominator of the wall ratio."
+    }
+   ],
+   "expected": {
+    "mass_kg": 2616.4916819360133,
+    "span_m": 1.0,
+    "extent_lo_m": -0.5,
+    "extent_hi_m": 0.5,
+    "cog_x_m": 0.0,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "Mesh (element length = max 2xOD) -- a solver decision.",
+    "IW-A bulkheads -- none present."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-TP_assembly.png",
+    "detail": "figures/ILS-TP_detail.png"
+   },
+   "notes": "Plain-pipe reference strains for comparison: 0.46% at R=70 m, 0.38% at R=85 m, 0.32% at R=100 m."
+  },
+  {
+   "id": "ILS-TT",
+   "title": "Tapered thick body -- code-compliant transition",
+   "purpose": "The same wall build-up as ILS-TP, but eased in and out by a taper at each end, with a straight land before the girth weld.",
+   "source": "IJRASET Vol 14 Issue VII, July 2026 -- TABLE XII",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-TT",
+     "frame": "local",
+     "ownership": "strict"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.0,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-TT",
+      "id": "TT",
+      "centre_x": 0.0,
+      "t_comp": 0.065,
+      "L_comp": 1.0,
+      "n": 16.0,
+      "L_NIB": 0.2,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [],
+    "associationsNote": "Empty, and correctly so: this archetype has a single component, so there is no component-to-component relation to declare. Present rather than omitted to show the layer was considered."
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "16 in line pipe",
+     "note": ""
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "parent wall",
+     "note": ""
+    },
+    {
+     "name": "t_comp",
+     "value": 0.065,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "~3.1x parent",
+     "note": ""
+    },
+    {
+     "name": "L_comp",
+     "value": 1.0,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "prismatic body only",
+     "note": ""
+    },
+    {
+     "name": "n",
+     "value": 16.0,
+     "unit": "-",
+     "source": "PAPER",
+     "part": "reference point = the 1:16 anchor. Taper length follows as n*dr and is NOT set directly.",
+     "note": ""
+    },
+    {
+     "name": "L_NIB",
+     "value": 0.2,
+     "unit": "m",
+     "source": "ASSUMED",
+     "part": "NOT in TABLE XII. Code floor 4*l_e = 198.0 mm rounded up to the next 50 mm. Confirm against the Abaqus model -- the reported peak-strain location sits at the taper toe, which moves with this value.",
+     "note": ""
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "n",
+     "rule": "n >= 4",
+     "why": "DNV-ST-F101 Sec.5.6 minimum taper slope 1:4."
+    },
+    {
+     "applies_to": "L_NIB",
+     "rule": ">= 4*l_e = 198.0 mm",
+     "why": "The undisturbed run between girth weld and taper toe. l_e = 49.49 mm on the PARENT wall; at 4 of them only 1.8% of the weld disturbance remains."
+    },
+    {
+     "applies_to": "L_taper",
+     "rule": "NOT FREE -- derived as n * dr",
+     "why": "Setting it directly would let it disagree with the slope."
+    }
+   ],
+   "variables": [
+    {
+     "name": "n",
+     "scope": "component",
+     "unit": "-",
+     "studied": [
+      4,
+      16,
+      64
+     ],
+     "bounds": "n >= 4 (DNV-ST-F101 Sec.5.6)",
+     "part": "TT",
+     "note": "The study axis. Taper length follows as n*dr."
+    },
+    {
+     "name": "t_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.065
+     ],
+     "bounds": "t_comp > t_pipe",
+     "part": "TT",
+     "note": "Moves the taper too, since dr changes."
+    },
+    {
+     "name": "L_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      1.0
+     ],
+     "bounds": "> 0",
+     "part": "TT",
+     "note": "Prismatic body only."
+    },
+    {
+     "name": "L_NIB",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.2
+     ],
+     "bounds": ">= 4*l_e = 198.0 mm",
+     "part": "TT",
+     "note": "Omit it and the spec derives it from the pipe."
+    }
+   ],
+   "expected": {
+    "mass_kg": 3216.7397163521423,
+    "span_m": 2.8080000000000003,
+    "extent_lo_m": -1.4040000000000001,
+    "extent_hi_m": 1.4040000000000001,
+    "cog_x_m": 1.4136902298149202e-16,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "Mesh (0.25 D at the transition, 2 D elsewhere) -- solver.",
+    "IW-A bulkheads -- none present."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-TT_assembly.png",
+    "detail": "figures/ILS-TT_detail.png"
+   },
+   "notes": "At the reference point the taper is 704 mm (1.73 D)."
+  },
+  {
+   "id": "ILS-SH",
+   "title": "Offset shroud -- EA-O, Type B1 behaviour",
+   "purpose": "Holds the pipeline off its natural catenary over a length, then ramps it back. Curvature concentrates at the catenary-side edge of the elevated zone -- a DIFFERENT mechanism from the two thick-body archetypes, which work by stiffness step over a roller.",
+   "source": "IJRASET Vol 14 Issue VII, July 2026 -- TABLE XXVIII / XXX",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-SH",
+     "frame": "local",
+     "ownership": "strict"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.0,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-SH",
+      "id": "SH",
+      "centre_x": 0.0,
+      "V": 0.4064,
+      "L1": 4.064,
+      "L2": 1.016,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [
+     {
+      "type": "PositionOrientation",
+      "from": {
+       "component": "SH"
+      },
+      "to": {
+       "datum": "pipeline_centreline"
+      },
+      "constraint": "V",
+      "value": 0.4064
+     }
+    ]
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "16 in line pipe",
+     "note": ""
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "parent wall",
+     "note": ""
+    },
+    {
+     "name": "V",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "offset depth below pipe centreline, 1.0 D",
+     "note": ""
+    },
+    {
+     "name": "L1",
+     "value": 4.064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "deep section length, 10 D",
+     "note": ""
+    },
+    {
+     "name": "L2",
+     "value": 1.016,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "taper slope length, 2.5 D. Reference point is run S3-3. NOTE the component DEFAULT is 5 D, outside the studied 2 - 2.5 D band, so this archetype pins it.",
+     "note": ""
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "section",
+     "rule": "adds NO material to the pipe",
+     "why": "Sec.2.4 -- section_at returns None, so the bending stiffness ratio is identically 1.0. A shroud works by geometry, not by stiffness."
+    },
+    {
+     "applies_to": "V, L2",
+     "rule": "ramp slope = V / L2",
+     "why": "Published runs span 0.40 to 0.50. The component default of L2 = 5 D gives 0.20, outside that."
+    },
+    {
+     "applies_to": "regions",
+     "rule": "X1..X5, peak at X2",
+     "why": "X2 is the catenary-side third of the deep section and governs design in every published case."
+    }
+   ],
+   "variables": [
+    {
+     "name": "V",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.30479999999999996,
+      0.4064
+     ],
+     "bounds": "> 0",
+     "part": "SH",
+     "note": "Offset depth. Strain plateaus beyond about 1.5 D (region X4), so deeper stops helping."
+    },
+    {
+     "name": "L1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      2.032,
+      2.4383999999999997,
+      4.064
+     ],
+     "bounds": "> 0",
+     "part": "SH",
+     "note": "Deep section length."
+    },
+    {
+     "name": "L2",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.8128,
+      1.016
+     ],
+     "bounds": "> 0",
+     "part": "SH",
+     "note": "Ramp length. With V it sets the ramp SLOPE V/L2, the direct analogue of GD-TT's 1:n."
+    }
+   ],
+   "expected": {
+    "mass_kg": 2395.1448335615405,
+    "span_m": 6.096,
+    "extent_lo_m": -3.048,
+    "extent_hi_m": 3.048,
+    "cog_x_m": 0.0,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "Mesh (element length = max 2xOD) -- a solver decision.",
+    "The catenary itself -- this is the DESIGN, not the lay. Type B1 behaviour only appears when a lay is applied."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-SH_assembly.png",
+    "detail": "figures/ILS-SH_detail.png"
+   },
+   "notes": "Regions for strain reporting (TABLE XXIX): X1 upstream taper and outside; X2 deep section, catenary side third -- PEAK IN ALL CASES; X3 midspan, 65-75% of X2; X4 vessel side, lowest, plateaus beyond V about 1.5 D; X5 downstream taper."
+  },
+  {
+   "id": "ILS-SHTP",
+   "title": "Offset shroud + thick pipe -- Type C1, combined mechanism",
+   "purpose": "A thick body sitting INSIDE the shroud deep section. Both mechanisms act at once: the shroud lifts the pipe off its catenary (Type B1) while the thick body puts a stiffness step inside that elevated zone (Type A). Worse than either alone in every published case.",
+   "source": "IJRASET Vol 14 Issue VII, July 2026 -- TABLE XXXVI / XXXVIII / XL",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-SHTP",
+     "frame": "local",
+     "ownership": "lowest"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.0,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-SH",
+      "id": "SH",
+      "centre_x": 0.0,
+      "V": 0.4064,
+      "L1": 4.064,
+      "L2": 1.016,
+      "provenance": "PAPER"
+     },
+     {
+      "code": "GD-TP",
+      "id": "TP",
+      "centre_x": 0.0,
+      "t_comp": 0.053,
+      "L_comp": 1.016,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [
+     {
+      "type": "PositionOrientation",
+      "from": {
+       "component": "SH"
+      },
+      "to": {
+       "datum": "pipeline_centreline"
+      },
+      "constraint": "V",
+      "value": 0.4064
+     }
+    ]
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "16 in line pipe",
+     "note": ""
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "parent wall",
+     "note": ""
+    },
+    {
+     "name": "V",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "SH",
+     "note": "Offset depth. Held fixed at 1 D by the published study; FREE in this archetype."
+    },
+    {
+     "name": "L1",
+     "value": 4.064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "SH",
+     "note": "Deep-section length. Held fixed at 10 D by the study; FREE in this archetype and independent of the thick pipe length."
+    },
+    {
+     "name": "L2",
+     "value": 1.016,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "SH",
+     "note": "Ramp length. Held fixed at 2.5 D by the study; FREE here. With V it sets the ramp slope, which decides how far past the deep section the shroud goes on owning contact."
+    },
+    {
+     "name": "L_comp",
+     "value": 1.016,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "TP",
+     "note": "Thick pipe length. Series 1 varies it (5 D, 10 D); Series 2 fixes it at 2.5 D and moves it instead."
+    },
+    {
+     "name": "t_comp",
+     "value": 0.053,
+     "unit": "m",
+     "source": "ASSUMED",
+     "part": "TP",
+     "note": "The thick pipe WALL is not stated in TABLE XXXVI, XXXVIII or XL. 53 mm (2.5x parent) is carried over from the Sec.VIII wall study as the most likely value. It drives the stiffness step that IS the Type A half of this mechanism, so a wrong value changes the result -- VERIFY before using any of these anchors as ground truth."
+    },
+    {
+     "name": "centre_x",
+     "value": 0.0,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "TP",
+     "note": "Thick pipe position relative to the shroud centre. 0 = midspan (X3) = the \"centralised\" case; Series 2 moves it to +/-3.333 D. The SHROUD also has a centre_x, fixed at 0 -- which is why every axis here names its body."
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "ownership",
+     "rule": "must be LOWEST, not STRICT",
+     "why": "Two components claim contact wherever the thick pipe sits inside the shroud. Under STRICT the assembly refuses to build. LOWEST is correct here because the shroud is genuinely deeper everywhere, so there is no guess being made."
+    },
+    {
+     "applies_to": "V",
+     "rule": "V > ~0.579 D for this thick pipe",
+     "why": "THE ONE PLACE where varying a dimension changes the TOPOLOGY. Above it the shroud owns contact and the thick pipe never touches a roller. Below it the thick pipe protrudes through and takes contact itself -- a different mechanical arrangement, not a smooth continuation. The threshold is the thick pipe half-OD, so it MOVES with t_comp. Published depths (0.75 D, 1.0 D) sit clear of it; the spec floor on V is 0.5 D, so the flip band is narrow but reachable."
+    },
+    {
+     "applies_to": "L_comp",
+     "rule": "break-through at L_comp ~ 14.2 D (at L1=10 D, L2=2.5 D, V=1 D, t_comp=53 mm)",
+     "why": "THE SECOND topology boundary. A thick pipe longer than the deep section does NOT immediately take contact -- the shroud RAMP is still deeper for a while, and only where the ramp rises above the thick pipe half-OD does the thick pipe break through. Closed form: the crossover sits at x = L1/2 + L2*(V - OD_comp/2)/(V - OD_pipe/2), which is 2.888 m here, so L_comp above 14.21 D flips it. Verified against a built assembly, which flips between 14.2 D and 14.5 D. It MOVES with L1, L2, V and t_comp, so it cannot be stored as a constant."
+    },
+    {
+     "applies_to": "centre_x",
+     "rule": "thick pipe within the deep section",
+     "why": "Outside it the thick pipe leaves the elevated zone and the combined mechanism stops being combined -- even while the shroud still owns contact."
+    },
+    {
+     "applies_to": "SH vs TP lengths",
+     "rule": "independent",
+     "why": "The shroud L1/L2 and the thick pipe L_comp are separate lengths on separate bodies. Use parts={\"SH\": {...}, \"TP\": {...}} to move both in one call."
+    }
+   ],
+   "variables": [
+    {
+     "name": "L_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      1.016,
+      2.032,
+      4.064
+     ],
+     "bounds": "> 0, and see the break-through bound",
+     "part": "TP",
+     "note": "THICK PIPE length (part TP). Series 1 axis. INDEPENDENT of the shroud lengths -- the two bodies are separately sized."
+    },
+    {
+     "name": "centre_x",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      -1.3546666666666667,
+      0.0,
+      1.3546666666666667
+     ],
+     "bounds": "within the deep section",
+     "part": "TP",
+     "note": "THICK PIPE position (part TP). Series 2 axis: X2 catenary third, X3 midspan, X4 vessel third. NEGATIVE x is taken as the catenary side, matching X1..X5 left to right in Fig 45 -- confirm the sign against the model."
+    },
+    {
+     "name": "t_comp",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.053
+     ],
+     "bounds": "t_comp > t_pipe",
+     "part": "TP",
+     "note": "THICK PIPE wall (part TP). Not stated in the source. See the VERIFY flag. It also MOVES both ownership thresholds below, since they are set by its half-OD."
+    },
+    {
+     "name": "L1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      4.064
+     ],
+     "bounds": "> 0",
+     "part": "SH",
+     "note": "SHROUD deep-section length (part SH). Held fixed at 10 D throughout the published Type C1 study, but a free axis of the archetype -- the shroud and the thick pipe are independently sized."
+    },
+    {
+     "name": "L2",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      1.016
+     ],
+     "bounds": "> 0",
+     "part": "SH",
+     "note": "SHROUD ramp length (part SH). Fixed at 2.5 D in the published study. With V it sets the ramp slope, which decides how far past the deep section the shroud goes on owning contact."
+    },
+    {
+     "name": "V",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.4064
+     ],
+     "bounds": "> ~0.579 D",
+     "part": "SH",
+     "note": "SHROUD depth (part SH). Fixed at 1 D in the published study. Below about 0.579 D the ownership FLIPS."
+    }
+   ],
+   "expected": {
+    "mass_kg": 2746.6516565102042,
+    "span_m": 6.096,
+    "extent_lo_m": -3.048,
+    "extent_hi_m": 3.048,
+    "cog_x_m": 0.0,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension (R=85 m, T=100 MT throughout) -- SLAY-tier.",
+    "Mesh (element length = max 2xOD) -- a solver decision.",
+    "The catenary itself -- Type C1 only appears under a lay."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-SHTP_assembly.png",
+    "detail": "figures/ILS-SHTP_detail.png"
+   },
+   "notes": "Shroud-only baseline for every comparison is X2 = 0.70% (anchor SH-S3-3, same shroud and same lay). Every Type C1 result exceeds it. Peak strain stays at X2 regardless of where the thick pipe sits; placing the thick pipe AT X2 is worst, because the stiffness step then lands exactly where catenary curvature is highest. The published study holds the shroud fixed (V=1 D, L1=10 D, L2=2.5 D) and moves only the thick pipe -- but the archetype leaves all six lengths free, since that is a choice of THAT study, not a property of the topology."
+  },
+  {
+   "id": "ILS-EAST",
+   "title": "Top structure -- EA-ST, connection system varied",
+   "purpose": "A frame carried ABOVE the pipe on a set of connectors. It owns no contact and never meets a roller; it hangs mass and restraint off the pipe through the connectors, so what governs is the connector LAYOUT, not the frame size. That is the published finding this family exists to test.",
+   "source": "IJRASET Vol 14 Issue VIII, Aug 2026 -- TABLE VI, Fig 17",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-EAST",
+     "frame": "local",
+     "ownership": "strict",
+     "connection_system": "F2"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.0,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-ST",
+      "id": "ST",
+      "centre_x": 0.0,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [],
+    "associationsNote": "Empty, and correctly so: this archetype has a single component, so there is no component-to-component relation to declare. Present rather than omitted to show the layer was considered."
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "16 in line pipe"
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "parent wall"
+    },
+    {
+     "name": "connection_system",
+     "value": "F2",
+     "unit": "-",
+     "source": "PAPER",
+     "part": "ST",
+     "note": "ILS-LEVEL, not a component field -- resolved once and supplied to every EA component, so two components cannot disagree. Reference point is F2; the six named cases below cover the whole taxonomy."
+    },
+    {
+     "name": "L_top",
+     "value": 6.5024,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "ST",
+     "note": "frame width, 16 x OD"
+    },
+    {
+     "name": "H_top",
+     "value": 1.6256,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "ST",
+     "note": ""
+    },
+    {
+     "name": "P_vt",
+     "value": -0.6095999999999999,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "ST",
+     "note": "SIGNED position of the frame underside, y positive DOWN -- negative means above the pipe centreline. Its magnitude is the lever arm to the pipe axis."
+    },
+    {
+     "name": "P_c1",
+     "value": 2.1674666666666664,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "ST",
+     "note": "span between interior connector slots 2 and 4"
+    },
+    {
+     "name": "P_c2",
+     "value": 1.0837333333333332,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "ST",
+     "note": ""
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "connection_system",
+     "rule": "ILS-level field",
+     "why": "Set it with variant(ils={\"connection_system\": ...}). Passing it as a component override reaches the dataclass and fails on a float conversion."
+    },
+    {
+     "applies_to": "active connectors",
+     "rule": "must lie within the frame",
+     "why": "The builder checks this. EA-ST F2 Case 2 in the source has P_c1 = 20 D, which puts two connectors 813 mm BEYOND the frame meant to carry them -- it is caught at build time, not on first use."
+    },
+    {
+     "applies_to": "P_gap",
+     "rule": "REQUIRED when the system contains a D",
+     "why": "Added to component_spec 28 Aug 2026. The builder errors if a D system is resolved and P_gap is unset, and warns outside the 25-100 mm the studies explored. It is not optional: a deadband REDISTRIBUTES strain rather than removing it, and the gap decides where it goes (KB rule TS-03)."
+    },
+    {
+     "applies_to": "contact",
+     "rule": "none -- owns no contact surface",
+     "why": "GD-ST sits above the pipe; contact_at returns None everywhere. A roller never touches it, so it does not appear in the contact envelope at all."
+    }
+   ],
+   "variables": [
+    {
+     "name": "connection_system",
+     "scope": "ils",
+     "unit": "-",
+     "studied": [],
+     "bounds": "one of F1, F1D, F2, F2D, PS, PSD",
+     "part": null,
+     "note": "THE study axis, and CATEGORICAL. Six named cases below. Vary with variant(ils={...}), not as a component override."
+    },
+    {
+     "name": "P_c1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "ST",
+     "note": "Interior connector span. The F2 study varies it (10 D, 20 D) while holding frame size separate -- the paper finds LAYOUT rather than size governs."
+    },
+    {
+     "name": "P_c2",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "ST",
+     "note": ""
+    },
+    {
+     "name": "L_top",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "ST",
+     "note": "Frame width. Connector slots are placed against it, so widening it moves the outer slots."
+    },
+    {
+     "name": "P_vt",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "signed",
+     "part": "ST",
+     "note": "Frame elevation, and so the lever arm."
+    }
+   ],
+   "expected": {
+    "mass_kg": 2395.144832363968,
+    "span_m": 6.5024,
+    "extent_lo_m": -3.2512,
+    "extent_hi_m": 3.2512,
+    "cog_x_m": 0.0,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "IW-A bulkheads -- deliberately excluded by the source so the connection-layout effect could be seen alone. Adding a GD-TP or GD-TT at a connection point would invalidate comparison with the published cases."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-EAST_assembly.png",
+    "detail": "figures/ILS-EAST_detail.png"
+   },
+   "notes": "Connector types (Fig 16): F fixed, all DOF restrained. D deadband, free until the gap closes then restrained. P pin and S slot, the pin taking two translations and the slot releasing one along the pipe. The five slots exist in every case; the system chooses among them.",
+   "connectorModellingNote": "EXPECTED WARNING, not a defect. ils_builder reports that this layout's connection_system populates slots while no edes:GD-Con parts exist. That is correct and deliberate: this archetype reproduces the source paper's own analysis model, where the connector is a beam element rather than a modelled part -- the SIMPLIFIED form described in edas:shared#/connectorAttachment.twoModellingLevels. A COMPLETE layout would place a GD-Con at each populated slot, landing on a neutral edes:GD-TP welded into a split header, with associations at both ends. Do NOT copy this archetype's connector treatment into a new layout; copy its geometry and parameters, and model the connections explicitly."
+  },
+  {
+   "id": "ILS-EASB",
+   "title": "Base structure -- EA-SB, connection system varied",
+   "purpose": "A cradle carried BELOW the pipe on the same connector taxonomy as EA-ST. Unlike a top structure it OWNS THE CONTACT SURFACE -- a roller meets the cradle, not the pipe -- and the reaction runs back up through the connectors on a real moment arm.",
+   "source": "IJRASET Vol 14 Issue VIII, Aug 2026 -- TABLE VI, Fig 18",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-EASB",
+     "frame": "local",
+     "ownership": "strict",
+     "connection_system": "F2"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.164,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-SB",
+      "id": "SB",
+      "centre_x": 0.0,
+      "P_vt": 0.0,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [],
+    "associationsNote": "Empty, and correctly so: this archetype has a single component, so there is no component-to-component relation to declare. Present rather than omitted to show the layer was considered."
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "16 in line pipe"
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "parent wall"
+    },
+    {
+     "name": "connection_system",
+     "value": "F2",
+     "unit": "-",
+     "source": "PAPER",
+     "part": "SB",
+     "note": "ILS-LEVEL field. Reference point is F2; the six named cases below cover the taxonomy."
+    },
+    {
+     "name": "P_vt",
+     "value": 0.0,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "SB",
+     "note": "Signed position of the structure face, y positive DOWN. PINNED at 0 to match the published EA-SB set, against a component default of -0.6096 m. At zero standoff every connector is genuinely ZERO-LENGTH, which is what the nodal-element framing asserts -- so no tie line is drawn."
+    },
+    {
+     "name": "P_l1",
+     "value": 6.5024,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "SB",
+     "note": "flat-bottom width -- the span the connectors work with"
+    },
+    {
+     "name": "P_l2",
+     "value": 0.8128,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "SB",
+     "note": "side-wall run"
+    },
+    {
+     "name": "P_v",
+     "value": 1.6256,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "SB",
+     "note": "depth below the face. With P_vt it sets the contact surface at 1.6256 m and the moment arm with it."
+    },
+    {
+     "name": "P_c1",
+     "value": 2.1674666666666664,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "SB",
+     "note": "span between interior connector slots 2 and 4"
+    },
+    {
+     "name": "P_c2",
+     "value": 1.0837333333333332,
+     "unit": "m",
+     "source": "DEFAULT",
+     "part": "SB",
+     "note": ""
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "connection_system",
+     "rule": "ILS-level field",
+     "why": "Set it with variant(ils={\"connection_system\": ...})."
+    },
+    {
+     "applies_to": "contact",
+     "rule": "OWNS contact, load path = CONNECTOR",
+     "why": "Unlike GD-ST, a base structure is what a roller touches, and the reaction returns through the connectors rather than bearing on the pipe wall. At these defaults the arm is 1.626 m -- dropping it in a later calculation discards the elevation effect the structure exists to produce."
+    },
+    {
+     "applies_to": "validate",
+     "rule": "does NOT call super().validate()",
+     "why": "KNOWN OPEN DEFECT. GD-SB skips the inherited P_c1/P_c2 positivity check, so a negative span builds crossed connector slots without complaint. GD-ST is unaffected. Check spans before sweeping them."
+    },
+    {
+     "applies_to": "P_gap",
+     "rule": "REQUIRED when the system contains a D",
+     "why": "Added to component_spec 28 Aug 2026. Required, not optional -- a deadband redistributes strain and the gap decides where it lands (KB rule TS-03). Note KB rule BS-02 makes F2D the PREFERRED base-structure system, so this is the parameter that matters most here."
+    }
+   ],
+   "variables": [
+    {
+     "name": "connection_system",
+     "scope": "ils",
+     "unit": "-",
+     "studied": [],
+     "bounds": "one of F1, F1D, F2, F2D, PS, PSD",
+     "part": null,
+     "note": "THE study axis, CATEGORICAL. Vary with variant(ils={...}), not as a component override."
+    },
+    {
+     "name": "P_c1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "SB",
+     "note": "Interior connector span."
+    },
+    {
+     "name": "P_c2",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "SB",
+     "note": ""
+    },
+    {
+     "name": "P_vt",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "signed",
+     "part": "SB",
+     "note": "Face position. 0 in the published set; a non-zero value gives the connectors real length."
+    },
+    {
+     "name": "P_v",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "SB",
+     "note": "Depth, and so the contact surface and moment arm."
+    },
+    {
+     "name": "P_l1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [],
+     "bounds": "> 0",
+     "part": "SB",
+     "note": ""
+    }
+   ],
+   "expected": {
+    "mass_kg": 2460.612123737491,
+    "span_m": 8.128,
+    "extent_lo_m": -4.064,
+    "extent_hi_m": 4.064,
+    "cog_x_m": -1.848106601197006e-16,
+    "cog_y_m": 0.0
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "IW-A bulkheads -- deliberately excluded by the source.",
+    "Structural MASS -- GD-SB carries a stiffness RATIO and geometry only, so assembly mass is a floor."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-EASB_assembly.png",
+    "detail": "figures/ILS-EASB_detail.png"
+   },
+   "notes": "Same connector taxonomy as EA-ST (Fig 16): F fixed, D deadband, P pin, S slot. What differs is the mechanics -- this structure is in the load path to the roller, so the connection system decides how that reaction is fed back into the pipe.",
+   "connectorModellingNote": "EXPECTED WARNING, not a defect. ils_builder reports that this layout's connection_system populates slots while no edes:GD-Con parts exist. That is correct and deliberate: this archetype reproduces the source paper's own analysis model, where the connector is a beam element rather than a modelled part -- the SIMPLIFIED form described in edas:shared#/connectorAttachment.twoModellingLevels. A COMPLETE layout would place a GD-Con at each populated slot, landing on a neutral edes:GD-TP welded into a split header, with associations at both ends. Do NOT copy this archetype's connector treatment into a new layout; copy its geometry and parameters, and model the connections explicitly."
+  },
+  {
+   "id": "ILS-ILT",
+   "title": "Inline Tee -- header + top structure + branch piping",
+   "purpose": "Branch piping teed off the header, rising to a support on the top structure. The branch adds a load path that leaves the header, travels through the structure and returns to the pipe at the structure connectors.",
+   "source": "IJRASET Vol 14 Issue VIII, Aug 2026 -- TABLE VII, Fig 20/21",
+   "definition": {
+    "schema_version": 1,
+    "ils": {
+     "name": "ILS-ILT",
+     "frame": "local",
+     "ownership": "strict",
+     "connection_system": "F2"
+    },
+    "pipeline": {
+     "OD_pipe": 0.4064,
+     "t_pipe": 0.021,
+     "provenance": "PAPER"
+    },
+    "header": {
+     "half_length": 6.164,
+     "provenance": "DERIVED",
+     "note": "Pinned 4Sep26. These archetypes' recorded expected.mass_kg were computed against a 12 m header, and assembly mass INCLUDES header pipe steel -- for ILS-TP that steel is the large majority of the 2616.5 kg. When the builder default changed to a 14 m joint, every recorded mass moved by the weight of the extra 2 m (+399.2 kg) while span and CoG were untouched. Pinning the header each archetype was validated against keeps those figures meaningful and makes them immune to any future change of the default."
+    },
+    "components": [
+     {
+      "code": "GD-ST",
+      "id": "ST",
+      "centre_x": 1.2192000000000003,
+      "L_top": 5.6895999999999995,
+      "H_top": 1.2191999999999998,
+      "P_vt": -0.2032,
+      "P_c1": 3.2512,
+      "P_c2": 0.4064,
+      "right_connector_y": [
+       -0.8128
+      ],
+      "provenance": "PAPER"
+     },
+     {
+      "code": "GD-B",
+      "id": "B",
+      "centre_x": 0.0,
+      "variant": "L",
+      "support_connector": "F",
+      "P_b1": 4.064,
+      "P_b2": 0.8128,
+      "P_bc": 0.40639999999999965,
+      "provenance": "PAPER"
+     }
+    ],
+    "associations": [],
+    "associationsNote": "EMPTY DELIBERATELY, and this is a real piece of assembly knowledge rather than an omission. The branch-to-structure tie in an ILT is VARIANT-DEPENDENT and therefore belongs on the ANCHOR, not on the archetype: an L branch ends horizontally and meets a SIDE edge (right1), a Z turns up and meets the TOP edge (top1), and under the F1p post arrangement the post's top face is the attachment for both. Declaring one fixed association here was tried on 4Sep26 and the coincidence check correctly rejected 8 of the 12 anchors -- the archetype is the TYPE, and this relation is not a property of the type. Each anchor below carries its own where the tie is determinate."
+   },
+   "params": [
+    {
+     "name": "OD_pipe",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "16 in line pipe"
+    },
+    {
+     "name": "t_pipe",
+     "value": 0.021,
+     "unit": "m",
+     "source": "PAPER",
+     "part": null,
+     "note": "parent wall"
+    },
+    {
+     "name": "connection_system",
+     "value": "F2",
+     "unit": "",
+     "source": "PAPER",
+     "part": null,
+     "note": "ILS-LEVEL. F1, F2, PS, PSD per TABLE VII. F1p is F1 with a POST-shaped structure, not a new system."
+    },
+    {
+     "name": "centre_x",
+     "value": 1.2192000000000003,
+     "unit": "m",
+     "source": "DERIVED",
+     "part": "ST",
+     "note": "On an L layout the frame RIGHT EDGE is the branch end, so centre_x = P_b1 - L_top/2."
+    },
+    {
+     "name": "L_top",
+     "value": 5.6895999999999995,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "ST",
+     "note": "frame width"
+    },
+    {
+     "name": "H_top",
+     "value": 1.2191999999999998,
+     "unit": "m",
+     "source": "DERIVED",
+     "part": "ST",
+     "note": "Set so the DEFAULT side node lands at the branch run elevation: H_top = 2(P_b2 - OD/2)."
+    },
+    {
+     "name": "P_vt",
+     "value": -0.2032,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "ST",
+     "note": "frame underside on the pipe crown"
+    },
+    {
+     "name": "P_c1",
+     "value": 3.2512,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "ST",
+     "note": "SPAN between slots 2 and 4 -- NOT an offset from centre. Slot 2 sits at centre_x - P_c1/2."
+    },
+    {
+     "name": "P_c2",
+     "value": 0.4064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "ST",
+     "note": "FURTHER offset from slot 2 out to slot 1 (and 4 to 5)."
+    },
+    {
+     "name": "right_connector_y",
+     "value": -0.8128,
+     "unit": "m",
+     "source": "DERIVED",
+     "part": "ST",
+     "note": "Side attachment node, pinned to the branch run elevation. L layouts only."
+    },
+    {
+     "name": "P_b1",
+     "value": 4.064,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "B",
+     "note": "branch horizontal run, Tee to support"
+    },
+    {
+     "name": "P_b2",
+     "value": 0.8128,
+     "unit": "m",
+     "source": "PAPER",
+     "part": "B",
+     "note": "branch rise. 2 D for L, 3.5 D for Z."
+    },
+    {
+     "name": "P_bc",
+     "value": 0.40639999999999965,
+     "unit": "m",
+     "source": "DERIVED",
+     "part": "B",
+     "note": "Measured FROM SLOT 2 in the POSITIVE x direction to the Tee: P_bc = x_Tee - x_slot2. Derived, not chosen."
+    },
+    {
+     "name": "support_connector",
+     "value": "F",
+     "unit": "",
+     "source": "PAPER",
+     "part": "B",
+     "note": "'F' fixed or 'S' slotted -- the -FT- / -ST- taxonomy."
+    }
+   ],
+   "constraints": [
+    {
+     "applies_to": "branch support",
+     "rule": "must land on a structure NODE",
+     "why": "L meets right_connector_y on the side edge; Z meets top_connector_x on the top edge. NOT CHECKED BY THE BUILDER -- a branch that misses its structure still builds. Proposed as a 7th validation check."
+    },
+    {
+     "applies_to": "P_bc",
+     "rule": "from SLOT 2, positive +x",
+     "why": "P_bc = x_Tee - x_slot2. The builder still validates it as an unsigned distance to the NEAREST active connector, which agrees whenever slot 2 IS nearest -- the arrangement in Fig 20. It would disagree if slot 4 were nearer."
+    },
+    {
+     "applies_to": "P_c1",
+     "rule": "SPAN between slots 2 and 4",
+     "why": "NOT an offset from the centre. At the built-in defaults P_c2 equals P_c1/2, so both readings give the same slots and the difference stays invisible until they are set independently."
+    },
+    {
+     "applies_to": "F1",
+     "rule": "P_c1 and P_c2 are INERT under F1",
+     "why": "F1 activates slot 3 alone, so the interior spans have no mechanical effect -- yet the spec still requires them positive and they still enter the feature vector. Mask them per system before training on F1 designs."
+    }
+   ],
+   "variables": [
+    {
+     "name": "connection_system",
+     "scope": "ils",
+     "unit": "",
+     "studied": [
+      "F1",
+      "F1p",
+      "F2",
+      "F2D",
+      "PS",
+      "PSD"
+     ],
+     "bounds": "TABLE VII, plus F1p",
+     "part": null,
+     "note": "CATEGORICAL. TABLE VII lists F1, F2, PS, PSD (F1D/F2D noted as applicable but not shown). F1p is a NAMED CODE of this catalogue: the connection arrangement is F1, but the structure is a narrow POST at the branch end rather than a box frame. Same one fixed slot, different structure -- so it needs its own code even though the taxonomy system underneath is F1. Set the arrangement with variant(ils={...}) and the post geometry on the ST part."
+    },
+    {
+     "name": "variant",
+     "scope": "component",
+     "unit": "",
+     "studied": [
+      "L",
+      "Z"
+     ],
+     "bounds": "'L' or 'Z'",
+     "part": "B",
+     "note": "Branch shape. DECIDES WHICH NODE the support lands on -- side edge for L, top edge for Z."
+    },
+    {
+     "name": "support_connector",
+     "scope": "component",
+     "unit": "",
+     "studied": [
+      "F",
+      "S"
+     ],
+     "bounds": "'F' or 'S'",
+     "part": "B",
+     "note": "The -FT- / -ST- half of the code."
+    },
+    {
+     "name": "P_b1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      4.064
+     ],
+     "bounds": "> 0",
+     "part": "B",
+     "note": "Branch run. On an L layout it also fixes the frame right edge."
+    },
+    {
+     "name": "P_b2",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      0.8128,
+      1.4223999999999999
+     ],
+     "bounds": "> 0",
+     "part": "B",
+     "note": "Branch rise. Sizes H_top via the attachment node."
+    },
+    {
+     "name": "P_c1",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      3.2512
+     ],
+     "bounds": "> 0",
+     "part": "ST",
+     "note": "Slot 2-to-4 span. Moves P_bc with it."
+    },
+    {
+     "name": "L_top",
+     "scope": "component",
+     "unit": "m",
+     "studied": [
+      5.6895999999999995
+     ],
+     "bounds": "> 0",
+     "part": "ST",
+     "note": ""
+    }
+   ],
+   "expected": {
+    "mass_kg": 8460.612123737492,
+    "span_m": 5.6895999999999995,
+    "extent_lo_m": -1.6255999999999995,
+    "extent_hi_m": 4.064,
+    "cog_x_m": 2.161545728408033,
+    "cog_y_m": -0.5764121943750878
+   },
+   "absent": [
+    "Stinger radius and top tension -- SLAY-tier.",
+    "IW-A bulkheads -- none present.",
+    "Branch pipe SECTION in the header: the branch owns no contact and adds no material to the header section."
+   ],
+   "figures": {
+    "assembly": "figures/ILS-ILT_assembly.png",
+    "detail": "figures/ILS-ILT_detail.png"
+   },
+   "notes": "Naming: {L|Z}-{FT|ST}-{code}. L/Z is the branch shape (IW-BL / IW-BZ); FT/ST is the branch SUPPORT connector, fixed or slotted; the code is the EA-ST arrangement. Codes: F1, F1p, F2, PS, PSD -- F1p being F1 with a POST structure. The full grid is 2 x 2 x 5 = 20 layouts; four are stored, all FIXED support. Attachment differs by branch shape: an L run ends horizontally so it meets a SIDE edge, a Z turns up so it meets the TOP edge -- except under F1p, where the post top face IS the attachment for both.",
+   "connectorModellingNote": "EXPECTED WARNING, not a defect. ils_builder reports that this layout's connection_system populates slots while no edes:GD-Con parts exist. That is correct and deliberate: this archetype reproduces the source paper's own analysis model, where the connector is a beam element rather than a modelled part -- the SIMPLIFIED form described in edas:shared#/connectorAttachment.twoModellingLevels. A COMPLETE layout would place a GD-Con at each populated slot, landing on a neutral edes:GD-TP welded into a split header, with associations at both ends. Do NOT copy this archetype's connector treatment into a new layout; copy its geometry and parameters, and model the connections explicitly."
+  }
+ ],
+ "anchors": [
+  {
+   "id": "TP-A1",
+   "archetype": "ILS-TP",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.032,
+    "L_comp": 1.0
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.562,
+      "peak_moment_kNm": 1311
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.473,
+      "peak_moment_kNm": 1251
+     }
+    },
+    {
+     "lay": {
+      "R_m": 100,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.339,
+      "peak_moment_kNm": 1131
+     }
+    }
+   ],
+   "source": "TABLE XX / XXI",
+   "note": "1.5x wall. Peak strain at the pipe-to-component junction; peak moment near component midspan."
+  },
+  {
+   "id": "TP-A2",
+   "archetype": "ILS-TP",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.042,
+    "L_comp": 1.0
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.647,
+      "peak_moment_kNm": 1347
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.508,
+      "peak_moment_kNm": 1288
+     }
+    },
+    {
+     "lay": {
+      "R_m": 100,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.358,
+      "peak_moment_kNm": 1144
+     }
+    }
+   ],
+   "source": "TABLE XX / XXI",
+   "note": "2.0x wall. Peak strain at the pipe-to-component junction; peak moment near component midspan."
+  },
+  {
+   "id": "TP-A3",
+   "archetype": "ILS-TP",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.053,
+    "L_comp": 1.0
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.727,
+      "peak_moment_kNm": 1366
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.556,
+      "peak_moment_kNm": 1311
+     }
+    },
+    {
+     "lay": {
+      "R_m": 100,
+      "tension_MT": 100
+     },
+     "results": {
+      "peak_strain_pct": 0.425,
+      "peak_moment_kNm": 1150
+     }
+    }
+   ],
+   "source": "TABLE XX / XXI",
+   "note": "2.5x wall. Peak strain at the pipe-to-component junction; peak moment near component midspan."
+  },
+  {
+   "id": "TT-1to4",
+   "archetype": "ILS-TT",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.065,
+    "L_comp": 1.0,
+    "n": 4.0,
+    "L_NIB": 0.2
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 1.14
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 0.91
+     }
+    }
+   ],
+   "source": "TABLE XIV",
+   "note": "1:4 taper. Peak at the straight-pipe / transition junction. R=100 m row not on the pages supplied."
+  },
+  {
+   "id": "TT-1to16",
+   "archetype": "ILS-TT",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.065,
+    "L_comp": 1.0,
+    "n": 16.0,
+    "L_NIB": 0.2
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 1.19
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 0.94
+     }
+    }
+   ],
+   "source": "TABLE XIV",
+   "note": "1:16 taper. Peak at the straight-pipe / transition junction. R=100 m row not on the pages supplied."
+  },
+  {
+   "id": "TT-1to64",
+   "archetype": "ILS-TT",
+   "component": 0,
+   "overrides": {
+    "t_comp": 0.065,
+    "L_comp": 1.0,
+    "n": 64.0,
+    "L_NIB": 0.2
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 2.58
+     }
+    },
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 120
+     },
+     "results": {
+      "peak_strain_pct": 1.27
+     }
+    }
+   ],
+   "source": "TABLE XIV",
+   "note": "1:64 taper. Peak at the straight-pipe / transition junction. R=100 m row not on the pages supplied."
+  },
+  {
+   "id": "SH-S3-2",
+   "archetype": "ILS-SH",
+   "component": 0,
+   "overrides": {
+    "V": 0.30479999999999996,
+    "L1": 4.064,
+    "L2": 1.016
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.62,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXX",
+   "note": "L1=10D, L2=2.5D, V=0.75D, ramp slope 0.30. Strain reported at region X2. 4 of 22 runs recorded -- the rest are not on the pages supplied."
+  },
+  {
+   "id": "SH-S3-3",
+   "archetype": "ILS-SH",
+   "component": 0,
+   "overrides": {
+    "V": 0.4064,
+    "L1": 4.064,
+    "L2": 1.016
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.7,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXX",
+   "note": "L1=10D, L2=2.5D, V=1.0D, ramp slope 0.40. Strain reported at region X2. 4 of 22 runs recorded -- the rest are not on the pages supplied."
+  },
+  {
+   "id": "SH-S1-1",
+   "archetype": "ILS-SH",
+   "component": 0,
+   "overrides": {
+    "V": 0.4064,
+    "L1": 2.032,
+    "L2": 1.016
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 120
+     },
+     "results": {
+      "X2_strain_pct": 0.81,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXX",
+   "note": "L1=5D, L2=2.5D, V=1.0D, ramp slope 0.40. Strain reported at region X2. 4 of 22 runs recorded -- the rest are not on the pages supplied."
+  },
+  {
+   "id": "SH-S1-2",
+   "archetype": "ILS-SH",
+   "component": 0,
+   "overrides": {
+    "V": 0.4064,
+    "L1": 2.4383999999999997,
+    "L2": 0.8128
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 70,
+      "tension_MT": 120
+     },
+     "results": {
+      "X2_strain_pct": 0.83,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXX",
+   "note": "L1=6D, L2=2.0D, V=1.0D, ramp slope 0.50. Strain reported at region X2. 4 of 22 runs recorded -- the rest are not on the pages supplied."
+  },
+  {
+   "id": "SHTP-L5D",
+   "archetype": "ILS-SHTP",
+   "component": "TP",
+   "overrides": {
+    "L_comp": 2.032,
+    "centre_x": 0.0,
+    "t_comp": 0.053
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.952,
+      "peak_moment_kNm": 1405,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXXIX / XLI",
+   "note": "Series 1 Case 1: 5 D, centred in X3. Shroud-only baseline 0.70%. Thick pipe wall is ASSUMED 53 mm -- not stated in the source."
+  },
+  {
+   "id": "SHTP-L10D",
+   "archetype": "ILS-SHTP",
+   "component": "TP",
+   "overrides": {
+    "L_comp": 4.064,
+    "centre_x": 0.0,
+    "t_comp": 0.053
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 1.26,
+      "peak_moment_kNm": 1555,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXXIX / XLI",
+   "note": "Series 1 Case 2: 10 D, spans X2+X3+X4. Shroud-only baseline 0.70%. Thick pipe wall is ASSUMED 53 mm -- not stated in the source."
+  },
+  {
+   "id": "SHTP-X2",
+   "archetype": "ILS-SHTP",
+   "component": "TP",
+   "overrides": {
+    "L_comp": 1.016,
+    "centre_x": -1.3546666666666667,
+    "t_comp": 0.053
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.901,
+      "peak_moment_kNm": 1362,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXXIX / XLI",
+   "note": "Series 2 Case 1: 2.5 D at X2, catenary third -- WORST. Shroud-only baseline 0.70%. Thick pipe wall is ASSUMED 53 mm -- not stated in the source."
+  },
+  {
+   "id": "SHTP-X3",
+   "archetype": "ILS-SHTP",
+   "component": "TP",
+   "overrides": {
+    "L_comp": 1.016,
+    "centre_x": 0.0,
+    "t_comp": 0.053
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.744,
+      "peak_moment_kNm": 1310,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXXIX / XLI",
+   "note": "Series 2 Case 2: 2.5 D at X3, midspan (centralised). Shroud-only baseline 0.70%. Thick pipe wall is ASSUMED 53 mm -- not stated in the source."
+  },
+  {
+   "id": "SHTP-X4",
+   "archetype": "ILS-SHTP",
+   "component": "TP",
+   "overrides": {
+    "L_comp": 1.016,
+    "centre_x": 1.3546666666666667,
+    "t_comp": 0.053
+   },
+   "parts": {},
+   "ils": {},
+   "pipeline": {},
+   "published": [
+    {
+     "lay": {
+      "R_m": 85,
+      "tension_MT": 100
+     },
+     "results": {
+      "X2_strain_pct": 0.744,
+      "peak_moment_kNm": 1271,
+      "phase": "Ph2"
+     }
+    }
+   ],
+   "source": "TABLE XXXIX / XLI",
+   "note": "Series 2 Case 3: 2.5 D at X4, vessel third. Shroud-only baseline 0.70%. Thick pipe wall is ASSUMED 53 mm -- not stated in the source."
+  },
+  {
+   "id": "ILS-EAST-F1",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "1 connector. Minimum restraint -- the frame is held at a single point and free to rotate about it."
+  },
+  {
+   "id": "ILS-EAST-F1D",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "F1D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "3 connectors: 1 fixed at centre, 2 deadbands at the outer slots. The deadbands do nothing until the gap closes. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm."
+  },
+  {
+   "id": "ILS-EAST-F2",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "F2"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "2 connectors. The reference case, and the one whose SPAN (P_c1) the source varies at 10 D and 20 D."
+  },
+  {
+   "id": "ILS-EAST-F2D",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "F2D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "4 connectors: 2 fixed interior, 2 deadbands outboard. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm."
+  },
+  {
+   "id": "ILS-EAST-PS",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "PS"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "2 connectors: a pin and a slot. The slot releases axial movement, so the frame cannot restrain the pipe along its length -- mechanically very different from F2 despite the same two positions."
+  },
+  {
+   "id": "ILS-EAST-PSD",
+   "archetype": "ILS-EAST",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "PSD"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 17",
+   "note": "4 connectors: pin, slot, and 2 deadbands outboard. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm."
+  },
+  {
+   "id": "ILS-EASB-F1",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "1 connector at centre. Base structure OWNS contact, reaction via connector."
+  },
+  {
+   "id": "ILS-EASB-F1D",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "F1D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "3: 1 fixed centre, 2 deadbands outboard. Base structure OWNS contact, reaction via connector. P_gap = 50 mm, ASSUMED (not stated in source)."
+  },
+  {
+   "id": "ILS-EASB-F2",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "F2"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "2 fixed interior. Reference case. Base structure OWNS contact, reaction via connector."
+  },
+  {
+   "id": "ILS-EASB-F2D",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "F2D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "4: 2 fixed interior, 2 deadbands outboard. Base structure OWNS contact, reaction via connector. P_gap = 50 mm, ASSUMED (not stated in source)."
+  },
+  {
+   "id": "ILS-EASB-PS",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {},
+   "parts": {},
+   "ils": {
+    "connection_system": "PS"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "2: pin and slot. The slot releases axial movement. Base structure OWNS contact, reaction via connector."
+  },
+  {
+   "id": "ILS-EASB-PSD",
+   "archetype": "ILS-EASB",
+   "component": 0,
+   "overrides": {
+    "P_gap": 0.05
+   },
+   "parts": {},
+   "ils": {
+    "connection_system": "PSD"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VI / Fig 18",
+   "note": "4: pin, slot, 2 deadbands outboard. Base structure OWNS contact, reaction via connector. P_gap = 50 mm, ASSUMED (not stated in source)."
+  },
+  {
+   "id": "ILT-L-FT-F1p",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 4.064,
+     "L_top": 0.4064,
+     "H_top": 0.6095999999999999,
+     "P_vt": -0.2032,
+     "top_connector_x": [
+      4.064
+     ],
+     "P_c1": null,
+     "P_c2": null,
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 4.064
+    }
+   },
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, FIXED support, EA-ST F1p -- one fixed slot at the structure centre. Branch meets the structure at its post top face. Structure is a narrow POST sized to the branch and centred under its end; the taxonomy system beneath is F1. P_bc = +10.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-L-ST-F1p",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 4.064,
+     "L_top": 0.4064,
+     "H_top": 0.6095999999999999,
+     "P_vt": -0.2032,
+     "top_connector_x": [
+      4.064
+     ],
+     "P_c1": null,
+     "P_c2": null,
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "S",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 4.064
+    }
+   },
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, SLOTTED support, EA-ST F1p -- one fixed slot at the structure centre. Branch meets the structure at its post top face. Structure is a narrow POST sized to the branch and centred under its end; the taxonomy system beneath is F1. P_bc = +10.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "S",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-L-FT-F2",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 1.2192000000000003,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 3.2512,
+     "P_c2": 0.4064,
+     "right_connector_y": [
+      -0.8128
+     ],
+     "top_connector_x": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "F2"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, FIXED support, EA-ST F2 -- two fixed interior slots. Branch meets the structure at its side edge (right_connector_y). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "right1"
+     },
+     "note": "branch end meets the structure at right1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-L-FT-F2D",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 1.2192000000000003,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 3.2512,
+     "P_c2": 0.4064,
+     "right_connector_y": [
+      -0.8128
+     ],
+     "top_connector_x": null,
+     "P_gap": 0.05
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "F2D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, FIXED support, EA-ST F2D -- two fixed interior slots plus two outboard deadbands. Branch meets the structure at its side edge (right_connector_y). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "right1"
+     },
+     "note": "branch end meets the structure at right1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-L-FT-PS",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 1.2192000000000003,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 3.2512,
+     "P_c2": 0.4064,
+     "right_connector_y": [
+      -0.8128
+     ],
+     "top_connector_x": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "PS"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, FIXED support, EA-ST PS -- pin and slot at the two interior slots -- the slot releases axial movement, so the frame cannot restrain the pipe along its length. Branch meets the structure at its side edge (right_connector_y). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "right1"
+     },
+     "note": "branch end meets the structure at right1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-L-FT-PSD",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 1.2192000000000003,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 3.2512,
+     "P_c2": 0.4064,
+     "right_connector_y": [
+      -0.8128
+     ],
+     "top_connector_x": null,
+     "P_gap": 0.05
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "L",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 0.8128,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "PSD"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "L-branch, FIXED support, EA-ST PSD -- pin, slot, and two outboard deadbands. Branch meets the structure at its side edge (right_connector_y). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "right1"
+     },
+     "note": "branch end meets the structure at right1; verified coincident at (4.0640, -0.8128)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-FT-F1p",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 4.064,
+     "L_top": 0.4064,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "top_connector_x": [
+      4.064
+     ],
+     "P_c1": null,
+     "P_c2": null,
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 4.064
+    }
+   },
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, FIXED support, EA-ST F1p -- one fixed slot at the structure centre. Branch meets the structure at its post top face. Structure is a narrow POST sized to the branch and centred under its end; the taxonomy system beneath is F1. P_bc = +10.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-ST-F1p",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 4.064,
+     "L_top": 0.4064,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "top_connector_x": [
+      4.064
+     ],
+     "P_c1": null,
+     "P_c2": null,
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "S",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 4.064
+    }
+   },
+   "ils": {
+    "connection_system": "F1"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, SLOTTED support, EA-ST F1p -- one fixed slot at the structure centre. Branch meets the structure at its post top face. Structure is a narrow POST sized to the branch and centred under its end; the taxonomy system beneath is F1. P_bc = +10.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "S",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-FT-F2",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 2.032,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 4.876799999999999,
+     "P_c2": 0.4064,
+     "top_connector_x": [
+      4.064
+     ],
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "F2"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, FIXED support, EA-ST F2 -- two fixed interior slots. Branch meets the structure at its top edge (top_connector_x). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-FT-F2D",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 2.032,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 4.876799999999999,
+     "P_c2": 0.4064,
+     "top_connector_x": [
+      4.064
+     ],
+     "right_connector_y": null,
+     "P_gap": 0.05
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "F2D"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, FIXED support, EA-ST F2D -- two fixed interior slots plus two outboard deadbands. Branch meets the structure at its top edge (top_connector_x). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-FT-PS",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 2.032,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 4.876799999999999,
+     "P_c2": 0.4064,
+     "top_connector_x": [
+      4.064
+     ],
+     "right_connector_y": null
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "PS"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, FIXED support, EA-ST PS -- pin and slot at the two interior slots -- the slot releases axial movement, so the frame cannot restrain the pipe along its length. Branch meets the structure at its top edge (top_connector_x). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  },
+  {
+   "id": "ILT-Z-FT-PSD",
+   "archetype": "ILS-ILT",
+   "component": 0,
+   "overrides": {},
+   "parts": {
+    "ST": {
+     "centre_x": 2.032,
+     "L_top": 5.6895999999999995,
+     "H_top": 1.2191999999999998,
+     "P_vt": -0.2032,
+     "P_c1": 4.876799999999999,
+     "P_c2": 0.4064,
+     "top_connector_x": [
+      4.064
+     ],
+     "right_connector_y": null,
+     "P_gap": 0.05
+    },
+    "B": {
+     "centre_x": 0.0,
+     "variant": "Z",
+     "support_connector": "F",
+     "P_b1": 4.064,
+     "P_b2": 1.4223999999999999,
+     "P_bc": 0.40639999999999965
+    }
+   },
+   "ils": {
+    "connection_system": "PSD"
+   },
+   "pipeline": {},
+   "published": [],
+   "source": "TABLE VII / Fig 20-21",
+   "note": "Z-branch, FIXED support, EA-ST PSD -- pin, slot, and two outboard deadbands. Branch meets the structure at its top edge (top_connector_x). Wide frame, IDENTICAL geometry across F2/F2D/PS/PSD -- only the connector types differ. P_bc = +1.0 D from slot 2, +x. P_gap = 50 mm, ASSUMED -- not stated in the source; the studies vary it 25/50/100 mm.",
+   "associations": [
+    {
+     "type": "Connection",
+     "connection": "F",
+     "from": {
+      "component": "B",
+      "feature": "end"
+     },
+     "to": {
+      "component": "ST",
+      "feature": "top1"
+     },
+     "note": "branch end meets the structure at top1; verified coincident at (4.0640, -1.4224)"
+    }
+   ]
+  }
+ ]
+}

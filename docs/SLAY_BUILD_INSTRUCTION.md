@@ -29,6 +29,7 @@ anything in §9 — raise it.
 | Component geometry model (GD-TP/TT/SH/PIP/VLV/B/ST/SB/Con/HdPipe/BrPipe) | `rebuild/component_spec.py` | **MIRRORED** from `Slay-ILS-Designer-V1.0`. Never edit here. |
 | Config loader + defaults | `rebuild/config.py`, `rebuild/slay_config.yaml` | **MIRRORED.** Never edit here. |
 | ILS assembly/validation layer | `rebuild/ils_builder.py` | **MIRRORED.** Never edit here. |
+| ILS layout fixtures (EDAS) | `rebuild/fixtures/standard_ils_layouts.json` | **MIRRORED DATA.** 7 archetypes + 39 anchors. Re-copy when the source moves; never hand-edit. |
 | Line mesher (arc-length, grading, snapping) | `rebuild/slay/model/mesh.py` | **OURS.** Working. Extend, don't rewrite. |
 | Old monolithic implementation | `slay_overbend_v1_50.py`, `slay_sliding_v0_4.py` | REFERENCE ONLY. Read for behaviour being reproduced. Never import. |
 | Case validation gate | `docs/reference/slay_case.py` | Working code, not yet integrated. Becomes `entry/spec.py` at T8. |
@@ -484,6 +485,36 @@ to the frame being modelled as a straight collinear beam rather than a
 portal with legs, so it carries no axial stiffness. Do not "fix" this while
 building; record it.
 
+### Two verification sources, answering different questions
+
+Do not conflate these. They measure different things and they do not agree
+everywhere — the EA-ST F2 note above is one already-recorded instance.
+
+| Source | Question it answers | Size |
+|---|---|---|
+| Architecture plan §6 | *Does the rebuild reproduce the old CODE?* | 7 rows |
+| EDAS anchors (`published`) | *Does the model match the PUBLISHED PAPER?* | 24 (lay, result) pairs across 39 configurations, R ∈ {70, 85, 100}, tension ∈ {100, 120} MT |
+
+§6 remains authoritative for **reproducibility** — it is the contract that
+the rebuild did not change behaviour. The anchors are the **validation**
+target and are far richer (peak strain, peak moment, and for some cases
+X2 strain and phase).
+
+A spot check shows they are not interchangeable: anchor `TP-A1` publishes
+0.473% at R=85, where §6 records "A1, R=85m → 0.540%". Whether `TP-A1` and
+§6's "A1" are even the same case is **unconfirmed** — §6's note says its A1
+needs ≥3 elements across the component at a 1×OD mesh, while the standard
+basis is 2×OD (G10). Resolve before quoting either number as the other's
+target; see D5.
+
+### L2 geometry fixtures
+
+`rebuild/tests/test_edas_archetypes.py` builds all 7 archetypes and checks
+mass, span and extent against the figures recorded alongside them. All 7
+currently match exactly. These check **geometry, not physics** — they need
+no solver and are the tripwire for the mirrored L2 code being re-synced
+upstream without anyone noticing.
+
 `docs/SLAY_ARCHITECTURE_AND_RESTRUCTURING_PLAN.md` §6 is the **only**
 authoritative baseline table. A number from a session log or a code comment
 is not authoritative — check whether §6 supersedes it. That has already
@@ -533,6 +564,24 @@ against the source repo when GD-SB work begins.
 pipe welded to a GD-PIP outer-pipe end node, carrying the connector) as
 out of scope. Confirm it stays out before T9.
 
+**D5 — Which source governs the milestone ladder?** §7 now has two, and
+they disagree on at least one spot-checked case. Options: keep §6 as the
+gate (reproduce the old code first, validate against the paper after), or
+promote the EDAS anchors to the primary target (richer, paper-traceable,
+but then a mismatch is ambiguous between a rebuild defect and a known
+old-code deviation). *Recommendation: §6 gates T5–T8 because reproducing
+known behaviour isolates rebuild defects; anchors become the T9 target once
+the pipeline is trusted.* Also needs settling: whether `TP-A1` is §6's
+"A1", and at which mesh density each was run. **Awaiting user.**
+
+**EDES is not a build input.** Recorded here because the question will
+recur. The `EDES_GD-*_KNOWLEDGE.json` files are narrative knowledge —
+sourceRef, edges, design-code scope, verification status, prose findings.
+They inform design reasoning and provenance in the ILS-Designer repo.
+`component_spec.py` is the executable form of the same knowledge, and it
+is what this pipeline builds from. Do not attempt to construct geometry
+from EDES.
+
 ---
 
 ## 10. Change log
@@ -541,3 +590,4 @@ out of scope. Confirm it stays out before T9.
 |---|---|
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
+| 12 Sep 2026 | T1 complete. EDAS layouts vendored as L2 fixtures; second verification source (published anchors) recorded in §7; D5 raised on which source gates the ladder. EDES noted as not a build input. |
