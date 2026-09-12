@@ -203,9 +203,23 @@ def _resolve_one_sided_rollers(rule: dict[str, Any], n_sr: int) -> frozenset[str
     return frozenset(stinger_names | vessel_names)
 
 
-ONE_SIDED_ROLLERS_DEFAULT: frozenset[str] = _resolve_one_sided_rollers(
-    _one_sided_rule, N_SR
-)
+def one_sided_rollers(n_sr: int = None) -> frozenset:
+    """Resolve the one-sided rule for a GIVEN stinger roller count.
+
+    The rule is stored rather than a fixed list precisely so it cannot go
+    stale when n_sr changes -- but that only holds if callers re-resolve it
+    for the count they are actually building. `ONE_SIDED_ROLLERS_DEFAULT`
+    below is resolved once at import against this file's own n_sr, so a
+    caller constructing a scene with a DIFFERENT n_sr must come through here
+    instead. Using the pre-resolved constant at n_sr=9 silently leaves SR7,
+    SR8 and SR9 bidirectional, which is the exact staleness the rule form
+    exists to prevent.
+    """
+    return _resolve_one_sided_rollers(_one_sided_rule,
+                                      N_SR if n_sr is None else n_sr)
+
+
+ONE_SIDED_ROLLERS_DEFAULT: frozenset[str] = one_sided_rollers(N_SR)
 
 # ---------------------------------------------------------------------------
 # Expose
@@ -239,4 +253,5 @@ __all__ = [
     "N_INCREMENTS_SHIFT",
     "REG_MULT_DEFAULT",
     "ONE_SIDED_ROLLERS_DEFAULT",
+    "one_sided_rollers",
 ]
