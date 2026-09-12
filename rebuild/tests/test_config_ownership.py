@@ -103,9 +103,44 @@ def test_vessel_roller_count():
 
 
 def test_stinger_roller_count():
-    """n_sr includes SR1, the tangency station on the deck line, so six
-    stations means one at theta=0 and five on the curve."""
+    """n_sr counts SR1 (the tangency station) but EXCLUDES the tip station.
+
+    So n_sr=6 means SR1..SR6 plus a further SR7 that this count does not
+    include. SR7 is a contact slot and is where lay tension is applied,
+    using its own tangent -- taking that tangent from SR6 instead reported
+    2.46% strain there against a ~0.83% reference.
+    """
     assert config.N_SR == 6
+
+
+def test_terminal_station_counting_is_asymmetric_and_that_is_deliberate():
+    """The one rule most likely to be mis-generalised, pinned.
+
+        n_vr INCLUDES its terminal station (fixed VR5)
+        n_sr EXCLUDES its terminal station (tip SR7)
+
+    So the defaults describe 5 vessel stations and 7 stinger stations.
+    Neither count means "stations" and neither means "contact slots" —
+    reading one from the other is an off-by-one in the model's supports.
+    """
+    n_vessel_stations = config.N_VR
+    n_stinger_stations = config.N_SR + 1
+    assert (n_vessel_stations, n_stinger_stations) == (5, 7)
+
+    vessel_contact = config.N_VR - 1        # VR5 is fixed, not contacting
+    stinger_contact = config.N_SR + 1       # the tip IS a contact slot
+    assert (vessel_contact, stinger_contact) == (4, 7)
+
+
+def test_elastic_end_zone():
+    """Both model ends are forced fully elastic to keep boundary-restraint
+    artefacts out of the reported strain.
+
+    NEW behaviour -- the old implementation has no end-zone treatment and no
+    per-element material assignment at all. Recorded here so the value has a
+    single home before the physics layer exists to consume it.
+    """
+    assert config.ELASTIC_END_ZONE_M == 16.0
 
 
 def test_one_sided_set_matches_the_ruling():

@@ -18,9 +18,26 @@ reference_pipeline:
 
 stinger_rollers:
   spacing_m: 8.0
-  n_sr: 6                  # stinger rollers. SR1 sits at theta=0, ON the deck
-                            # tangent line; SR2 is the first station actually on
-                            # the curve. So n_sr counts the tangency station too.
+  n_sr: 6                  # stinger rollers, EXCLUDING the tip station.
+                            # SR1 sits at theta=0, ON the deck tangent line, and
+                            # IS counted; SR2 is the first station on the curve.
+                            # A further station SR{n_sr+1} exists beyond SR6: it
+                            # is a contact slot AND the point the lay tension is
+                            # applied at, using ITS OWN tangent. Taking that
+                            # tangent from SR6 instead put a spurious transverse
+                            # force on the tip and reported 2.46% strain at SR6
+                            # against a ~0.83% reference -- a 3x error, caught in
+                            # first validation of the old code.
+                            #
+                            # NOTE THE ASYMMETRY WITH n_vr, which is deliberate
+                            # (ruling 12 Sep 2026) and is exactly the shape of an
+                            # off-by-one waiting to happen:
+                            #     n_vr INCLUDES its terminal station (fixed VR5)
+                            #     n_sr EXCLUDES its terminal station (tip SR7)
+                            # So n_vr=5, n_sr=6 means 5 vessel stations and 7
+                            # stinger stations. Neither count is "stations", and
+                            # neither is "contact slots" -- read each one's own
+                            # rule, do not generalise from the other.
   n_vr: 5                  # vessel rollers, counting ALL vessel stations --
                             # the fixed one included. VR1 is the first roller
                             # inboard of SR1; numbering increases away from the
@@ -123,3 +140,30 @@ solver:
   reg_mult_default: 0.0
   # k_spring intentionally has no entry: tested, rejected, removed 12 Aug
   # 2026. Not being reintroduced as a default with any value, including 0.
+
+end_zones:
+  # Boundary-effect suppression, ruled 12 Sep 2026.
+  #
+  # The first and last stretch of the pipeline model is forced FULLY ELASTIC
+  # -- no material plasticity -- at BOTH ends: the stinger/catenary end and
+  # the vessel-interior end. Restraints at a model boundary generate local
+  # strain that is an artefact of where the model was cut, not of the lay. In
+  # an elasto-plastic run that artefact can also drive spurious permanent
+  # strain, so it does not simply wash out.
+  #
+  # THIS IS NEW BEHAVIOUR, not a reproduction. The old implementation has no
+  # end-zone treatment and no per-element material assignment at all -- its
+  # material is global per run. Two consequences follow:
+  #   * L5 needs per-element material binding, which nothing upstream has.
+  #   * Results may differ from the architecture plan's section 6 baselines
+  #     wherever a reported peak sat inside an end zone. The recorded peaks
+  #     are at component junctions rather than at model ends, so the
+  #     expectation is no change -- but it is an expectation, and T5 must
+  #     confirm it rather than assume it.
+  #
+  # The zone boundary is a MATERIAL discontinuity and must not be smeared
+  # across an element, so it is a MANDATORY mesh station. That is a fourth
+  # reason for MANDATORY beyond the three component_spec's NodePriority
+  # lists (section change, slope change, topological junction); component_spec
+  # is mirrored and cannot be edited here, so the scene layer declares it.
+  elastic_length_m: 16.0

@@ -239,6 +239,47 @@ asserts the premise — if a re-sync ever brings down a `component_spec.py`
 that reads something else from config, the split stops being safe and the
 test says so. **Scene is unblocked.**
 
+### 3.6 Elastic end zones — a new requirement, not a reproduction
+
+Ruled 12 Sep 2026:
+
+> 16 m of the pipeline model at both ends (stinger end and vessel interior
+> end) shall consist of fully elastic elements — no material plasticity —
+> to avoid spurious high strain reporting at these locations due to
+> boundary condition effects.
+
+A restraint at a model boundary generates local strain that is an artefact
+of where the model was cut, not of the lay. In an elasto-plastic run that
+artefact can also drive spurious *permanent* strain, so it does not wash out
+on unloading.
+
+**It is new.** The old implementation has no end-zone treatment — every
+"elastic" reference in it is the `elastic_first` two-phase solve, which is a
+convergence strategy, not a zoning one — and no per-element material
+assignment at all. Its material is global per run.
+
+**Three layers touch it, which is the useful part of the finding:**
+
+| layer | responsibility |
+|---|---|
+| **L3 Scene** | *defines* the zones — it owns `extent`, so it knows where 16 m from each end falls |
+| **L4 Model** | the zone boundary is a **MANDATORY** station: a material discontinuity must not be smeared across an element, exactly as a section discontinuity must not |
+| **L5 Physics** | *applies* it — `bind_material` gives elements inside the zones the elastic material and the rest J2 or RO |
+
+Note L4's obligation is a **fourth reason for MANDATORY**, beyond the three
+`component_spec`'s `NodePriority` docstring lists (section change, slope
+change, topological junction). `component_spec` is mirrored and cannot be
+edited here, so Scene declares the station rather than the component library.
+
+**Two consequences.** L5 needs per-element material binding, which nothing
+upstream provides. And results may differ from the §6 baselines wherever a
+reported peak sat inside an end zone — the recorded peaks are at component
+junctions rather than model ends, so the expectation is no change, but that
+is an expectation and T5 must confirm it.
+
+`config.ELASTIC_END_ZONE_M = 16.0` records the length now, so it has one
+home before the layer that consumes it exists.
+
 ### 3.5 Two consequences to check, not yet resolved
 
 **The sweep-ceiling reasoning is written against the old numbering.**
@@ -398,17 +439,32 @@ comment and `test_config_ownership.py` both state the new meaning
 explicitly, but **please confirm**, because it is a silent off-by-one in the
 number of supports if I have read it the wrong way.
 
-**3. The extra stinger roller.** The old code carries
-`n_sr_total = n_sr + 1` and a matching slot, giving the sweep somewhere to
-go on the stinger side. Should Scene emit that extra station, or is the
-stinger-side buffer purely a matter of extent? I lean toward emitting it, so
-the buffer is a real station rather than an implicit assumption — but the
-old code's intent is not fully clear to me, and the vessel side now has its
-buffer expressed as real stations, which argues for symmetry.
+**3. ~~The extra stinger roller~~ — RESOLVED 12 Sep 2026: `n_sr` excludes
+it.** So `n_sr = 6` means SR1..SR6 and a further SR7 exists that the count
+does not include. Scene emits it.
+
+It is not a buffer. SR7 is a contact slot **and** the point lay tension is
+applied at, using its own tangent. The old code carries a comment recording
+what happens otherwise: taking the departure tangent from SR6 put a spurious
+transverse force on the tip and reported **2.46% strain at SR6 against a
+~0.83% reference** — a 3x error, caught in first validation.
+
+**This makes the two counts asymmetric, deliberately:**
+
+|  | terminal station | counted? | stations | contact slots |
+|---|---|---|---|---|
+| `n_vr = 5` | VR5, all DOF fixed | **included** | 5 | 4 |
+| `n_sr = 6` | SR7, tip + tension | **excluded** | 7 | 7 |
+
+Neither count means "stations" and neither means "contact slots". Reading
+one rule from the other is an off-by-one in the model's supports, so both
+are written into the YAML beside their values and pinned by
+`test_terminal_station_counting_is_asymmetric_and_that_is_deliberate`.
 
 **4. Diagram substitution (§7)** — coordinate layout instead of a flowchart?
 §3.4's table is most of it already; the picture would add where the fixed
-station sits and which direction each roller can push.
+station sits, where the tip station sits, and which direction each roller
+can push. This is the only question left open on T2.
 
 ---
 
@@ -417,4 +473,5 @@ station sits and which direction each roller can push.
 | Date | Action |
 |---|---|
 | 12 Sep 2026 | Draft written. Three convention findings raised; §3.2 (VR numbering inversion) blocks coding. |
+| 12 Sep 2026 | n_sr ruled to EXCLUDE the tip station, making the two counts deliberately asymmetric (§3.4 table). Elastic end zones ruled in as §3.6 — new behaviour, three-layer split, needs per-element material binding. Only the diagram question remains open. |
 | 12 Sep 2026 | Rulings received. §3.2 RESOLVED — config's numbering stands, old code's superseded; one-sided pair verified unmoved at x = +8/+16. New §3.4: n_vr 3→5 with the fixed station moving inside the series as VR{n_vr} — conflicts with a mirrored file, now the blocking item. New §3.5: sweep-ceiling wording and §6 baseline sensitivity both need checking before T4/T5. |

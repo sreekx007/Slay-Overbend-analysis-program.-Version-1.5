@@ -64,6 +64,7 @@ _EXPECTED_SECTIONS = (
     "physical_constants",
     "section",
     "solver",
+    "end_zones",
 )
 
 for _section in _EXPECTED_SECTIONS:
@@ -120,6 +121,13 @@ _one_sided_rule: dict[str, Any] = _sr["one_sided_rollers_default"]
 
 _mesh = _raw["mesh"]
 OD_MULTIPLE: float = _mesh["od_multiple"]
+
+# Length at EACH end of the pipeline model forced fully elastic, to keep
+# boundary-restraint artefacts out of the reported strain. Consumed by the
+# physics layer (material binding) and by the scene layer, which declares the
+# zone boundary as a mandatory mesh station. See slay_config.yaml for why this
+# is new behaviour rather than reproduced behaviour.
+ELASTIC_END_ZONE_M: float = float(_raw["end_zones"]["elastic_length_m"])
 
 _j2 = _materials["j2"]
 MATERIAL_J2_E: float = float(_j2["E_Pa"])
@@ -213,6 +221,7 @@ __all__ = [
     "N_VR",
     "ROLLER_RADIUS_DEF",
     "OD_MULTIPLE",
+    "ELASTIC_END_ZONE_M",
     "MATERIAL_J2_E",
     "MATERIAL_J2_TABLE",
     "MATERIAL_RO_E",
