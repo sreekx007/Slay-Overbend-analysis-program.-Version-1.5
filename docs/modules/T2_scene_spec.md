@@ -130,8 +130,22 @@ the furthest station `VR0` is actively misleading. I propose naming it
 `ANCHOR` outright. It is not a contact slot in any case — the old code
 excludes it from the slot list and treats it as a fixed node.
 
-**Decision needed: adopt config's numbering (recommended), or keep the old
-code's and raise a change against the mirror?**
+**RESOLVED 12 Sep 2026 — config's numbering is correct.** Ruling:
+
+> SR1 is the first stinger roller, still on the horizontal line. SR2 is the
+> first roller on the curve. VR1 is the first roller inboard of SR1 on the
+> straight line itself.
+
+So vessel numbering increases *inboard*, away from the stinger, and the old
+code's numbering is superseded rather than reconciled. The acceptance test
+in §6 holds and is now confirmed from both directions: the one-sided pair
+sits at x = +8 and +16 under the new naming, which is exactly where the old
+code's releasable pair sat. The physics is unchanged; only the labels moved.
+
+SR1 at θ = 0 on the deck tangent line is unchanged from the old code and
+needed no ruling — recording it because the spec had not stated it
+explicitly and a reader could otherwise assume SR1 is the first *curved*
+station.
 
 ### 3.3 Tracker item 16's quoted figures were computed at 9 m spacing
 
@@ -156,6 +170,81 @@ study.
 the T2 VERIFY clause in the build instruction.** Recording it because a
 future session reading item 16 would otherwise write a failing test and
 assume the code was wrong.
+
+### 3.4 The vessel roller count changes, and it is a mirrored file — BLOCKING
+
+Ruling, 12 Sep 2026:
+
+> 5 vessel rollers VR1–VR5 is default, with possibility to increase based on
+> component length. VR5 has all DOF fixed. VR1–VR4 are involved in the
+> contact constraints. VR1–VR2 are unidirectional rollers (uplift allowed);
+> VR3 onwards are bidirectional.
+
+This is the layout it describes, at R = 85 and 8 m spacing:
+
+| station | role | s_arc | x | y |
+|---|---|---|---|---|
+| VR5 | **fixed, all DOF** | −40.0 | +40.0 | 0 |
+| VR4 | bidirectional | −32.0 | +32.0 | 0 |
+| VR3 | bidirectional | −24.0 | +24.0 | 0 |
+| VR2 | one-sided, uplift allowed | −16.0 | +16.0 | 0 |
+| VR1 | one-sided, uplift allowed | −8.0 | +8.0 | 0 |
+| SR1 | tangency, on the deck line | 0 | 0 | 0 |
+| SR2 | first curved station | +8.0 | −7.988 | 0.376 |
+| … | | | | |
+| SR6 | | +40.0 | −38.540 | 9.239 |
+
+**Two things follow that the spec did not previously account for.**
+
+**The anchor moves inside the VR series.** The old code kept a separate
+`VR0` at the far end. Under the ruling the fixed station is `VR5` — the
+*last* vessel roller, not a zeroth one. So the rule is "the anchor is
+`VR{n_vr}`", and my earlier proposal to name it `ANCHOR` is withdrawn: it
+has a real name now. It is still excluded from the contact slot list.
+
+**`n_vr` conflicts with the mirrored config, and its meaning changes too.**
+
+| | value | what it counts |
+|---|---|---|
+| `slay_config.yaml` (mirrored) | `n_vr: 3` | contact rollers, with a separate anchor station in addition |
+| This ruling | 5 | **all** vessel stations, the fixed one included (4 contact + 1 fixed) |
+
+Both the number and the semantic differ. Under the old meaning the ruling
+would be `n_vr = 4`; under the new meaning it is 5. Getting this wrong is a
+silent off-by-one in the number of supports.
+
+`slay_config.yaml` is a **mirrored file (G7)** — it belongs to
+Slay-ILS-Designer-V1.0 and is not editable here. So this cannot be
+implemented by patching config; it has to be raised against the source
+repo. Until it is, Scene would have to either read a value it knows to be
+wrong or carry a local override, and a local override in a layer whose
+whole job is to read config is exactly the second-source-of-truth failure
+this project keeps eliminating.
+
+**This blocks coding Scene.** See question 1 in §8.
+
+### 3.5 Two consequences to check, not yet resolved
+
+**The sweep-ceiling reasoning is written against the old numbering.**
+`docs/reference/slay_case.py` computes the reachable sweep as
+`ceiling_elems = max(1, floor(spacing/elem_len) - 1)`, justified by "VR1
+sits exactly one roller spacing from the fixed VR0 anchor BY CONSTRUCTION,
+so the achievable sweep is bounded at ~one spacing REGARDLESS of n_vr",
+citing tech-ref §14.4's finding that raising n_vr 10→20 "had no effect".
+
+Under the new numbering the roller adjacent to the anchor is **VR4**, not
+VR1, and the deck run grows from 32 m to 40 m. The physical constraint (the
+anchor bounds the slide) is unchanged, but the sentence describing it is
+now wrong, and whether the *ceiling itself* changes needs checking rather
+than assuming. This is an L5/L7 concern, so it does not block Scene — but
+it must be settled before T4.
+
+**The §6 baselines were produced at the old count.** Adding a fourth
+contact roller at x = +32 changes the vessel-side restraint. Tech-ref §14.4
+implies this is insensitive — the extra supports sit on straight, already
+supported deck far from the bending — which would mean the baselines still
+reproduce. Plausible, but it is an assumption and should be verified at T5
+rather than discovered at T9.
 
 ## 4. What Scene produces
 
@@ -202,10 +291,15 @@ the exact pair that caused trouble before.
 per span. Station *i* sits at angle `(i−1)·dtheta`, arc `R·theta`, world
 position `(−R·sin θ, R·(1−cos θ))`.
 
-**Vessel stations** sit on the deck at `x = +j·spacing` under the
-recommended numbering, `y = 0`, arc `s = −j·spacing`. Arc and x agree in
+**Vessel stations** sit on the deck at `x = +j·spacing`, `y = 0`, arc
+`s = −j·spacing`, with VR1 one spacing inboard of SR1. Arc and x agree in
 magnitude here because the deck is straight — the distinction only bites on
 the arc.
+
+`VR{n_vr}` is the fixed station: all DOF restrained, and not a contact slot.
+Scene emits it as a station because it is a real support the model needs,
+flagged so the contact layer skips it. Every other vessel station is a
+contact roller.
 
 **The outward normal** at a stinger station is the direction the roller
 pushes the pipe: away from the arc centre, toward the sea surface. At
@@ -219,7 +313,11 @@ deck the normal is `(0, −1)` everywhere.
 **One-sided flags** come from `config.ONE_SIDED_ROLLERS_DEFAULT`, which
 resolves the stored *rule* (all SR, plus the named vessel pair) into
 concrete names using `n_sr`. Scene never hardcodes the list; that is the
-whole reason it is a rule.
+whole reason it is a rule. One-sided means uplift is allowed — the roller
+pushes the pipe but cannot hold it down, so the pipe may leave the roller.
+VR1 and VR2 are one-sided, VR3 and VR4 bidirectional, and `VR{n_vr}` is
+outside this classification entirely because it is fixed rather than
+contacting.
 
 **Roller radius** is per station, defaulting to `config.ROLLER_RADIUS_DEF`
 and overridable per name. The fresh-build spec's decision 1 is explicit
@@ -247,10 +345,15 @@ placement offset is applied by the SLAY builder — which is this layer.
 | 4 | The rule scales | change `n_sr`, and every SR is still one-sided with no edit |
 | 5 | Normal direction | `(0, −1)` at SR1 and on the deck; tangent asserted to point toward the tip, per item 28 |
 | 6 | Vessel and stinger do not overlap in x | the defect present in the stale prototype |
-| 7 | Anchor is not a contact slot | excluded from the station list the contact layer reads |
+| 7 | `VR{n_vr}` is not a contact slot | excluded from the list the contact layer reads; all DOF fixed |
+| 8 | SR1 is on the deck line | `y = 0`, `θ = 0`; SR2 is the first station with `y > 0` |
+| 9 | VR1 is one spacing inboard of SR1 | x = +8 at 8 m spacing, and adjacent to SR1 with nothing between |
+| 10 | Station count | `n_vr` vessel stations of which one is fixed, `n_sr` stinger stations of which one is the tangency |
 
-Check 3 is the important one: it is the same assertion under either naming
-decision, and it is what makes §3.2 safe to resolve either way.
+Check 3 was the important one while §3.2 was open: it is the same assertion
+under either naming, which is what made that decision safe to take either
+way. It now doubles as the regression lock proving the renumbering did not
+move any physical roller.
 
 ## 7. On the flowchart (step 3)
 
@@ -268,18 +371,38 @@ Your call, and the §3 exemption is stated rather than assumed either way.
 
 ## 8. Questions for you
 
-1. **Vessel roller numbering (§3.2)** — adopt `config`'s convention (VR1
-   nearest the stinger), which is my recommendation, or keep the old code's
-   and raise a change against the mirrored file?
-2. **Anchor naming** — `ANCHOR` rather than `VR0`, so it cannot be read as
-   part of the numbering sequence?
-3. **The extra stinger roller.** The old code carries `n_sr_total = n_sr + 1`
-   and a corresponding slot, giving the sweep somewhere to go on the stinger
-   side. Should Scene emit that extra station, or is the stinger-side buffer
-   purely a matter of extent? I lean toward emitting it, so the buffer is a
-   real station rather than an implicit assumption, but the old code's intent
-   is not fully clear to me here.
-4. **Diagram substitution (§7)** — coordinate layout instead of a flowchart?
+**1. `n_vr` — how do we get to 5 without editing a mirrored file? (BLOCKING)**
+`slay_config.yaml` says `n_vr: 3`; the ruling says 5. It is mirrored, so
+G7 says raise rather than patch. Three ways forward:
+
+- **(a) Change it upstream** in Slay-ILS-Designer-V1.0 and re-mirror.
+  Cleanest, keeps one source of truth, but needs a commit in the other repo.
+- **(b) Carry it as a case-level parameter** rather than a config default,
+  so `n_vr` arrives with the lay configuration and config's value becomes a
+  fallback nobody uses. This fits the existing decision that per-study
+  parameters go through the case gate, not the shared file.
+- **(c) Local override in Scene** — fastest, and the one I would not take:
+  it puts a second source of truth in the layer whose job is to read config.
+
+*I lean (a) if you can make the upstream change, (b) if not.*
+
+**2. What does `n_vr` count?** I have read the ruling as `n_vr = 5` meaning
+*all* vessel stations including the fixed one, giving four contact rollers.
+The old code's `n_vr` counted contact rollers only, with the anchor extra —
+under which the same layout would be `n_vr = 4`. Confirm the new meaning, as
+it is a silent off-by-one in the number of supports either way.
+
+**3. The extra stinger roller.** The old code carries
+`n_sr_total = n_sr + 1` and a matching slot, giving the sweep somewhere to
+go on the stinger side. Should Scene emit that extra station, or is the
+stinger-side buffer purely a matter of extent? I lean toward emitting it, so
+the buffer is a real station rather than an implicit assumption — but the
+old code's intent is not fully clear to me, and the vessel side now has its
+buffer expressed as real stations, which argues for symmetry.
+
+**4. Diagram substitution (§7)** — coordinate layout instead of a flowchart?
+§3.4's table is most of it already; the picture would add where the fixed
+station sits and which direction each roller can push.
 
 ---
 
@@ -288,3 +411,4 @@ Your call, and the §3 exemption is stated rather than assumed either way.
 | Date | Action |
 |---|---|
 | 12 Sep 2026 | Draft written. Three convention findings raised; §3.2 (VR numbering inversion) blocks coding. |
+| 12 Sep 2026 | Rulings received. §3.2 RESOLVED — config's numbering stands, old code's superseded; one-sided pair verified unmoved at x = +8/+16. New §3.4: n_vr 3→5 with the fixed station moving inside the series as VR{n_vr} — conflicts with a mirrored file, now the blocking item. New §3.5: sweep-ceiling wording and §6 baseline sensitivity both need checking before T4/T5. |
