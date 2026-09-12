@@ -18,8 +18,24 @@ reference_pipeline:
 
 stinger_rollers:
   spacing_m: 8.0
-  n_sr: 6                  # stinger rollers
-  n_vr: 3                  # vessel rollers -- confirmed correct default this session
+  n_sr: 6                  # stinger rollers. SR1 sits at theta=0, ON the deck
+                            # tangent line; SR2 is the first station actually on
+                            # the curve. So n_sr counts the tangency station too.
+  n_vr: 5                  # vessel rollers, counting ALL vessel stations --
+                            # the fixed one included. VR1 is the first roller
+                            # inboard of SR1; numbering increases away from the
+                            # stinger; VR{n_vr} (VR5 here) has all DOF fixed and
+                            # is NOT a contact slot. So this default means four
+                            # contact rollers plus one fixed support.
+                            #
+                            # Was 3, under the OLD meaning where n_vr counted
+                            # contact rollers only and a separate VR0 anchor sat
+                            # outside the count. Both the number and the meaning
+                            # changed (ruling 12 Sep 2026) -- the same physical
+                            # layout would read n_vr=4 under the old meaning, so
+                            # this is an off-by-one waiting to happen if the two
+                            # are ever mixed. Raise n_vr when a longer component
+                            # needs more sweep room.
   roller_radius_default_m: 0.30   # fallback only; per-roller OD lookup lives in slay_geometry.py
   # One-sided (unilateral) contact: rollers riding the stinger arc can only
   # PUSH the pipe along the curve, never hold it down against it -- so every

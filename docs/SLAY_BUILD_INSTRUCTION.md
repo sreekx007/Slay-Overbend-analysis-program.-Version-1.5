@@ -27,7 +27,7 @@ anything in §9 — raise it.
 |---|---|---|
 | FE kernel (elements, J2 plasticity, assembly, Newton) | `nlfea_v4.py` (repo root) | **FROZEN.** Validated independently. Never edit. |
 | Component geometry model (GD-TP/TT/SH/PIP/VLV/B/ST/SB/Con/HdPipe/BrPipe) | `rebuild/component_spec.py` | **MIRRORED** from `Slay-ILS-Designer-V1.0`. Never edit here. |
-| Config loader + defaults | `rebuild/config.py`, `rebuild/slay_config.yaml` | **MIRRORED.** Never edit here. |
+| Config loader + defaults | `rebuild/config.py`, `rebuild/slay_config.yaml` | **OURS** since 12 Sep 2026 (was mirrored). Editable. Five constants stay shared — see G7. |
 | ILS assembly/validation layer | `rebuild/ils_builder.py` | **MIRRORED.** Never edit here. |
 | ILS layout fixtures (EDAS) | `rebuild/fixtures/standard_ils_layouts.json` | **MIRRORED DATA.** 7 archetypes + 39 anchors. Re-copy when the source moves; never hand-edit. |
 | Line mesher (arc-length, grading, snapping) | `rebuild/slay/model/mesh.py` | **OURS.** Working. Extend, don't rewrite. |
@@ -149,7 +149,7 @@ Each rule below exists because it was violated once and cost real work.
 | G4 | **Never drop a MANDATORY station.** | Slivers from snap-vs-regular collisions made one case fail to converge outright and shifted another's peak by +30% on pure numerical artefact. |
 | G5 | **No `k_spring`.** | Tested, rejected 12 Aug 2026 (NaN on a shroud contact-release case). Not reintroduced with any value, including 0. |
 | G6 | **Never edit `nlfea_v4.py`.** | Frozen, independently validated. Work around it, never in it. |
-| G7 | **Never edit mirrored files** (`component_spec.py`, `config.py`, `ils_builder.py`, `slay_config.yaml`). | They belong to `Slay-ILS-Designer-V1.0`. Local edits desync silently. Needed change → raise it, don't patch. |
+| G7 | **Never edit the mirrored files** — `component_spec.py`, `ils_builder.py`. | They belong to `Slay-ILS-Designer-V1.0` and are actively developed there. Local edits desync silently. Needed change → raise it upstream, don't patch. **`config.py` / `slay_config.yaml` came OUT of the mirror on 12 Sep 2026 and are ours to edit** — the mirrored code reads only five constants from them (OD_PIPE_DEF, T_WALL_DEF, STEEL_E, G, RHO_STEEL), guarded by `tests/test_config_ownership.py`. |
 | G8 | **"It ran without error" is not verification.** | This codebase has a documented silent-failure mode (`phase1_peak=0.0`, no exception). Every card requires a *number*. |
 | G9 | **Never substitute F for P/S/D connectors.** | The solver implements F only. A P/S/D case must be refused, not approximated — it would silently answer a different question. |
 | G10 | **Mesh density is 2×OD.** | Matches the paper's own basis. Refining to 1×OD moved *away* from apples-to-apples and was reverted. Do not "improve" it without changing the comparison basis too. |
@@ -591,3 +591,4 @@ from EDES.
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
 | 12 Sep 2026 | T1 complete. EDAS layouts vendored as L2 fixtures; second verification source (published anchors) recorded in §7; D5 raised on which source gates the ladder. EDES noted as not a build input. |
+| 12 Sep 2026 | Roller layout ruled: SR1 at θ=0 on the deck line, VR1 first inboard of SR1, n_vr=5 counting all vessel stations with VR5 fixed, VR1–VR2 one-sided. Config ownership moved to this repo (the mirrored code reads only five constants); G7 narrowed to `component_spec.py` + `ils_builder.py`. T2 unblocked. |

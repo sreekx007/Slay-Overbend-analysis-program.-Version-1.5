@@ -1,0 +1,14 @@
+{
+  "source_repo": "sreekx007/Slay-ILS-Designer-V1.0",
+  "source_path": "plotters/config.py + plotters/slay_config.yaml",
+  "source_commit": "200667052e52a6f8b1b51fe4d2b2862946c65387",
+  "captured": "2026-09-12",
+  "why": "These five are the ONLY config constants the mirrored ILS-tier code reads: component_spec.py uses OD_PIPE_DEF, T_WALL_DEF, STEEL_E and G; ils_builder.py uses RHO_STEEL. slay_config.yaml is owned by THIS repo as of 12 Sep 2026, so these are the only values that must stay in step with upstream. Everything else in the file is SLAY-tier and ours alone.",
+  "constants": {
+    "OD_PIPE_DEF": 0.4064,
+    "T_WALL_DEF": 0.021,
+    "STEEL_E": 210000000000.0,
+    "G": 9.81,
+    "RHO_STEEL": 7850.0
+  }
+}

@@ -221,7 +221,23 @@ wrong or carry a local override, and a local override in a layer whose
 whole job is to read config is exactly the second-source-of-truth failure
 this project keeps eliminating.
 
-**This blocks coding Scene.** See question 1 in §8.
+**RESOLVED 12 Sep 2026 — this repo now owns the config.** The mirror
+argument turned out to be weaker than stated above. Checking what the
+mirrored ILS-tier code actually reads from config gives five constants and
+no more: `component_spec.py` uses OD_PIPE_DEF, T_WALL_DEF, STEEL_E and G;
+`ils_builder.py` uses RHO_STEEL. It reads none of the stinger, roller,
+solver, material, mesh or section blocks.
+
+So `n_vr` is a SLAY-tier parameter that happened to share a file, and
+seeking upstream approval to change a value the other repo never reads was
+friction without benefit. `config.py` and `slay_config.yaml` moved out of
+the mirror; `component_spec.py` and `ils_builder.py` stay in it.
+
+`n_vr` is now 5, with the semantic written into the YAML alongside it.
+`tests/test_config_ownership.py` guards the five shared constants and also
+asserts the premise — if a re-sync ever brings down a `component_spec.py`
+that reads something else from config, the split stops being safe and the
+test says so. **Scene is unblocked.**
 
 ### 3.5 Two consequences to check, not yet resolved
 
@@ -371,26 +387,16 @@ Your call, and the §3 exemption is stated rather than assumed either way.
 
 ## 8. Questions for you
 
-**1. `n_vr` — how do we get to 5 without editing a mirrored file? (BLOCKING)**
-`slay_config.yaml` says `n_vr: 3`; the ruling says 5. It is mirrored, so
-G7 says raise rather than patch. Three ways forward:
+**1. ~~`n_vr` and the mirror~~ — RESOLVED.** Config ownership moved to
+this repo; `n_vr` is 5. See §3.4.
 
-- **(a) Change it upstream** in Slay-ILS-Designer-V1.0 and re-mirror.
-  Cleanest, keeps one source of truth, but needs a commit in the other repo.
-- **(b) Carry it as a case-level parameter** rather than a config default,
-  so `n_vr` arrives with the lay configuration and config's value becomes a
-  fallback nobody uses. This fits the existing decision that per-study
-  parameters go through the case gate, not the shared file.
-- **(c) Local override in Scene** — fastest, and the one I would not take:
-  it puts a second source of truth in the layer whose job is to read config.
-
-*I lean (a) if you can make the upstream change, (b) if not.*
-
-**2. What does `n_vr` count?** I have read the ruling as `n_vr = 5` meaning
-*all* vessel stations including the fixed one, giving four contact rollers.
-The old code's `n_vr` counted contact rollers only, with the anchor extra —
-under which the same layout would be `n_vr = 4`. Confirm the new meaning, as
-it is a silent off-by-one in the number of supports either way.
+**2. What does `n_vr` count?** I have implemented `n_vr = 5` as meaning
+*all* vessel stations including the fixed one, giving four contact rollers
+plus VR5. The old code's `n_vr` counted contact rollers only, with the
+anchor extra — under which the same layout would be `n_vr = 4`. The YAML
+comment and `test_config_ownership.py` both state the new meaning
+explicitly, but **please confirm**, because it is a silent off-by-one in the
+number of supports if I have read it the wrong way.
 
 **3. The extra stinger roller.** The old code carries
 `n_sr_total = n_sr + 1` and a matching slot, giving the sweep somewhere to

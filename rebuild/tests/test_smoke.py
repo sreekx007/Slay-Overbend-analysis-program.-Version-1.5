@@ -25,8 +25,12 @@ REPO = Path(__file__).resolve().parents[2]
 # --------------------------------------------------------------------------
 
 def test_config_defaults():
-    """The three corrections the fresh-build review settled, still in force."""
-    assert config.N_VR == 3, 'n_vr default is 3, not the 10 the old code drifted to'
+    """Corrections the fresh-build review settled, still in force.
+
+    n_vr is asserted in test_config_ownership.py instead -- it changed to 5
+    under the 12 Sep ruling and its meaning changed with it, so it is tested
+    alongside the rest of the roller layout rather than here.
+    """
     assert config.MATERIAL_RO_ALPHA_DNV == 1.300, (
         'alpha_DNV is 1.300; nlfea_v4 states two conflicting values in its own '
         'docstrings and 1.300 is the arithmetically correct one')

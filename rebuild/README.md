@@ -6,14 +6,29 @@ root (kept as reference, untouched).
 
 ## What lives here vs. what doesn't
 
-`component_spec.py`, `config.py`, `slay_config.yaml`, and `ils_builder.py`
-are **mirrored** from
+`component_spec.py` and `ils_builder.py` are **mirrored** from
 [`sreekx007/Slay-ILS-Designer-V1.0`](https://github.com/sreekx007/Slay-ILS-Designer-V1.0)
 (`plotters/`), at commit `200667052e52a6f8b1b51fe4d2b2862946c65387`
 (2026-09-10). That repo owns the ILS/component geometry model, an
 assembly-validation layer, and a much larger RAG/knowledge-graph design
 framework (EDPR/EDES/EDAS/EDIKB) built on top of it -- none of which is
-duplicated here.
+duplicated here. Do not edit them here; raise the change upstream and
+re-copy.
+
+`config.py` and `slay_config.yaml` were mirrored until 12 Sep 2026 and are
+now **owned by this repo**. The mirrored ILS-tier code reads exactly five
+constants from config -- `component_spec.py` takes OD_PIPE_DEF, T_WALL_DEF,
+STEEL_E and G, `ils_builder.py` takes RHO_STEEL -- and none of the stinger,
+roller, solver, material, mesh or section blocks. Those are SLAY-tier
+parameters that happened to share a file, and needing upstream approval to
+change a value the other repo never reads was friction without benefit.
+
+The five that genuinely are shared are recorded in
+`fixtures/upstream_shared_constants.json` with the commit they came from,
+and `tests/test_config_ownership.py` guards them. That suite also asserts
+the premise: if a future re-sync brings down a `component_spec.py` that
+reads anything else from config, the split stops being safe and the test
+says so.
 
 `ils_plotter.py` / `component_plotter.py` (the drawing layer) were left in
 the source repo, not mirrored -- nothing here needs them yet.
