@@ -1,6 +1,6 @@
 # T2 — Scene · specification for review
 
-**Status:** BUILT — steps 1–7 complete. One finding in §9 needs a decision.
+**Status:** COMPLETE — steps 1–7 done. §9 accepted as-is for now, revisit before T4.
 **Card:** `docs/SLAY_BUILD_INSTRUCTION.md` §6 T2
 **Layer:** `scene` (L3) · **Workflow:** none permitted
 
@@ -520,8 +520,10 @@ and the tension station SR7 inside a zone — both of which are boundary
 apparatus rather than physics.
 
 `build_scene` currently defaults `margin` to 0 and takes it explicitly, so
-nothing silently assumes either answer. **Decision needed before T4**, since
-the mesher needs the extent and the zone boundaries as mandatory stations.
+nothing silently assumes either answer. **DEFERRED 12 Sep 2026** — accepted as-is for now. `margin` stays 0, so the
+zones do currently cover SR5 and SR6. Revisit before T4 hands the extent and
+the zone boundaries to the mesher, and before any §6 baseline is quoted from
+a run made under it.
 
 Note this is related to but distinct from the sweep buffer (§3.5): the
 sweep needs room for the ILS to travel, the end zones need room for the

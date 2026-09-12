@@ -172,8 +172,8 @@ then thickened in a second pass.
 |---|---|---|---|---|
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
 | T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
-| T2 | L3 | stinger arc, roller stations, deck | — | next — full §3 process applies |
-| T3 | L4 | header polyline, junction merge, global numbering | — | |
+| T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
+| T3 | L4 | header polyline, junction merge, global numbering | — | next — full §3 process; **D2 comes due here** |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
@@ -591,5 +591,6 @@ from EDES.
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
 | 12 Sep 2026 | T1 complete. EDAS layouts vendored as L2 fixtures; second verification source (published anchors) recorded in §7; D5 raised on which source gates the ladder. EDES noted as not a build input. |
+| 12 Sep 2026 | T2 complete. Layout diagram generated from Scene (SVG, to scale). Model extent left at the station span for now — the end zones therefore cover SR5/SR6; deferred, see T2 spec §9. |
 | 12 Sep 2026 | Elastic end zones ruled in (16 m both ends, fully elastic) — NEW behaviour, needs per-element material binding at L5 and a MANDATORY station at L4; may shift §6 baselines if any peak sat in an end zone. `n_sr` ruled to exclude the tip station. |
 | 12 Sep 2026 | Roller layout ruled: SR1 at θ=0 on the deck line, VR1 first inboard of SR1, n_vr=5 counting all vessel stations with VR5 fixed, VR1–VR2 one-sided. Config ownership moved to this repo (the mirrored code reads only five constants); G7 narrowed to `component_spec.py` + `ils_builder.py`. T2 unblocked. |
