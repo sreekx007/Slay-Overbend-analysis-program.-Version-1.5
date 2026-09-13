@@ -96,11 +96,23 @@ whatever we declare. The 12 Aug architecture plan records what that costs:
 > into the pipe, silently turning a two-point attachment into a continuous
 > stiffener
 
-**So the rule has to be restated as an obligation on the Model rather than a
-promise about the mesher:**
+**RESOLVED 13 Sep 2026 — the kernel is changed instead.** `nlfea_v4` will
+key nodes by id rather than by coordinate, because the deliberate merging
+moves into the mesher where it is ordered and bounded
+(`T3_assembly_spec.md` §9). The rule below was the best available answer while
+the kernel could not be touched; it is now the weaker half of a stronger
+guarantee.
 
-> **Coordinate coincidence and intended merging must agree.** Two nodes
-> share a coordinate **if and only if** a junction declares them merged.
+> **SUPERSEDED.** *Coordinate coincidence and intended merging must agree.
+> Two nodes share a coordinate if and only if a junction declares them
+> merged.*
+
+What replaces it is narrower and true: **coincidence carries no meaning at
+all.** Two nodes may share a coordinate freely; they are joined only by a
+pass-1/1b/2 merge or by a recorded connector association. The assertion the
+Model still owns is that every *intended* join is declared — the other
+direction no longer needs guarding, because the kernel has stopped
+volunteering.
 
 That is checkable, and checking it is the single most valuable thing T3 can
 do. Stated as an integrity assertion on the emitted Model, it catches the
@@ -170,30 +182,13 @@ partition from `line_id` alone, on a model with a GD-ST attached, which is
 what turns this from an argument into evidence. If that check fails, the
 object goes back in.
 
-## 8. How it is built
+## 8. How it is built — SUPERSEDED
 
-**The header line.** A straight polyline from the Scene extent's low end to
-its high end at `y_offset = 0`. Mandatory stations on it:
-
-- the two extent ends;
-- the two elastic-zone boundaries, because a material discontinuity must not
-  be smeared across an element any more than a section change may be — the
-  fourth MANDATORY reason, which `component_spec`'s `NodePriority` does not
-  list and which Scene therefore declares;
-- every structural node of every inline component, mapped from ILS-local
-  position into `s`.
-
-**Components with their own lines** — a GD-ST frame, a GD-SB trapezoid, a
-GD-VLV stem, a GD-B branch — are meshed separately by the existing
-`mesh_component`, in their own `(s, y_offset)` coordinates, and appended.
-
-**Junctions** are then resolved: each `(node_id, target_line)` pair
-declared by a component becomes a shared node index, and the §4 assertion
-confirms nothing else shares coordinates.
-
-**Connectors** are emitted as single 2-node elements, never subdivided.
-
-**Global numbering** is assigned last, once every node exists.
+See **`docs/modules/T3_assembly_spec.md`** (13 Sep 2026), which rules the
+build as four ordered passes with an explicit 0.01 m merge tolerance and a
+two-layer node identity. The sketch that stood here — header line, components
+appended, junctions resolved, numbering last — was right in outline and wrong
+in the part that mattered: it left merging to coincidence.
 
 ## 9. What I would verify
 

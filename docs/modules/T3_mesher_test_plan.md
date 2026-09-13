@@ -553,17 +553,29 @@ Recorded in `T3_model_spec.md` §10, which also sets out why *junctions* and
 *connectors* are different mechanisms and only the first is settled by this
 ruling.
 
-**5. G6 — still open.** §7 recommends option (b): a `merge_coincident` flag
-on `Model` defaulting to today's behaviour, so every validated result stays
-bit-identical while our layer opts out. No line of `nlfea_v4.py` is touched
-until this is ruled on. **This is the one decision blocking implementation.**
+**5. G6 — RULED: the kernel keys nodes by id (option a).** Deliberate
+merging moves into the mesher, where it is ordered and bounded by a 0.01 m
+tolerance that never crosses a pass boundary. Full ruling, scope of the edit
+and its regression cost: **`docs/modules/T3_assembly_spec.md`** §9. §7 below
+records the investigation that led there; its option table is kept for the
+reasoning, but option (b) was not the choice.
 
-**6. Group B — still open.** Restated at length below, since the original
-phrasing was too compressed to answer.
+**6. Connectors — RULED, and they are not deferred.** They become two part
+nodes plus a *recorded association* enforced by penalty constraints on the
+DOF the connector actually restrains, with stiffness taken from a 1 × OD
+length of pipeline rather than from the connector's own length
+(`T3_assembly_spec.md` §7–§8). §13 below is superseded: it framed this as a
+choice between three models, and the ruling is none of them — the connector
+is a real two-node association whose *joint type* selects which DOF are tied,
+which is what the P/S/D/F distinction was always for.
+
+Group B is no longer blocked in principle. It is staged: all seven archetypes
+use `F`, so **F-only comes first** and P/S/D follow. **G9 stands until they
+do** — a P/S/D case is still refused, never approximated by F.
 
 ---
 
-## 13. Q6 restated — what a connector becomes in the model
+## 13. Q6 restated — what a connector becomes in the model  *(SUPERSEDED 13 Sep 2026 — see `T3_assembly_spec.md` §7–§8; kept for the evidence it gathered)*
 
 **The situation.** ILS-EAST, ILS-EASB and ILS-ILT each carry a structure that
 sits *beside* the pipe on its own structural line — a GD-ST portal frame, a
@@ -633,5 +645,6 @@ test B0 pinning the blocker until then?
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | G6 and the connector question both RULED — see `T3_assembly_spec.md`. §13 superseded. |
 | 13 Sep 2026 | Rulings recorded in §12: 6 m beyond each component end; ILS-ILT's asymmetry kept deliberately; the 20 kN case confirmed alongside the specified 200 kN, **with peak stress and strain plotted per component** (a new output, added as checks 2.5 and 4.7); full junction machinery against all seven archetypes. Q6 restated at length in §13 with three connector models, their costs, and a recommendation — deferring, and modelling the connector as the published zero-length centreline tie, so the 24 published anchors stay a valid check. G6 (§7) remains the one decision blocking implementation. |
 | 12 Sep 2026 | Plan written against the specified rig. Four findings: the kernel merges coincident nodes (§7, amends G6); the solver tolerance has an under-converged default, a usable plateau at 10⁻⁵–10⁻⁷ and a silent non-terminating cliff past it (§8); fibre integration is 6.6 % stiff at 30 fibres (§9); `NodeReason` has no member for a load point (§10). Case set split into prismatic Group A (runs today) and attached Group B (blocked on connector modelling). Every figure measured by `tools/spike_mesher_rig.py`. |
