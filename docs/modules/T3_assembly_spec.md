@@ -449,6 +449,96 @@ approximated by `F`.
 
 ---
 
+## Penalty constraints — measured 13 Sep 2026
+
+`tools/study_connectors.py` ties the GD-ST frame to fixed nodes through real
+connectors, on all five named layouts. First working penalty constraints, and
+the first prescribed-stiffness connector element.
+
+**The rig.** Bottom node fixed in all DOF (where the pipe will be) → connector
+element 0.5 × OD long → top node → penalty tie to the frame slot node, with
+the DOF pattern set by the joint type. Load 20/200 kN at the top-chord centre.
+
+### Regularisation — the working penalty was measured, not chosen
+
+`nlfea_v4.apply_bcs_sparse` scales its penalty to `K.diagonal().max() * 1e8`
+— the **global** maximum. A frame matrix's translational and rotational
+diagonals differ by orders of magnitude, so a global scale makes the condition
+number carry that whole spread on top of the penalty. Scaling to the **local**
+diagonals each constraint ties, `k_pen = α · max(K[a,a], K[b,b])`, makes
+conditioning grow with α alone. Sweeping α on F2 at 200 kN:
+
+| α | δ (mm) | violation (mm) | cond(K) |
+|---|---|---|---|
+| 10² | 2.701813 | 4.8 × 10⁻⁴ | 3.9 × 10⁷ |
+| 10³ | 2.701169 | 4.8 × 10⁻⁵ | 3.9 × 10⁹ |
+| 10⁴ | 2.701105 | 4.8 × 10⁻⁶ | 3.9 × 10¹¹ |
+| **10⁵** | **2.701098** | **4.8 × 10⁻⁷** | **3.9 × 10¹³** |
+| 10⁶ | 2.701098 | 4.8 × 10⁻⁸ | 3.9 × 10¹⁵ |
+| 10⁹ | 2.701098 | 4.8 × 10⁻¹¹ | 2.0 × 10²¹ |
+| 10¹² | 2.701098 | 4.8 × 10⁻¹⁴ | 2.0 × 10²⁷ |
+
+**α = 10⁵.** The displacement has converged to six figures, the violation is
+half a nanometre, and conditioning sits two decades below what double
+precision carries. Everything past it buys precision nobody needs and pays for
+it in conditioning.
+
+### Results, in the order asked for
+
+| layout | slots | δ at 200 kN | ΣR |
+|---|---|---|---|
+| F1 | F @ 0 | 3.71422 mm | 200.000 kN |
+| F2 | F @ ±1.084 | 2.70110 mm | 200.000 kN |
+| PS | P @ +1.084, S @ −1.084 | 2.93552 mm | 200.000 kN |
+| PSD | + D @ ±2.167 | 2.93552 mm | 200.000 kN |
+| F2D | + D @ ±2.167 | 2.70110 mm | 200.000 kN |
+
+F1 is softest — one support point against two. PS is 8.7 % softer than F2 on
+the same two slots, because `P` frees rotation at one and `S` frees sliding at
+the other. **PSD and F2D are bit-identical to PS and F2**, because a `D`
+restrains nothing while open and none of them closes: the largest separation
+across a `D` is 0.61 mm against a 1 mm deadband.
+
+### An engaged deadband holds AT the gap, not at zero
+
+This was wrong first time and the failure is worth keeping. Enforcing
+`u_a − u_b = 0` on an engaged `D` drags the node back to coincidence, which
+drops the separation below the gap, which releases the connector, which lets
+it separate again. The active set chattered — four flips, never settling, and
+the reported state disagreed with the returned displacement.
+
+The signature has to be **`u_a − u_b = ± P_gap`**, and release has to test the
+**force direction**, not the separation: at engagement the separation sits at
+the gap by construction, so testing it again releases every time.
+
+Shrinking the gap on PSD at 200 kN, with that fixed:
+
+| `P_gap` | engaged | flips | δ (mm) |
+|---|---|---|---|
+| 1.000 mm | – – – – | 0 | 2.93552 |
+| 0.600 mm | − . . . | 1 | 2.92808 |
+| 0.500 mm | − . . . | 1 | 2.84427 |
+| 0.300 mm | − . . − | 1 | 2.49554 |
+| 0.100 mm | − . . − | 1 | 2.14434 |
+| 0.030 mm | − . . − | 1 | 2.02142 |
+
+Monotone, settles in one flip, and approaches the rigid-support limit as the
+gap closes. At 0.6 mm only the `D` with 0.609 mm of separation engages, which
+matches the measured separations exactly.
+
+**Without this sweep the D rows above would be indistinguishable from a D
+that does not work.** Engagement has to be seen changing the answer.
+
+### Still owed
+
+The constraints here are applied in **global axes**. The frame is horizontal
+in this study, so EA-ST local x *is* global s and the rotations are ~10⁻⁴ rad
+— exact at the reference configuration and negligible beyond it. It is not
+the co-rotating form the stinger needs, where the local axis turns up to
+32.4°. `S` and `D` are the types that would notice.
+
+---
+
 ## Action log
 
 | Date | Action |
