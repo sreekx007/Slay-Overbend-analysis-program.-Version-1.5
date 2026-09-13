@@ -641,6 +641,59 @@ test B0 pinning the blocker until then?
 
 ---
 
+## 14. Executed — 13 Sep 2026
+
+`tools/run_mesher_rig.py` runs the rig through `build_model` and solves it.
+Until this existed **nothing from the assembly had ever been through the
+solver** — the spike solved a hand-built mesh, and `test_model.py` only
+checked the model's shape. A mesh can be structurally perfect and still be
+wrong: a node in the wrong place, a span double-counted, a length subtly off.
+None of that shows up in a count; it shows up in a deflection.
+
+**Group A, through `build_model`, at `tol = 1e-6`:**
+
+| archetype | el | L (m) | δ 20 kN | δ 200 kN | σ 200 kN | ε 200 kN |
+|---|---|---|---|---|---|---|
+| ILS-TP | 16 | 13.000 | 2.30160 mm | 22.97868 mm | 139.3 MPa | 0.0663 % |
+| ILS-TT | 26 | 14.808 | 3.40158 mm | 33.89434 mm | 158.4 MPa | 0.0754 % |
+| ILS-SH | 22 | 18.096 | 6.20730 mm | 61.35083 mm | 192.2 MPa | 0.0915 % |
+| ILS-SHTP | 24 | 18.096 | 6.20729 mm | 61.34903 mm | 192.2 MPa | 0.0915 % |
+
+**Every deflection reproduces §5 to the last digit** — and §5 was measured on
+a hand-built mesh before `build_model` existed. Two independent construction
+paths agreeing to nine significant figures is the evidence; either alone would
+not be. Mesh invariance likewise: SH vs SHTP at 3.12 × 10⁻⁷ (20 kN) and
+2.95 × 10⁻⁵ (200 kN), both unchanged.
+
+The 200 kN stresses read slightly under §5's 139.5 / 158.9 / 194.2 MPa,
+because those were `M_max·c/I` from the *linear* closed form while these are
+recovered from the converged nonlinear solution — which is stiffer, so its
+moment is lower. Same effect as the deflection column, seen in the other
+variable.
+
+**Peak stress and strain are plotted** (`docs/diagrams/mesher_rig_stress.png`),
+which was ruling 3. The moment diagram comes out as it must for a fixed-fixed
+beam under a central point load: peaks at both ends and at the load, zeros at
+the two contraflexure points. ILS-SH and ILS-SHTP lie on top of each other
+everywhere their meshes share a node and differ only in *where* they sample
+the same diagram — most visible near the contraflexure points, and not a
+disagreement.
+
+23 tests in `rebuild/tests/test_mesher_rig.py` pin all of it.
+
+### One API addition the rig forced
+
+`build_model(..., extra_stations=())`. Finding 4 said `NodeReason` cannot
+express "a load acts here"; the rig hit the consequence. `nlfea_v4.JointLoad`
+names a *node id*, so a load with no node under it cannot be applied at all —
+and ILS-SH has no structural node at its own centre, because GD-SH declares no
+structural lines. Three of the four MANDATORY reasons are geometric and come
+from the component; the rest are external — the elastic-zone boundary Scene
+declares, and the load or restraint point the analysis declares. They arrive
+as bare arc positions until `NodeReason` has members for them.
+
+---
+
 ## Action log
 
 | Date | Action |

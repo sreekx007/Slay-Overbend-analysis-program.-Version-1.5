@@ -233,12 +233,22 @@ def build_model(scene,
                 s_centre: float = 0.0,
                 target_len: float = None,
                 max_ratio: float = 2.0,
-                merge_tol: float = MERGE_TOL) -> Model:
+                merge_tol: float = MERGE_TOL,
+                extra_stations=()) -> Model:
     """Assemble one Model. See `docs/modules/T3_assembly_spec.md`.
 
     `scene` supplies the extent and the forced-elastic zone boundaries; `ils`
     is optional -- without one the result is plain pipe over the extent, which
     is the M1 case.
+
+    `extra_stations` are arc positions an OUTSIDE layer requires a node at.
+    Three of the four MANDATORY reasons are geometric and come from the
+    component itself; the rest are external -- the elastic-zone boundary that
+    Scene declares, and the point where a load or restraint acts, which the
+    analysis declares. `nlfea_v4.JointLoad` names a node id, so a load with no
+    node under it cannot be applied at all. `NodeReason` has no member for
+    either (finding 4 of the test plan), so they arrive here as bare arc
+    positions until it does.
     """
     target_len = (config.OD_MULTIPLE * config.OD_PIPE_DEF
                   if target_len is None else target_len)
@@ -289,6 +299,8 @@ def build_model(scene,
         reg.add(f'PIPE-C{cid}{slot}', s_c, 0.0, PASS_HEADER, 'pipeline')
     for (s_j, y_j, cid, tag) in junc_stations:
         reg.add(f'{cid}-{tag}', s_j, y_j, PASS_HEADER, cid)
+    for k, s_x in enumerate(extra_stations):
+        reg.add(f'PIPE-X{k}', float(s_x), 0.0, PASS_HEADER, 'pipeline')
 
     # Register every IW point on the header BEFORE building any element, so
     # welds are known by the time an element names an id.
