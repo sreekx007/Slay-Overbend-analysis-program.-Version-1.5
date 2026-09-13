@@ -388,3 +388,91 @@ def test_kernel_leaves_the_model_intact(scene, arch_id):
     assert set(ms.user_node_to_mesh.values()) == set(range(ms.n_nodes))
     for n in m.nodes:
         assert ms.mesh_nodes[ms.user_node_to_mesh[n.index]] == (n.s, n.y)
+
+
+# ---------------------------------------------------------------------------
+# Group B -- the blocker, pinned (test plan "B0")
+# ---------------------------------------------------------------------------
+
+GROUP_B = ('ILS-EAST', 'ILS-EASB', 'ILS-ILT')
+
+
+@pytest.mark.parametrize('arch_id', GROUP_B)
+def test_group_b_is_singular_until_penalties_are_applied(scene, arch_id):
+    """Group B assembles correctly and CANNOT YET BE SOLVED, on purpose.
+
+    The EA structure is held to the pipe by connectors, and a connector is a
+    recorded association enforced by a penalty constraint. The model layer
+    declares those associations; nothing applies them to the stiffness matrix
+    yet. So the frame floats.
+
+    This is pinned rather than left implicit so the gap cannot be mistaken for
+    a passing test later. When the penalty module lands, this test flips to its
+    opposite and that flip is the evidence the module works.
+
+    Measured on the free stiffness matrix with both pipe ends fixed:
+
+        ILS-SH    (Group A)   smallest |eigenvalue| 6.7e+02   solvable
+        ILS-TT    (Group A)                         5.6e+02   solvable
+        ILS-EAST  (Group B)                         1.7e-07   rigid-body mode
+        ILS-ILT   (Group B)                         2.8e-07   rigid-body mode
+        ILS-EASB  (Group B)                         0.0       fully detached
+
+    ILS-EASB is exactly zero because its connectors are zero-length: they
+    contribute no element at all, so those nodes carry no stiffness whatever.
+    Nine orders of magnitude separate the two groups, so this is not a
+    threshold judgement.
+    """
+    np = pytest.importorskip('numpy')
+    fe = pytest.importorskip('nlfea_v4')
+
+    m = _model(scene, arch_id)
+    assert m.associations, 'the ties are declared even though nothing applies them'
+
+    mdl = fe.Model(
+        nodes=[fe.Node(n.index, n.s, n.y) for n in m.nodes],
+        elements=[fe.UserElement(e.index, e.n1, e.n2, 1, 1, seed=1)
+                  for e in m.elements],
+        sections=[fe.PipeSection(1, 0.4064, 0.021)],
+        materials=[fe.Material(1, 2.1e11)])
+    ms = fe.MeshedStructure(mdl)
+    K, *_ = fe.assemble(ms, np.zeros(ms.n_dofs),
+                        np.full(ms.n_elems, np.nan), {}, [], 1.0)
+
+    ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
+    free = np.ones(ms.n_dofs, bool)
+    for n in ends:
+        for k in (0, 1, 2):
+            free[3 * ms.user_node_to_mesh[n.index] + k] = False
+    Kf = K.toarray()[np.ix_(free, free)]
+    smallest = np.abs(np.linalg.eigvalsh((Kf + Kf.T) / 2)).min()
+
+    assert smallest < 1.0, (
+        f'{arch_id}: smallest |eigenvalue| is {smallest:.3e}. If the penalty '
+        f'module has landed, this test has done its job -- invert it.')
+
+
+@pytest.mark.parametrize('arch_id', ('ILS-SH', 'ILS-TT'))
+def test_group_a_is_not_singular(scene, arch_id):
+    """The control. Without it, the test above would pass on a build that had
+    simply stopped assembling anything."""
+    np = pytest.importorskip('numpy')
+    fe = pytest.importorskip('nlfea_v4')
+
+    m = _model(scene, arch_id)
+    mdl = fe.Model(
+        nodes=[fe.Node(n.index, n.s, n.y) for n in m.nodes],
+        elements=[fe.UserElement(e.index, e.n1, e.n2, 1, 1, seed=1)
+                  for e in m.elements],
+        sections=[fe.PipeSection(1, 0.4064, 0.021)],
+        materials=[fe.Material(1, 2.1e11)])
+    ms = fe.MeshedStructure(mdl)
+    K, *_ = fe.assemble(ms, np.zeros(ms.n_dofs),
+                        np.full(ms.n_elems, np.nan), {}, [], 1.0)
+    ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
+    free = np.ones(ms.n_dofs, bool)
+    for n in ends:
+        for k in (0, 1, 2):
+            free[3 * ms.user_node_to_mesh[n.index] + k] = False
+    Kf = K.toarray()[np.ix_(free, free)]
+    assert np.abs(np.linalg.eigvalsh((Kf + Kf.T) / 2)).min() > 100.0
