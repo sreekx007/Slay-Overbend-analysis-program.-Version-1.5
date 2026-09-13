@@ -160,31 +160,83 @@ length, then:
 3. **Record the associations**: `C<n>-P` ↔ the pipeline/IW node, `C<n>-E` ↔
    the EA component node. These are enforced later as **penalty constraints**.
 
+### The frame the constraints live in
+
+Every DOF rule below is stated in the **EA component's local frame**, not in
+global axes:
+
+| axis | direction |
+|---|---|
+| **local x** | along the **slope of the pipeline / IW the connector attaches to** — the tangential direction |
+| **local y** | perpendicular to that — which is the connector's own axis |
+| **rz** | rotation, frame-independent |
+
+**This frame co-rotates, and that is not optional.** The pipe slope runs from
+0° at SR1 to **32.4° at SR7** on the default R = 85 m stinger:
+
+| | SR1 | SR2 | SR3 | SR4 | SR5 | SR6 | SR7 |
+|---|---|---|---|---|---|---|---|
+| slope | 0.00° | 5.39° | 10.79° | 16.18° | 21.57° | 26.96° | 32.36° |
+
+A constraint written against a fixed global direction would be **up to 32°
+wrong** by the time the ILS reaches the stinger tip — and the mesh's reference
+configuration is straight (`T3_model_spec.md` §3), so it starts at 0° and
+rotates as the solve proceeds. A sliding joint that slides in the wrong
+direction is not an approximation of the right one; it restrains the thing it
+was meant to release.
+
+**Consequence for implementation.** `apply_bcs_sparse` applies penalties to
+**global DOF indices**. A constraint aligned with a co-rotating local axis is
+a *skewed* constraint and is not expressible that way. Any connector whose
+rule below is not "all DOF tied" therefore needs the separate module — the
+skew is what makes it separate, as much as the nonlinearity.
+
 ### Which DOF each association ties
 
-The pipe-side association is always **W** or **F** — **all three DOF tied**.
+The **pipe-side** association (`C<n>-P` ↔ pipeline/IW node) is always **W** or
+**F**: all three DOF tied. Frame does not matter when everything is tied.
 
-The EA-side association varies by connector type. `component_spec`'s
-`CONNECTOR_OAM_CLASS` already fixes the kinematics; this is that map written
-out as DOF:
+The **EA-side** association (`C<n>-E` ↔ EA node) varies by joint type.
+`component_spec`'s `CONNECTOR_OAM_CLASS` fixes the kinematics; this writes
+them out as DOF in the local frame above:
 
-| type | OAM class | ux | uy | rz | notes |
+| type | OAM class | local x (along slope) | local y (perpendicular) | rz | skewed? |
 |---|---|---|---|---|---|
-| `W` | FixedConnection | tied | tied | tied | girth weld |
-| `F` | FixedConnection | tied | tied | tied | fixed attachment |
-| `P` | MovableConnection | tied | tied | **free** | revolute — a pin |
-| `S` | MovableConnection | ? | ? | tied | prismatic — **see Q1** |
-| `D` | IntermittentConnection | gap-dependent | | | deadband `P_gap`, **nonlinear** |
+| `W` | FixedConnection | tied | tied | tied | no |
+| `F` | FixedConnection | tied | tied | tied | no |
+| `P` | MovableConnection | tied | tied | **free** | no — rz is frame-free |
+| `S` | MovableConnection | **free — slides along the slope** | tied | tied | **yes** |
+| `D` | IntermittentConnection | see below | **deadband ±`P_gap`** | see below | **yes** |
 
-`D` is genuinely a separate module, as you anticipated. It is an active-set
-problem — engaged or free depending on a gap — which is **the same machinery
-as roller contact**, and should reuse that rather than grow a second copy.
+**`S` — RULED 13 Sep 2026.** Free to slide along the **local x axis of the
+EA-ST**, i.e. along the slope direction of the pipeline/IW it attaches to.
+Not along its own axis. This was the open question and it is the answer that
+makes physical sense for a slotted support: the frame is free to travel with
+the pipe as the pipe stretches and rotates beneath it, while still carrying
+load across the gap.
 
-**G9 still stands until this lands.** "Never substitute F for P/S/D — the
-solver implements F only; a P/S/D case must be refused, not approximated."
-This design is the route to lifting G9, not an exemption from it. All seven
-archetypes use `F` (`connection_system = 'F2'`), so **Group B can be built and
-run on F alone first**, with P/S/D following.
+**`D` — RULED 13 Sep 2026, and it is a deadband, not a contact gap.**
+
+A `D` connector is a **bidirectional support**. It engages only once the
+displacement **perpendicular to the EA component slope** — the local y
+direction, the connector's own axis — exceeds `P_gap`.
+
+This corrects the shape I proposed earlier. Roller contact is **unilateral**:
+the gap closes in one direction and uplift is simply free. A `D` connector is
+a **symmetric deadband**: free within ±`P_gap`, engaged beyond it **in either
+direction**.
+
+```
+        engaged          free          engaged
+    <---------------|--------------|--------------->
+                 -P_gap     0     +P_gap        local y
+```
+
+So it shares the **machinery** with roller contact — an active set, re-solved
+as the state changes — but not the **rule**. They differ by one condition,
+and the module should take the condition as a parameter rather than grow two
+implementations. That is the reuse worth having; "same as contact" would have
+been wrong.
 
 ## 8. Pass 4 — connector stiffness
 
@@ -276,23 +328,46 @@ then     mesh each part element separately
          assign final integer node and element numbers
 ```
 
-## 11. Questions
+## 11. Open items
 
-**1. The `S` (prismatic) connector — which translation slides?** The map
-fixes `rz` as tied and one translation as free, but not which. For a
-connector running transverse to the pipe, "slides along its own axis" (axial
-free, shear tied) and "slides along the pipe" (shear free, axial tied) are
-both defensible and they are different joints. No safe default.
+All three questions of 13 Sep are answered. What is left is one decision and
+two things to measure rather than assert.
 
-**2. Penalty stiffness magnitude.** Pass 4 sets the *connector element*
-stiffness. The *penalty* that enforces each association is a separate number.
-Proposal: 10³ × the local structural stiffness — stiff enough to tie, soft
-enough to keep the matrix conditioned. Worth pinning by experiment on the
-first EA case rather than by assertion.
+**1. `D`'s other two DOF — NOT YET RULED.** The perpendicular behaviour is
+settled: a symmetric ±`P_gap` deadband on local y. What a `D` does in **local
+x** and **rz** while its deadband is open is not. Two readings:
 
-**3. `D` connectors.** Confirm these follow the roller-contact active-set
-module rather than a second implementation, and that they are out of scope
-until that module exists.
+- a pure support — local x and rz stay free whatever the gap does, so the
+  connector carries load in one direction only and never restrains sliding
+  or rotation;
+- a gapped `F` — once engaged, all three DOF tie; while open, none do.
+
+These give different frame behaviour under the same `P_gap`. No safe default,
+and it only matters when `D` is implemented, so it is not blocking.
+
+**2. Penalty stiffness magnitude — RULED: measure it.** Pass 4 sets the
+*connector element* stiffness; the *penalty* enforcing each association is a
+separate number. Starting point 10³ × the local structural stiffness, then
+pinned by experiment on the first EA case. G5's lesson applies —
+conditioning, not magnitude, is what failed before — so the experiment
+records the residual and the condition number, not just whether it ran.
+
+**3. The skewed-constraint module.** `S` and `D` both need constraints
+aligned with a co-rotating local axis, which `apply_bcs_sparse` cannot
+express (§7). Scoping that module is its own card. Nothing above it is
+blocked: **`F` needs none of it**, and all seven archetypes use `F`.
+
+### Staging
+
+| stage | needs | unblocks |
+|---|---|---|
+| **1** | passes 1–4, `F`/`W` only, all DOF tied | all 7 archetypes, Group A and Group B |
+| **2** | penalty experiment | the stiffness number, measured |
+| **3** | skewed constraints, co-rotating | `P` (rz free — no skew, could come earlier), then `S` |
+| **4** | active set with a deadband condition | `D` |
+
+**G9 stands until stage 3–4 land.** A `P`/`S`/`D` case is refused, never
+approximated by `F`.
 
 ---
 
@@ -300,4 +375,5 @@ until that module exists.
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | Connector kinematics ruled. `S` slides along the EA-ST **local x** — the slope direction of the pipeline/IW it attaches to, not its own axis. `D` is a **symmetric ±`P_gap` deadband** on the perpendicular (local y) direction, bidirectional — which corrects the earlier claim that it is the same rule as roller contact: it shares the active-set machinery but not the condition, one being unilateral and the other a deadband. Both constraints live in a **co-rotating local frame**: the pipe slope runs 0° to 32.4° across the stinger at R = 85 m, so a globally-aligned constraint would be up to 32° wrong, and `apply_bcs_sparse` cannot express a skewed constraint — that, as much as the nonlinearity, is what makes the separate module necessary. Staging recorded: `F`-only first, which needs none of it. |
 | 13 Sep 2026 | Assembly ruled: four-pass build, 0.01 m merge tolerance within a pass and never across, two-layer node identity, connectors as recorded associations enforced by penalty constraints, connector stiffness from a 1 × OD length of pipeline. Merge tolerance verified against all 7 archetypes and 35 anchors — tightest distinct spacing 0.176 m, a 17.6× margin. G6 answered: the kernel keys nodes by ID, since deliberate merging now lives in the mesher. |
