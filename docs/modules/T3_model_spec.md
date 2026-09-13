@@ -1,6 +1,8 @@
 # T3 — Model · specification for review
 
-**Status:** DRAFT — §3 step 1 (plain-language algorithm). Awaiting your review.
+**Status:** §3 step 1 reviewed; the two open decisions are RULED in §10
+(13 Sep 2026). Implementation waits only on G6 —
+`docs/modules/T3_mesher_test_plan.md` §7.
 **Card:** `docs/SLAY_BUILD_INSTRUCTION.md` §6 T3
 **Layer:** `model` (L4) · **Workflow:** algorithmic only
 
@@ -212,32 +214,56 @@ it is cheap.
 
 Check 5 is where §2.5's claim stops being an assertion.
 
-## 10. Questions for you
+## 10. Decisions — answered 13 Sep 2026
 
-**1. ILS placement direction.** To map ILS-local positions into `s` I need
-to know which way the ILS faces. I propose **local +x aligns with +s**, i.e.
-toward the stinger, so `s = s_centre + x_local`. The alternative aligns it
-with world +x, toward the vessel, and the two differ by a reflection — an
-ILS with an asymmetric component (a GD-TT with unequal NIBs, a GD-B branch)
-would be installed back-to-front under the wrong one. No default is safe
-here, so I would rather have it stated.
+**1. ILS placement direction — RULED: local +x toward the VESSEL.**
 
-**2. Scope of this card.** The milestone ladder needs only a plain-pipe
-header for M1, but we have 7 EDAS archetypes that already build, and
-exercising the splice and junction machinery against them now costs little
-and de-risks T9 considerably. I propose building the full machinery and
-verifying against the archetypes, while leaving component *contact
-ownership* to T9 as planned. Say if you would rather keep T3 to plain pipe
-only.
+This is the opposite of what §10 originally proposed, and the difference is a
+reflection, so it is worth writing the consequence down rather than leaving it
+to be re-derived.
 
-**3. Flowchart.** Unlike Scene, this module has real control flow —
-chaining, station collection, junction resolution, numbering. A mermaid
-flowchart looks worth drawing here. Agree?
+`slay/scene/path.py` measures arc length from SR1 with **`s` increasing toward
+the stinger** while **`x` increases toward the vessel** — `ds/dx < 0`, the one
+minus sign in the scene layer. So aligning ILS-local +x with the vessel makes
+the ILS frame agree with the world frame exactly:
 
----
+| | ILS-local | world | mapping |
+|---|---|---|---|
+| along the pipe | `+x` toward the vessel | `+x` toward the vessel | identity |
+| transverse | `+y` down (EDAS convention) | `+y` down | identity |
+| arc length | — | `+s` toward the stinger | **`s = s_centre − x_local`** |
+
+**There is no reflection anywhere** — the ILS is placed by a translation in
+`x`, and the single sign flip lives in the `x → s` conversion that already
+exists in `path.py`. An asymmetric assembly (ILS-ILT's GD-B branch, a GD-TT
+with unequal NIBs) therefore installs with its local +x end nearer the vessel,
+which is the thing that had to be stated because no default is safe.
+
+The same property the layout diagram has — stinger left, vessel right, no
+axis flip — now holds for component placement too.
+
+**2. Scope — RULED: full junction machinery, verified against all seven
+archetypes.** Not plain pipe only. `merge_junctions` and the §4 integrity
+assertion are built now and exercised on every archetype, which de-risks T9
+and turns §7's D2 argument into evidence rather than an assertion.
+
+Note the boundary this does *not* cross. **Junctions and connectors are
+different mechanisms** and only the first is in scope here:
+
+- a **junction** is `component.junctions()` — a declared shared node between
+  two lines of the *same* component, e.g. ILS-ILT's GD-B teeing into the
+  pipeline. Pure topology, no physics, entirely the mesher's business.
+- a **connector** is `ILS.connectors_of()` — an ILS-level attachment of a
+  separate structure to the pipe, returned as an axial station plus a moment
+  arm. What it becomes in the FE model is a modelling decision, not a meshing
+  one. See `T3_mesher_test_plan.md` §12 Q6.
+
+**3. Flowchart.** Still open. Not blocking — the drawing is written after the
+control flow it documents, so it lands with steps 5–7.
 
 ## Action log
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | §10 rulings: ILS-local +x points toward the VESSEL, so the ILS frame matches the world frame and placement is a pure translation with `s = s_centre − x_local` — the opposite of the draft's proposal. Scope ruled to full junction machinery against all seven archetypes, with the junction/connector distinction made explicit. |
 | 12 Sep 2026 | Draft written. §4 finding (kernel merges by coordinate) restates the card's junction rule as a Model integrity assertion. D2 answered in §7: no MeshTopology, with check 4 as the evidence. |

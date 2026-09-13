@@ -173,7 +173,7 @@ then thickened in a second pass.
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
 | T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
 | T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
-| T3 | L4 | header polyline, junction merge, global numbering | — | spec + test plan drafted, awaiting review; **D2 comes due here** |
+| T3 | L4 | header polyline, junction merge, global numbering | — | spec + test plan RULED 13 Sep; **blocked on G6** (kernel node merge); D2 answered — no `MeshTopology` |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
@@ -603,6 +603,7 @@ from EDES.
 |---|---|
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
+| 13 Sep 2026 | T3 rulings: ILS-local +x toward the vessel (placement is a pure translation, `s = s_centre − x_local`); 6 m of plain pipe beyond each component end; full junction machinery against all seven archetypes; the 20 kN case confirmed alongside 200 kN with peak stress/strain plotted per component. Connector modelling restated as an open question with a recommendation (`T3_mesher_test_plan.md` §13). G6 is now the only blocker on T3 implementation. |
 | 12 Sep 2026 | T3 mesher test plan drafted (`docs/modules/T3_mesher_test_plan.md`) with `tools/spike_mesher_rig.py` as its measuring instrument. **G6 flagged for amendment** — the kernel merges coincident nodes and the ruling is that it must be fixed; wording and options are in the plan §7, and nothing is edited until confirmed. |
 | 12 Sep 2026 | T1 complete. EDAS layouts vendored as L2 fixtures; second verification source (published anchors) recorded in §7; D5 raised on which source gates the ladder. EDES noted as not a build input. |
 | 12 Sep 2026 | T2 complete. Layout diagram generated from Scene (SVG, to scale). Model extent left at the station span for now — the end zones therefore cover SR5/SR6; deferred, see T2 spec §9. |

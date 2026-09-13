@@ -1,6 +1,8 @@
 # T3 — mesher test plan
 
-**Status:** DRAFT for review. Companion to `docs/modules/T3_model_spec.md`.
+**Status:** Rig and case set RULED 13 Sep 2026 (§12). One decision still
+blocks implementation — **G6**, §7 — and one is deferred pending your answer
+— **connectors**, §13. Companion to `docs/modules/T3_model_spec.md`.
 **Card:** `docs/SLAY_BUILD_INSTRUCTION.md` §6 T3 · **Layer:** `model` (L4)
 **Every number below was produced by a working spike**, not estimated. What
 the spike is and how to re-run it is in §11.
@@ -205,6 +207,7 @@ Cheap, exact, and they fail first when something breaks.
 | 2.2 | end moments | `Pab²/L²` and `Pa²b/L²` to 1 × 10⁻⁴ relative |
 | 2.3 | reactions sum | `ΣF_y = −P` to 1 × 10⁻⁹ |
 | 2.4 | symmetry | δ(s) = δ(L−s) to 1 × 10⁻¹⁰ on the three symmetric cases |
+| 2.5 | **peak stress and strain plotted per component** | peak lands at the two fixed ends and the load point, at the §5 figures, and does **not** drift with refinement (§12 Q3) |
 
 2.1 is stated as a *band*, not a bound. An open "within 1 %" bound would pass
 happily on a mesher that had lost a station; requiring the residual to equal
@@ -236,6 +239,7 @@ is the same shift-invariance claim T3 spec §9 check 5 makes.
 | 4.4 | ILS-SH vs ILS-SHTP | **2.95 × 10⁻⁵ ± 20 %** — genuine mesh sensitivity, confirmed tolerance-independent (§8) |
 | 4.5 | peak stress below first yield | < 360 MPa, recorded per case (worst 194.2 MPa) |
 | 4.6 | **every solve returns within a few seconds** | a stalled solve never returns and is never reported (§8); the harness times out, the kernel will not |
+| 4.7 | peak stress and strain plotted per component | as 2.5, at the 200 kN figures |
 
 ### Tier 5 — Group B, deferred
 
@@ -495,38 +499,133 @@ When T3 is implemented the tests are rewritten against the real
 `build_model()` and the spike is deleted — it exists to plan the tests, not
 to become them.
 
-## 12. Questions for you
+## 12. Decisions — answered 13 Sep 2026
 
-**1. Which "6 m"?** EDAS pins `header.half_length` — 6.0 m for five
-archetypes, 6.164 m for EASB and ILT — measured **from the ILS centre**. Your
-instruction reads 6 m **beyond each end of the component**. For ILS-SH
-(6.096 m span) those are very different models: EDAS's header leaves 2.95 m
-of plain pipe each side, yours leaves 6 m. I have built yours.
+**1. Which "6 m" — RULED: 6 m beyond each end of the component.** Not EDAS's
+`header.half_length` from the ILS centre. The plan as written is correct;
+`L = span + 12 m` stands.
 
-One consequence to accept with it: the rig's pipeline is longer than the
-archetype's pinned header, so the fixture's recorded `mass_kg` and `cog_m` do
-not describe the rig model. The existing geometry tests keep the pinned
-header; the mesher tests use the rig's. The two must not be compared.
+One consequence travels with it: the rig's pipeline is longer than the
+archetype's pinned header, so the fixture's recorded `mass_kg` and `cog_m`
+describe a different model and must never be compared against the rig's. The
+existing geometry tests keep the pinned header; the mesher tests use the
+rig's.
 
-**2. "Component body centre" on ILS-ILT.** Its extent is asymmetric
-(−1.626 … +4.064 m). The ILS-local origin `x = 0` is the GD-B branch centre;
-the extent midpoint is `x = +1.219 m`. I have taken `x = 0`, the assembly's
-own datum, which makes ILT the one off-centre case in the set. Only ILT is
-affected and it sits in deferred Group B, so this can wait — but it needs
-deciding before Group B runs.
+**2. Asymmetry — RULED: fine as it is.** ILS-ILT keeps its load at the
+ILS-local origin `x = 0`, leaving it the one off-centre case, exercising the
+general `Pa³b³/3EI·L³` form rather than the centred special case. The aim is a
+*testable* model of meshing, and an asymmetric case tests more of it.
 
-**3. The 20 kN run.** Not in your specification. It is the only absolute
-check in the plan (§3), and it costs one extra solve per case. Confirm you
-want it, or the plan drops to invariances only.
+**3. Both loads — RULED: 20 kN runs, and the results get plotted.**
 
-**4. Group B deferral.** EAST, EASB and ILT need connector modelling that
-does not exist yet (§4), and that is a physics-layer design question rather
-than a mesher one. Confirm it belongs on a later card, with test B0 pinning
-the blocker in the meantime.
+So the rig has two load cases, not one:
 
-**5. G6.** §7 recommends option (b) — a `merge_coincident` flag defaulting to
-today's behaviour — plus the amended wording. Confirm before any line of
-`nlfea_v4.py` is touched.
+| | purpose |
+|---|---|
+| **20 kN** | the analytical regime. Closed form is usable as an absolute reference, the mesh is invisible to 5.5 × 10⁻⁶ over a 15× refinement, and peak stress/strain are plotted per component |
+| **200 kN** | the rig as originally specified. Invariances, and the pinned 2.95 × 10⁻⁵ nonlinear mesh sensitivity |
+
+**New requirement: plot peak stress and strain per case.** That is an output
+the plan did not previously carry, and it changes one thing about the rig —
+recovering a *peak* means recovering element stresses, not just the
+displacement at the load point.
+
+Two notes on doing that honestly:
+
+- **Peak stress is the diagnostic, not the acceptance criterion.** The
+  acceptance criteria stay the invariances and the closed form, because a
+  peak is a maximum over elements and a maximum is exactly the quantity that
+  moves when a node moves. Plotting it is how a meshing defect becomes
+  *visible*; asserting on it is how a sound mesh gets failed for being
+  refined. Both matter, and they are not the same test.
+- With the pipeline section applied throughout and the load at a node,
+  `σ = Mc/I` peaks at a fixed *material* location (the two fixed ends and the
+  load point), so the plotted peak must land on the §5 figures — 13.9 to
+  19.4 MPa at 20 kN, 139.5 to 194.2 MPa at 200 kN — regardless of how the
+  span between them is discretised. A peak that drifts with refinement on a
+  prismatic beam is a finding.
+
+The plots belong to the rig, not to L8: they are `tools/` output for reading
+a test result, not the reporting layer's product.
+
+**4. Scope — RULED: full junction machinery against all seven archetypes.**
+Recorded in `T3_model_spec.md` §10, which also sets out why *junctions* and
+*connectors* are different mechanisms and only the first is settled by this
+ruling.
+
+**5. G6 — still open.** §7 recommends option (b): a `merge_coincident` flag
+on `Model` defaulting to today's behaviour, so every validated result stays
+bit-identical while our layer opts out. No line of `nlfea_v4.py` is touched
+until this is ruled on. **This is the one decision blocking implementation.**
+
+**6. Group B — still open.** Restated at length below, since the original
+phrasing was too compressed to answer.
+
+---
+
+## 13. Q6 restated — what a connector becomes in the model
+
+**The situation.** ILS-EAST, ILS-EASB and ILS-ILT each carry a structure that
+sits *beside* the pipe on its own structural line — a GD-ST portal frame, a
+GD-SB straddle. That line declares **no junction** to the pipeline. The
+attachment is made at the ILS level instead, and this is what the builder
+returns for it:
+
+```
+ILS-EAST   connectors_of(GD-ST) -> [(2, -1.0837, 'F', 0.6096, None),
+                                    (4, +1.0837, 'F', 0.6096, None)]
+                                    ^index  ^axial x  ^type  ^moment arm
+```
+
+An axial station, a type, and a **moment arm**. No second node, no
+`y_offset`, no geometry. A connector today is a *recipe for a constraint*,
+not an object with nodes — so there is nothing for the mesher to mesh, and
+nothing holding the frame to the pipe. Assembled as-is, the frame has rigid
+body modes and the stiffness matrix is singular. **Group B cannot be solved
+at all until someone decides what that recipe becomes.**
+
+That is a modelling decision, not a meshing one, which is why I proposed
+deferring it.
+
+**What makes it genuinely undecided** is that two documents in this
+repository already answer it, differently:
+
+- `T3_model_spec.md` §8 says *"Connectors are emitted as single 2-node
+  elements, never subdivided"* — a real element spanning the offset.
+- `ils_builder.modelling_boundaries()` records the published studies' own
+  convention: *"Connectors attach ON THE PIPE CENTRELINE: active_connectors()
+  returns an axial station and a moment arm, carrying no offset from the pipe
+  axis. Listed under Limitations in both studies."* — i.e. a **zero-length**
+  tie at `y = 0`, with the arm carried as a moment rather than as geometry.
+
+Those are different models. They give different attachment stiffness,
+different local stress where the frame meets the pipe, and different node
+counts. Worse, they differ on §4 of the spec: under the zero-length reading
+the frame node and the pipe node **coincide by intent**, so the merge is
+correct and the §4 assertion must expect it — which is the one case where
+coincidence is not a defect.
+
+**The three candidates:**
+
+| | Model | Needs | Cost |
+|---|---|---|---|
+| **(a)** | a short 2-node beam element, length = the moment arm, frame node to pipe node | nothing new — it is another `UserElement` | its section/stiffness becomes a parameter nobody has chosen; too stiff and it is a rigid link, too soft and it is a spring (cf. **G5**, which forbids `k_spring`) |
+| **(b)** | zero-length tie on the centreline, arm carried as an offset moment | the published convention, and the kernel's existing coordinate merge does the tie for free | reproduces the benchmark studies exactly; the arm's real geometry is never in the model, so local effects at the attachment are not represented |
+| **(c)** | kinematic coupling — frame DOF tied to pipe DOF with an offset | a multi-point-constraint facility | the kernel has none; this is new solver work |
+
+**My recommendation is (b), and to keep Group B deferred.** (b) is what the
+published anchors were computed against, so it is the only option under which
+those 24 published results remain a valid check on our solver — and per §7 of
+the build instruction, the anchors are one of the two verification sources.
+Choosing (a) or (c) now would mean our first EA result cannot be compared
+against anything. It also costs nothing to defer: Group A tests the mesher
+completely on its own, and (b) requires the G6 merge decision to have landed
+first, since it depends on coincident nodes tying correctly *on purpose*.
+
+**So the question, precisely:** do you want connector modelling decided now,
+inside T3 — in which case I would implement (b) and Group B joins the rig —
+or left to the card that also handles component contact ownership (T9), with
+test B0 pinning the blocker until then?
 
 ---
 
@@ -534,4 +633,5 @@ today's behaviour — plus the amended wording. Confirm before any line of
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | Rulings recorded in §12: 6 m beyond each component end; ILS-ILT's asymmetry kept deliberately; the 20 kN case confirmed alongside the specified 200 kN, **with peak stress and strain plotted per component** (a new output, added as checks 2.5 and 4.7); full junction machinery against all seven archetypes. Q6 restated at length in §13 with three connector models, their costs, and a recommendation — deferring, and modelling the connector as the published zero-length centreline tie, so the 24 published anchors stay a valid check. G6 (§7) remains the one decision blocking implementation. |
 | 12 Sep 2026 | Plan written against the specified rig. Four findings: the kernel merges coincident nodes (§7, amends G6); the solver tolerance has an under-converged default, a usable plateau at 10⁻⁵–10⁻⁷ and a silent non-terminating cliff past it (§8); fibre integration is 6.6 % stiff at 30 fibres (§9); `NodeReason` has no member for a load point (§10). Case set split into prismatic Group A (runs today) and attached Group B (blocked on connector modelling). Every figure measured by `tools/spike_mesher_rig.py`. |
