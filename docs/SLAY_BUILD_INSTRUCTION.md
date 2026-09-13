@@ -173,7 +173,7 @@ then thickened in a second pass.
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
 | T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
 | T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
-| T3 | L4 | header polyline, junction merge, global numbering | — | **fully specified, unblocked** — `T3_assembly_spec.md` (build), `T3_model_spec.md` (design), `T3_mesher_test_plan.md` (tests). D2 answered — no `MeshTopology` |
+| T3 | L4 | header polyline, junction merge, global numbering | — | ✅ 13 Sep 2026 — stage 1 (F/W). `slay/model/parts.py`, `slay/model/assemble.py`, 62 tests. All 7 archetypes assemble. D2 answered — no `MeshTopology` |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
@@ -603,6 +603,7 @@ from EDES.
 |---|---|
 | 11 Sep 2026 | v1.0 — initial. Layers, artifact chain, and workflow map agreed in session; build order refined to a vertical-slice-first sequence (§5 note); D1/D2 raised. |
 | 12 Sep 2026 | D1 resolved (plain names). T0 complete. `slay_mesh.py` → `slay/model/mesh.py`. Status column added to §5. D2 still open, due at T3. |
+| 13 Sep 2026 | **T3 stage 1 implemented.** `slay/model/parts.py` (part layer, merge registry, joint kinematics) and `slay/model/assemble.py` (the four passes). All seven archetypes assemble; plain pipe gives the predicted 109 elements. `nlfea_v4._mesh()` changed under the amended G6 to key nodes by id — the validated rig re-run and every figure bit-identical, the only change being the merge probe now reporting nodes kept separate. |
 | 13 Sep 2026 | `D` ruled a pure support — perpendicular deadband only, never restraining slide or rotation. Adds a **layout-adequacy rule** to the physics layer: a connector layout must restrain local x, local y and rz with every `D` treated as open, else refuse it (**G9** — refuse, never stiffen to rescue). All six named systems pass in their weakest state; a hand-built `D/-/-/-/D` does not. |
 | 13 Sep 2026 | Connector kinematics ruled (`T3_assembly_spec.md` §7): `S` slides along the EA-ST local x, the pipeline slope direction; `D` is a symmetric ±`P_gap` deadband perpendicular to it, bidirectional. Both need constraints in a **co-rotating** frame — the pipe slope reaches 32.4° at SR7 — which `apply_bcs_sparse` cannot express, so the skew is as much a reason for a separate module as the nonlinearity. Staged: `F`-only needs none of it and covers all seven archetypes. |
 | 13 Sep 2026 | **G6 amended and the assembly ruled** (`docs/modules/T3_assembly_spec.md`): four ordered passes, 0.01 m merge tolerance within a pass and never across it, two-layer node identity, connectors as recorded associations enforced by penalty constraints on the DOF their joint type restrains, connector stiffness from a 1 × OD length of pipeline rather than from their own length. The kernel will key nodes by id. Tolerance verified across all 7 archetypes and 35 anchors — tightest distinct spacing 0.176 m, a 17.6× margin. T3 is unblocked. |

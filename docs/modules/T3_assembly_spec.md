@@ -425,3 +425,76 @@ approximated by `F`.
 | 13 Sep 2026 | `D` ruled a **pure support**: local x and rz never restrained, in either state; only the perpendicular deadband. That forces a layout-adequacy rule, since a support that holds nothing while open cannot restrain a structure alone — checked against all six named systems with every gap open, and all six are adequate (`PS` exactly so: `P` gives local x, `S` gives rz). `ConnectionSystem` accepts any 5-tuple though, and `D/-/-/-/D` is legal to build and singular in both states, so the check is generic on the tuple rather than a whitelist. |
 | 13 Sep 2026 | Connector kinematics ruled. `S` slides along the EA-ST **local x** — the slope direction of the pipeline/IW it attaches to, not its own axis. `D` is a **symmetric ±`P_gap` deadband** on the perpendicular (local y) direction, bidirectional — which corrects the earlier claim that it is the same rule as roller contact: it shares the active-set machinery but not the condition, one being unilateral and the other a deadband. Both constraints live in a **co-rotating local frame**: the pipe slope runs 0° to 32.4° across the stinger at R = 85 m, so a globally-aligned constraint would be up to 32° wrong, and `apply_bcs_sparse` cannot express a skewed constraint — that, as much as the nonlinearity, is what makes the separate module necessary. Staging recorded: `F`-only first, which needs none of it. |
 | 13 Sep 2026 | Assembly ruled: four-pass build, 0.01 m merge tolerance within a pass and never across, two-layer node identity, connectors as recorded associations enforced by penalty constraints, connector stiffness from a 1 × OD length of pipeline. Merge tolerance verified against all 7 archetypes and 35 anchors — tightest distinct spacing 0.176 m, a 17.6× margin. G6 answered: the kernel keys nodes by ID, since deliberate merging now lives in the mesher. |
+
+---
+
+## Implementation notes — 13 Sep 2026
+
+Stage 1 is built: `rebuild/slay/model/parts.py` (part layer, merge registry,
+joint kinematics) and `rebuild/slay/model/assemble.py` (the four passes),
+with 62 tests in `rebuild/tests/test_model.py`.
+
+**All seven archetypes assemble.** Plain pipe gives 110 nodes / 109 elements
+over the 88 m extent at 2 × OD, which is the figure `T3_model_spec.md` §9
+predicted.
+
+| archetype | nodes | elements | associations | lines |
+|---|---|---|---|---|
+| ILS-TP | 111 | 110 | 0 | 1 |
+| ILS-TT | 119 | 118 | 0 | 1 |
+| ILS-SH | 110 | 109 | 0 | 1 |
+| ILS-SHTP | 111 | 110 | 0 | 1 |
+| ILS-EAST | 132 | 129 | 4 | 4 |
+| ILS-EASB | 134 | 129 | 4 | 2 |
+| ILS-ILT | 138 | 135 | 4 | 5 |
+
+### Three things the build found
+
+**1. A declared junction needs a station, and the declaration is what creates
+it.** ILS-ILT would not assemble: GD-B declares a tee onto the pipeline, but
+GD-B has no line *on* the pipeline, so pass 1 never registered a header node
+there and pass 1b had nothing to resolve into. Junction targets are now
+collected in pass 0 alongside the connector stations — same reasoning, same
+place: the position is known up front, the tie is still built later.
+
+**2. The two ends of a connector are separate populations.** A zero-length
+connector puts `C<n>-P` and `C<n>-E` at the same point, and the within-pass
+merge promptly fused them — which would have deleted the connector by
+collapsing the very pair the penalty tie joins. They now occupy passes 4 and
+5. The pass mechanism that keeps the straddle off the pipe is the same one
+that keeps a connector from eating itself.
+
+**3. A zero-length connector's nodes need materialising anyway.** They carry
+no element, so the meshing loop never reaches them — but the penalty tie
+needs a DOF row at each end, so they are real nodes. Every part node named by
+an association is materialised whether or not an element touches it.
+
+### The EASB case, now verified
+
+At slot 2 (`s = 1.0837`, `y = 0`) **four distinct model nodes** now stack: the
+header station, GD-SB's own `sslot2`, and both ends of the zero-length
+connector. Under the old kernel that was **one** node. None of GD-SB's seven
+centreline nodes is a pass-1 node, so the straddle cannot weld itself into the
+pipe wall regardless of element size.
+
+### Shift invariance, corrected
+
+`T3_model_spec.md` §9 check 5 claimed whole-model invariance. Measured, that
+is too strong and the correction is worth keeping:
+
+- **The ILS's own element lengths are bit-identical** at `s_centre` = 0, +6
+  and −11.5 m, on all seven archetypes.
+- **The plain-pipe filler cannot be.** The extent is fixed while the ILS moves
+  within it, so the gaps either side change length and their
+  `round(L / target)` subdivision changes too — a 6 m shift is 7.38 elements.
+  One gap gains one, the other loses one.
+
+The component's discretisation is the one that matters: that is where strain
+is reported, and that is what the mesher must not perturb.
+
+### G6 clause (c) — the validated set, re-run
+
+`tools/spike_mesher_rig.py` before and after the kernel change: **every
+numerical figure is bit-identical.** The only differences are timing jitter
+and the coincident-node probe, which now reports 4 mesh nodes from 4 declared
+rather than 3, and "kept separate" rather than "MERGED" — the change itself.

@@ -198,7 +198,7 @@ in the part that mattered: it left merging to coincidence.
 | 2 | Elastic-zone boundaries are nodes | exact nodes at s = −24 and +32 |
 | 3 | **Coincidence ⟺ declared junction** | asserted on every model built, including all 7 EDAS archetypes |
 | 4 | **Chain partition from `line_id` alone** | pipeline and GD-ST frame separable with no topology object (D2) |
-| 5 | **Shift invariance** | two models built with the ILS at different `s` have identical element *counts and lengths*; only positions differ |
+| 5 | **Shift invariance** | the ILS's OWN element lengths are bit-identical at any `s_centre`. Scoped to the components — see the note below |
 | 6 | Every mandatory station survives | component stations all present as nodes (G4) |
 | 7 | Zero-length connector | its two nodes coincide, and the junction declares it |
 | 8 | All 7 EDAS archetypes mesh | zero warnings on each |
@@ -207,7 +207,20 @@ Check 3 is the one that matters most: it is the guard against the
 documented "two-point attachment became a continuous stiffener" failure, and
 it is cheap.
 
-Check 5 is where §2.5's claim stops being an assertion.
+Check 5 is where §2.5's claim stops being an assertion — **and where it turned
+out to be overstated.** Implementation, 13 Sep 2026:
+
+> Component-owned element lengths are bit-identical at `s_centre` = 0, +6 and
+> −11.5 m, on all seven archetypes. The **plain-pipe filler cannot be**: the
+> model extent is fixed while the ILS moves inside it, so the two gaps either
+> side change length and their `round(L / target)` subdivision changes with
+> them. A 6 m shift is 7.38 elements, not a whole number of them, so one gap
+> gains an element and the other loses one.
+
+The invariance that matters is the component's, because that is where strain
+is reported and that is the discretisation the mesher must not perturb. Both
+halves are now asserted: `test_ils_discretisation_is_shift_invariant` and
+`test_plain_pipe_filler_absorbs_the_shift`.
 
 ## 10. Decisions — answered 13 Sep 2026
 
@@ -260,5 +273,6 @@ control flow it documents, so it lands with steps 5–7.
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | T3 implemented. §9 check 5 corrected: shift invariance holds for the ILS's own elements (bit-identical lengths at three placements, all seven archetypes) but NOT for the plain-pipe filler, which must absorb the shift because the extent is fixed while the ILS moves within it. |
 | 13 Sep 2026 | §10 rulings: ILS-local +x points toward the VESSEL, so the ILS frame matches the world frame and placement is a pure translation with `s = s_centre − x_local` — the opposite of the draft's proposal. Scope ruled to full junction machinery against all seven archetypes, with the junction/connector distinction made explicit. |
 | 12 Sep 2026 | Draft written. §4 finding (kernel merges by coordinate) restates the card's junction rule as a Model integrity assertion. D2 answered in §7: no MeshTopology, with check 4 as the evidence. |

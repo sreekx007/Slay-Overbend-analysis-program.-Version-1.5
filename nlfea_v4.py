@@ -943,36 +943,70 @@ class MeshedStructure:
         self.material_map = {mat.id: mat for mat in m.materials}
 
     def _mesh(self):
+        """Build the mesh. NODES ARE IDENTIFIED BY ID, NEVER BY POSITION.
+
+        CHANGED 13 Sep 2026 under the amended G6 (see
+        docs/modules/T3_assembly_spec.md section 9). This used to key every
+        node on (round(x,10), round(y,10)), so two user nodes at the same
+        coordinate silently became one node. That is wrong for models this
+        program must build: a bolted slot connection became a rigid weld, a
+        two-point attachment became a continuous stiffener, and the structure
+        came out stiffer than reality with nothing reported. ILS-EASB's GD-SB
+        sits at P_vt = 0 with seven nodes exactly on the pipe centreline, so
+        it was not a hypothetical.
+
+        Deliberate merging now belongs to the mesher, where it is ordered,
+        bounded by a stated tolerance, and never crosses a pass boundary.
+        This routine's job is to build what it is given and change nothing.
+
+        BEHAVIOUR CHANGE, stated rather than glossed: a model that relied on
+        coordinate coincidence to weld two lines will now come apart. That is
+        the point of the change, not a side effect of it.
+        """
         self.mesh_nodes = []
         self.mesh_elems = []   # (n1, n2, mat_id, sec_id, user_elem_id)
-        node_coords = {}
+        node_index = {}        # user node id -> mesh index
 
-        def get_or_add(x, y):
-            key = (round(x, 10), round(y, 10))
-            if key not in node_coords:
-                node_coords[key] = len(self.mesh_nodes)
-                self.mesh_nodes.append((x, y))
-            return node_coords[key]
+        def user_node(uid):
+            if uid not in node_index:
+                n = self.node_map[uid]
+                node_index[uid] = len(self.mesh_nodes)
+                self.mesh_nodes.append((n.x, n.y))
+            return node_index[uid]
+
+        def interior(x, y):
+            """A subdivision point. Unique to its element by construction, so
+            it needs no key at all."""
+            self.mesh_nodes.append((x, y))
+            return len(self.mesh_nodes) - 1
 
         for ue in self.model.elements:
             n1 = self.node_map[ue.node1_id]
             n2 = self.node_map[ue.node2_id]
             dx = (n2.x - n1.x) / ue.seed
             dy = (n2.y - n1.y) / ue.seed
+            prev = user_node(ue.node1_id)
             for k in range(ue.seed):
-                xa = n1.x + k*dx;     ya = n1.y + k*dy
-                xb = n1.x + (k+1)*dx; yb = n1.y + (k+1)*dy
-                self.mesh_elems.append((get_or_add(xa, ya), get_or_add(xb, yb),
-                                        ue.material_id, ue.section_id, ue.id))
+                if k == ue.seed - 1:
+                    cur = user_node(ue.node2_id)
+                else:
+                    cur = interior(n1.x + (k+1)*dx, n1.y + (k+1)*dy)
+                self.mesh_elems.append((prev, cur, ue.material_id,
+                                        ue.section_id, ue.id))
+                prev = cur
+
+        # A user node no element references still gets an index, so the map is
+        # total. The old coordinate lookup raised KeyError on exactly this
+        # case; an unattached node is a caller's modelling error, but it
+        # should surface as a singular matrix, not as a dict miss here.
+        for uid in self.node_map:
+            user_node(uid)
 
         self.n_nodes = len(self.mesh_nodes)
         self.n_elems = len(self.mesh_elems)
         self.n_dofs  = 3 * self.n_nodes
 
-        self.user_node_to_mesh = {}
-        for uid, unode in self.node_map.items():
-            key = (round(unode.x, 10), round(unode.y, 10))
-            self.user_node_to_mesh[uid] = node_coords[key]
+        self.user_node_to_mesh = dict(node_index)
 
         # Precomputed: user_elem_id -> list of mesh elem indices
         self.user_elem_to_mesh: Dict[int, List[int]] = {}
