@@ -135,7 +135,14 @@ def recover(U, ms) -> tuple:
         th0 = math.atan2(y2 - y1, x2 - x1)
         th = math.atan2((y2 + U[d[4]]) - (y1 + U[d[1]]),
                         (x2 + U[d[3]]) - (x1 + U[d[0]]))
+        # De Souza unwrap, the same one `assemble()` does. Without it an
+        # element whose chain runs in -s has th0 = pi, atan2 returns ~-pi for
+        # the deformed angle, and dth comes out ~-2pi -- giving a moment of
+        # 4EI/L x 2pi that is enormous and IDENTICAL for every load, because
+        # it is measuring the wrap rather than the deformation. The pipeline
+        # rig never saw it: its elements all run one way, so th0 = 0.
         dth = th - th0
+        dth -= 2.0 * math.pi * round(dth / (2.0 * math.pi))
         u3, u6 = U[d[2]] - dth, U[d[5]] - dth
         EIL = ms.elem_E[ie] * ms.elem_I[ie] / L0
         M[ie] = max(abs(4*EIL*u3 + 2*EIL*u6), abs(2*EIL*u3 + 4*EIL*u6))
