@@ -86,15 +86,34 @@ class PartElement:
 class ConnectorSpec:
     """What a connector IS, for L5 to turn into stiffness.
 
-    `stiffness` is deliberately a rule name rather than a number: T3 emits no
-    physics. The rule is pass 4's -- the stiffness of a 1 x OD length of
-    pipeline, never derived from the connector's own length, because zero
-    length is legal and is the default.
+    `stiffness` is deliberately a rule name rather than a number: T3 emits
+    no physics. The rule is pass 4's, and it is ABSOLUTE --
+
+        every connector's stiffness is that of a 1 x OD length of
+        pipeline, whatever the connector's own length is
+
+    -- so length never enters the stiffness at all. `length` is carried
+    for geometry and reporting, never for stiffness.
+
+    THIS IS WHY ZERO LENGTH IS NOT A SPECIAL CASE. A connector at
+    y_struct = 0 is genuinely zero-length, is legal, and is the DEFAULT --
+    ILS-EASB uses it. Under a length-derived stiffness that case would be
+    undefined exactly where it is most needed; under this rule it is the
+    same as every other connector.
+
+    NOTE FOR L5, and it is not optional. The rule means the element's
+    stiffness is PRESCRIBED, not derived from its geometry. `nlfea_v4`'s
+    corotational element builds EA/L0 and EI/L0 from the node coordinates
+    and divides by the deformed length, so a zero-length element makes it
+    divide by zero -- observed, not predicted. Scaling the section by
+    L/OD reproduces the rule for a non-zero length but is still a
+    derivation and still breaks at the legal default, so it is not the
+    answer. A prescribed-stiffness element type is.
     """
     conn_type: str            # F / W / P / S / D
-    length: float             # m, |y_struct|; 0.0 is legal
+    length: float             # m, |y_struct|; 0.0 is legal AND the default
     slot: int                 # which of the five Set-2 slots
-    stiffness: str = '1xOD_pipeline'
+    stiffness: str = '1xOD_pipeline'   # absolute: never length-derived
 
 
 @dataclass(frozen=True)

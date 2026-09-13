@@ -248,14 +248,40 @@ def test_connector_associations_are_recorded(scene):
         assert not a.skewed, 'F needs no co-rotating frame'
 
 
-def test_zero_length_connector_has_no_element(scene):
-    """Zero length is LEGAL and is the default -- ILS-EASB uses it. The penalty
-    tie IS the connector; there is nothing to give a length-derived stiffness
-    to, which is why pass 4's rule is not length-derived."""
+def test_zero_length_connector_is_still_an_element(scene):
+    """Zero length is LEGAL, is the DEFAULT, and is not a special case.
+
+    ILS-EASB's connectors are zero-length and still carry the full connector
+    stiffness -- that of a 1 x OD length of pipeline, the same as every other
+    connector. The rule is absolute precisely so that this case needs no
+    exception: a length-derived stiffness would be undefined exactly where the
+    default lands.
+    """
     m = _model(scene, 'ILS-EASB')
-    assert not [e for e in m.elements if e.connector is not None]
-    assert len([w for w in m.warnings if 'zero-length' in w]) == 2
-    assert len(m.associations) == 4, 'the ties are still declared'
+    conns = [e for e in m.elements if e.connector is not None]
+    assert len(conns) == 2
+    for e in conns:
+        assert e.connector.length == 0.0
+        assert e.connector.stiffness == '1xOD_pipeline'
+    assert len(m.associations) == 4
+    assert m.warnings == []
+
+
+def test_connector_stiffness_is_independent_of_length(scene):
+    """Three archetypes, three different connector lengths, one stiffness
+    rule. If the rule ever became length-derived this is what would catch
+    it."""
+    lengths = {}
+    for arch_id in ('ILS-EASB', 'ILS-ILT', 'ILS-EAST'):
+        m = _model(scene, arch_id)
+        conns = [e for e in m.elements if e.connector is not None]
+        assert conns, arch_id
+        assert {e.connector.stiffness for e in conns} == {'1xOD_pipeline'}
+        lengths[arch_id] = conns[0].connector.length
+    assert lengths['ILS-EASB'] == 0.0
+    assert lengths['ILS-ILT'] == pytest.approx(0.2032)
+    assert lengths['ILS-EAST'] == pytest.approx(0.6096)
+    assert len(set(lengths.values())) == 3, 'the lengths really do differ'
 
 
 def test_nonzero_connector_becomes_an_element(scene):
@@ -398,36 +424,37 @@ GROUP_B = ('ILS-EAST', 'ILS-EASB', 'ILS-ILT')
 
 
 @pytest.mark.parametrize('arch_id', GROUP_B)
-def test_group_b_is_singular_until_penalties_are_applied(scene, arch_id):
+def test_group_b_cannot_yet_be_solved(scene, arch_id):
     """Group B assembles correctly and CANNOT YET BE SOLVED, on purpose.
 
-    The EA structure is held to the pipe by connectors, and a connector is a
-    recorded association enforced by a penalty constraint. The model layer
-    declares those associations; nothing applies them to the stiffness matrix
-    yet. So the frame floats.
+    Pinned rather than left implicit, so the gap cannot be mistaken later for
+    a passing test. There are two distinct blockers and both are real:
 
-    This is pinned rather than left implicit so the gap cannot be mistaken for
-    a passing test later. When the penalty module lands, this test flips to its
-    opposite and that flip is the evidence the module works.
+    1. NO PENALTY CONSTRAINTS. The EA structure is held to the pipe by
+       connectors, and a connector is a recorded association enforced by a
+       penalty. The model declares the associations; nothing applies them, so
+       the frame floats. Measured on the free stiffness matrix with both pipe
+       ends fixed, the smallest |eigenvalue| is 1.7e-07 (EAST) and 2.8e-07
+       (ILT) against 6.7e+02 and 5.6e+02 for Group A -- nine orders of
+       magnitude, so it is not a threshold judgement.
 
-    Measured on the free stiffness matrix with both pipe ends fixed:
+    2. A ZERO-LENGTH CONNECTOR IS NOT A COROTATIONAL ELEMENT. Every connector
+       carries the stiffness of a 1 x OD length of pipeline whatever its own
+       length, so a zero-length one is an ordinary case -- but `nlfea_v4`
+       divides by the deformed length and returns inf/NaN for it. ILS-EASB's
+       connectors are zero-length, which is the DEFAULT, so this is the
+       common case rather than an edge one. It needs a prescribed-stiffness
+       element type, not a workaround.
 
-        ILS-SH    (Group A)   smallest |eigenvalue| 6.7e+02   solvable
-        ILS-TT    (Group A)                         5.6e+02   solvable
-        ILS-EAST  (Group B)                         1.7e-07   rigid-body mode
-        ILS-ILT   (Group B)                         2.8e-07   rigid-body mode
-        ILS-EASB  (Group B)                         0.0       fully detached
-
-    ILS-EASB is exactly zero because its connectors are zero-length: they
-    contribute no element at all, so those nodes carry no stiffness whatever.
-    Nine orders of magnitude separate the two groups, so this is not a
-    threshold judgement.
+    When both land this test flips to its opposite, and that flip is the
+    evidence they work.
     """
     np = pytest.importorskip('numpy')
     fe = pytest.importorskip('nlfea_v4')
 
     m = _model(scene, arch_id)
     assert m.associations, 'the ties are declared even though nothing applies them'
+    assert [e for e in m.elements if e.connector is not None], 'connectors exist'
 
     mdl = fe.Model(
         nodes=[fe.Node(n.index, n.s, n.y) for n in m.nodes],
@@ -436,17 +463,29 @@ def test_group_b_is_singular_until_penalties_are_applied(scene, arch_id):
         sections=[fe.PipeSection(1, 0.4064, 0.021)],
         materials=[fe.Material(1, 2.1e11)])
     ms = fe.MeshedStructure(mdl)
-    K, *_ = fe.assemble(ms, np.zeros(ms.n_dofs),
-                        np.full(ms.n_elems, np.nan), {}, [], 1.0)
+    with np.errstate(divide='ignore', invalid='ignore'):
+        K, *_ = fe.assemble(ms, np.zeros(ms.n_dofs),
+                            np.full(ms.n_elems, np.nan), {}, [], 1.0)
+    Kd = K.toarray()
 
+    zero_len = [e for e in m.elements
+                if e.connector is not None and e.connector.length == 0.0]
+    if zero_len:
+        # Blocker 2. The kernel cannot form this element at all.
+        assert not np.isfinite(Kd).all(), (
+            f'{arch_id}: the kernel now forms a zero-length connector. If a '
+            f'prescribed-stiffness element has landed, invert this test.')
+        return
+
+    # Blocker 1. The matrix is finite but singular -- the frame floats.
+    assert np.isfinite(Kd).all()
     ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
     free = np.ones(ms.n_dofs, bool)
     for n in ends:
         for k in (0, 1, 2):
             free[3 * ms.user_node_to_mesh[n.index] + k] = False
-    Kf = K.toarray()[np.ix_(free, free)]
+    Kf = Kd[np.ix_(free, free)]
     smallest = np.abs(np.linalg.eigvalsh((Kf + Kf.T) / 2)).min()
-
     assert smallest < 1.0, (
         f'{arch_id}: smallest |eigenvalue| is {smallest:.3e}. If the penalty '
         f'module has landed, this test has done its job -- invert it.')

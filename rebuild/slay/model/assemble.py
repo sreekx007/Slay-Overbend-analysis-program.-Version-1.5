@@ -416,19 +416,17 @@ def build_model(scene,
             assocs.append(Association(e_id, ea_node, ctype, TIES_OPEN[ctype],
                                       skewed=SKEWED[ctype]))
 
-            spec = ConnectorSpec(conn_type=ctype, length=abs(y_struct),
-                                 slot=slot)
-            if abs(y_struct) > 1e-12:
-                part_elems.append(PartElement(
-                    line_id=f'{cid}:connector{slot}', n1=p_id, n2=e_id,
-                    owner='GD-Con', connector=spec))
-            else:
-                # Zero length is LEGAL and is the default -- ILS-EASB uses it.
-                # There is no element to build; the penalty tie IS the whole
-                # connector. T3_assembly_spec.md section 8(b).
-                warnings.append(
-                    f'{cid} slot {slot}: zero-length {ctype} connector -- '
-                    f'penalty tie only, no element')
+            # ALWAYS an element, zero length included. Its stiffness is that
+            # of a 1 x OD length of pipeline whatever its own length is, so
+            # length never enters the stiffness at all and there is nothing
+            # for a zero-length case to be undefined about. That is the whole
+            # reason pass 4's rule is not length-derived -- zero length is
+            # legal and is the DEFAULT, and ILS-EASB uses it.
+            part_elems.append(PartElement(
+                line_id=f'{cid}:connector{slot}', n1=p_id, n2=e_id,
+                owner='GD-Con',
+                connector=ConnectorSpec(conn_type=ctype,
+                                        length=abs(y_struct), slot=slot)))
 
     # -- welds, named last -------------------------------------------------
     # A point claimed by two or more owners is a weld. Renaming happens once,
@@ -503,8 +501,20 @@ def _mesh_and_number(reg, part_elems, assocs, warnings, target_len, max_ratio):
             nodes.append(ModelNode(len(nodes), n.x, n.y, pid))
         return part_index[pid]
 
+    # A connector NEVER goes through the line mesher. It is one element by
+    # definition -- never subdivided -- and a zero-length one has no arc
+    # coordinate for the mesher to work in. Routing it straight through is
+    # what lets the stiffness rule stay independent of length.
+    for e in (e for e in part_elems if e.connector is not None):
+        elements.append(ModelElement(
+            index=len(elements),
+            n1=node_for_part(e.n1), n2=node_for_part(e.n2),
+            line_id=e.line_id, owner=e.owner, connector=e.connector))
+
     by_line: dict = {}
     for e in part_elems:
+        if e.connector is not None:
+            continue
         by_line.setdefault(e.line_id, []).append(e)
 
     for line_id, elems in by_line.items():

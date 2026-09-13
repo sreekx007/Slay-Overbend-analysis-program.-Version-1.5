@@ -315,30 +315,61 @@ For the reference pipe (OD 0.4064 m, t 0.021 m, E 2.1 × 10¹¹ Pa), `L₀ = OD`
 | rotational `4EI/L₀` | 9.7865 × 10⁸ N·m/rad |
 | shear `12EI/L₀³` | 1.7776 × 10¹⁰ N/m |
 
-### Two consequences worth stating
+### The rule is absolute, and that is the point
 
-**(a) It supersedes the mirrored presets.** `Connector.k_axial`, `k_shear`
-and `k_rot` all default to `1.0e9`. That matches the rotational figure almost
-exactly (1.02×) but is **13× soft in axial and 18× soft in shear**. Those
-fields live in mirrored code (**G7** — never edited locally), so we do not
-change them: **our physics layer derives connector stiffness from the rule
-and ignores the presets.** If the presets should change, that is an upstream
-request, not a local patch.
+**Every connector's stiffness is that of a 1 × OD length of pipeline,
+whatever the connector's own length is.** Length never enters the stiffness
+at all. `ConnectorSpec.length` is carried for geometry and reporting, never
+for stiffness.
 
-**(b) A zero-length connector is not an element at all.** The kernel computes
-element stiffness as `EA/L₀` and `EI/L₀` from the *geometric* length, so a
-connector of real length `L` gets the rule's stiffness by scaling its section:
+**So a zero-length connector is not a special case.** It carries the same
+stiffness as every other connector, and it is a real element like every other
+connector. This is the whole reason the rule is not length-derived: zero
+length is legal, it is the *default*, and ILS-EASB uses it -- so a
+length-derived stiffness would be undefined exactly where the default lands.
 
-    A_used = A_pipe × L / OD          I_used = I_pipe × L / OD
+An earlier draft of this spec said a zero-length connector was "not an
+element at all -- only the penalty tie". **That was wrong** and the
+implementation inherited the error. It treated the legal default as a
+degenerate case needing an exception, which is the opposite of what the rule
+is for.
 
-which gives `EA_used/L = EA_pipe/OD` exactly, with no kernel change. At
-`L = 0` that scaling is undefined and the element is degenerate — and `L = 0`
-is the **default**, and is what ILS-EASB actually uses (`P_vt = 0` ⇒
-`y_struct = 0` ⇒ `L_conn = 0`). So:
+### It supersedes the mirrored presets
 
-> **If `L_conn = 0` there is no connector element — only the penalty tie
-> between `C<n>-P` and `C<n>-E`. If `L_conn > 0` there is a beam element with
-> the scaled section, plus a penalty tie at each end.**
+`Connector.k_axial`, `k_shear` and `k_rot` all default to `1.0e9`. That
+matches the rotational figure almost exactly (1.02×) but is **13× soft in
+axial and 18× soft in shear**. Those fields live in mirrored code (**G7** --
+never edited locally), so we do not change them: **our physics layer derives
+connector stiffness from the rule and ignores the presets.** If the presets
+should change, that is an upstream request, not a local patch.
+
+### What L5 has to build, and it is not optional
+
+The rule means the connector element's stiffness is **prescribed**, not
+derived from its geometry. `nlfea_v4`'s corotational element builds `EA/L0`
+and `EI/L0` from the node coordinates and divides by the deformed length
+`Ld`, so a zero-length element makes it divide by zero.
+
+**Observed, not predicted.** Assembling ILS-EASB and calling `assemble()`
+gives `RuntimeWarning: divide by zero` at `nlfea_v4.py:1216` and a stiffness
+matrix carrying `inf`.
+
+Two approaches that do *not* work:
+
+- **Scale the section by `L/OD`** (`A_used = A_pipe·L/OD`,
+  `I_used = I_pipe·L/OD`). This reproduces the local terms exactly for a
+  non-zero length -- but it is still a derivation from length, and it breaks
+  at `L = 0`, which is the default. It also leaves the transverse term
+  `12EI/L³` following the real length rather than `OD`, so it does not even
+  give a 1 × OD element for the non-zero cases.
+- **Skip the element and keep only the penalty tie.** That is the error this
+  section corrects: it deletes stiffness the rule says is there.
+
+What works is a **prescribed-stiffness element**: form the 6 × 6 of a 1 × OD
+pipe element once and use it for every connector, oriented in the EA local
+frame (§7) rather than from the element's own geometry -- which a zero-length
+element does not have. That frame is already needed for `S` and `D`, so it is
+one mechanism serving both.
 
 ## 9. What this settles about G6
 
@@ -422,6 +453,7 @@ approximated by `F`.
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | Connector stiffness rule restated as ABSOLUTE: every connector carries the stiffness of a 1 × OD length of pipeline whatever its own length, so a zero-length one is an ordinary case and an ordinary element. Corrects an earlier claim in this spec that a zero-length connector was no element at all — the legal default was being treated as a degenerate case needing an exception, which is the opposite of what the rule is for. Implementation follows: all three Group B archetypes now carry connector elements, ILS-EASB's at length 0. Confirms L5 needs a prescribed-stiffness element type: the corotational kernel divides by the deformed length and returns inf for a zero-length element, observed at `nlfea_v4.py:1216`. |
 | 13 Sep 2026 | `D` ruled a **pure support**: local x and rz never restrained, in either state; only the perpendicular deadband. That forces a layout-adequacy rule, since a support that holds nothing while open cannot restrain a structure alone — checked against all six named systems with every gap open, and all six are adequate (`PS` exactly so: `P` gives local x, `S` gives rz). `ConnectionSystem` accepts any 5-tuple though, and `D/-/-/-/D` is legal to build and singular in both states, so the check is generic on the tuple rather than a whitelist. |
 | 13 Sep 2026 | Connector kinematics ruled. `S` slides along the EA-ST **local x** — the slope direction of the pipeline/IW it attaches to, not its own axis. `D` is a **symmetric ±`P_gap` deadband** on the perpendicular (local y) direction, bidirectional — which corrects the earlier claim that it is the same rule as roller contact: it shares the active-set machinery but not the condition, one being unilateral and the other a deadband. Both constraints live in a **co-rotating local frame**: the pipe slope runs 0° to 32.4° across the stinger at R = 85 m, so a globally-aligned constraint would be up to 32° wrong, and `apply_bcs_sparse` cannot express a skewed constraint — that, as much as the nonlinearity, is what makes the separate module necessary. Staging recorded: `F`-only first, which needs none of it. |
 | 13 Sep 2026 | Assembly ruled: four-pass build, 0.01 m merge tolerance within a pass and never across, two-layer node identity, connectors as recorded associations enforced by penalty constraints, connector stiffness from a 1 × OD length of pipeline. Merge tolerance verified against all 7 archetypes and 35 anchors — tightest distinct spacing 0.176 m, a 17.6× margin. G6 answered: the kernel keys nodes by ID, since deliberate merging now lives in the mesher. |
@@ -445,8 +477,12 @@ predicted.
 | ILS-SH | 110 | 109 | 0 | 1 |
 | ILS-SHTP | 111 | 110 | 0 | 1 |
 | ILS-EAST | 132 | 129 | 4 | 4 |
-| ILS-EASB | 134 | 129 | 4 | 2 |
+| ILS-EASB | 134 | **131** | 4 | 2 |
 | ILS-ILT | 138 | 135 | 4 | 5 |
+
+ILS-EASB gained two elements on 13 Sep when the stiffness rule was restated:
+its zero-length connectors are ordinary connectors and carry ordinary
+elements.
 
 ### Three things the build found
 
@@ -464,10 +500,12 @@ collapsing the very pair the penalty tie joins. They now occupy passes 4 and
 5. The pass mechanism that keeps the straddle off the pipe is the same one
 that keeps a connector from eating itself.
 
-**3. A zero-length connector's nodes need materialising anyway.** They carry
-no element, so the meshing loop never reaches them — but the penalty tie
-needs a DOF row at each end, so they are real nodes. Every part node named by
-an association is materialised whether or not an element touches it.
+**3. A connector never goes through the line mesher.** It is one element by
+definition — never subdivided — and a zero-length one has no arc coordinate
+for the mesher to work in. Connector elements are emitted straight through,
+which is what lets the stiffness rule stay independent of length. Every part
+node named by an association is also materialised whether or not an element
+touches it, since the penalty tie needs a DOF row at each end.
 
 ### The EASB case, now verified
 
