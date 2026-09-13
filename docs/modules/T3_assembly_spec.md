@@ -206,7 +206,7 @@ them out as DOF in the local frame above:
 | `F` | FixedConnection | tied | tied | tied | no |
 | `P` | MovableConnection | tied | tied | **free** | no — rz is frame-free |
 | `S` | MovableConnection | **free — slides along the slope** | tied | tied | **yes** |
-| `D` | IntermittentConnection | see below | **deadband ±`P_gap`** | see below | **yes** |
+| `D` | IntermittentConnection | **free, always** | **deadband ±`P_gap`** | **free, always** | **yes** |
 
 **`S` — RULED 13 Sep 2026.** Free to slide along the **local x axis of the
 EA-ST**, i.e. along the slope direction of the pipeline/IW it attaches to.
@@ -232,11 +232,70 @@ direction**.
                  -P_gap     0     +P_gap        local y
 ```
 
+It is a **pure support**: local x and rz are **never** restrained, in either
+state. A `D` carries load across its own axis once the deadband closes, and
+does nothing else — it never restrains sliding, and it never restrains
+rotation.
+
 So it shares the **machinery** with roller contact — an active set, re-solved
 as the state changes — but not the **rule**. They differ by one condition,
 and the module should take the condition as a parameter rather than grow two
 implementations. That is the reuse worth having; "same as contact" would have
 been wrong.
+
+### The rule a pure support forces: layout adequacy
+
+A `D` that restrains nothing while open cannot hold a structure up on its
+own. So the connector layout as a whole must restrain all three planar
+rigid-body DOF of the EA structure — **and must do so in the weakest state,
+with every deadband open**, or the first solve increment meets a singular
+matrix.
+
+Restraint in the EA local frame, per joint type:
+
+| | local x | local y | rz |
+|---|---|---|---|
+| `F`, `W` | ✓ | ✓ | ✓ |
+| `P` | ✓ | ✓ | — (revolute) |
+| `S` | — (slides) | ✓ | ✓ |
+| `D` open | — | — | — |
+| `D` shut | — | ✓ | — |
+
+Rotation also counts as restrained when **two or more connectors tie local y
+at different x** — a couple.
+
+**Checked against all six named systems, with every `D` gap open:**
+
+| system | layout | gap open | gap shut |
+|---|---|---|---|
+| `F1` | –/–/F/–/– | OK | OK |
+| `F2` | –/F/–/F/– | OK | OK |
+| `F1D` | D/–/F/–/D | OK | OK |
+| `F2D` | D/F/–/F/D | OK | OK |
+| `PS` | –/P/–/S/– | OK | OK |
+| `PSD` | D/P/–/S/D | OK | OK |
+
+Every published layout is adequate in its weakest state, so ruling `D` a pure
+support introduces no mechanism anywhere in the confirmed set. `PS` is worth
+reading once: `P` supplies local x, `S` supplies `rz`, and each supplies
+local y — neither is sufficient alone and together they are exactly
+determinate.
+
+**But `ConnectionSystem` accepts any 5-tuple**, so an adequate layout is not
+guaranteed by construction:
+
+    D / - / - / - / D     open:  x ✗  y ✗  rz ✗      shut:  x ✗  y ✓  rz ✓
+
+Singular in both states, and in **local x** even when both gaps are shut.
+Legal to build, impossible to solve.
+
+> **Validation rule for the physics layer:** a connector layout must restrain
+> local x, local y and rz with every `D` treated as open. Refuse the layout
+> otherwise — refuse, per **G9**, never quietly stiffen something to rescue
+> it.
+
+This is a generic check on the tuple, not a whitelist of the six systems, so
+a user-defined layout is judged on the same terms as a published one.
 
 ## 8. Pass 4 — connector stiffness
 
@@ -330,29 +389,17 @@ then     mesh each part element separately
 
 ## 11. Open items
 
-All three questions of 13 Sep are answered. What is left is one decision and
-two things to measure rather than assert.
+Every question of 13 Sep is answered. What is left is one thing to measure
+and one module to scope — no open decisions.
 
-**1. `D`'s other two DOF — NOT YET RULED.** The perpendicular behaviour is
-settled: a symmetric ±`P_gap` deadband on local y. What a `D` does in **local
-x** and **rz** while its deadband is open is not. Two readings:
-
-- a pure support — local x and rz stay free whatever the gap does, so the
-  connector carries load in one direction only and never restrains sliding
-  or rotation;
-- a gapped `F` — once engaged, all three DOF tie; while open, none do.
-
-These give different frame behaviour under the same `P_gap`. No safe default,
-and it only matters when `D` is implemented, so it is not blocking.
-
-**2. Penalty stiffness magnitude — RULED: measure it.** Pass 4 sets the
+**1. Penalty stiffness magnitude — RULED: measure it.** Pass 4 sets the
 *connector element* stiffness; the *penalty* enforcing each association is a
 separate number. Starting point 10³ × the local structural stiffness, then
 pinned by experiment on the first EA case. G5's lesson applies —
 conditioning, not magnitude, is what failed before — so the experiment
 records the residual and the condition number, not just whether it ran.
 
-**3. The skewed-constraint module.** `S` and `D` both need constraints
+**2. The skewed-constraint module.** `S` and `D` both need constraints
 aligned with a co-rotating local axis, which `apply_bcs_sparse` cannot
 express (§7). Scoping that module is its own card. Nothing above it is
 blocked: **`F` needs none of it**, and all seven archetypes use `F`.
@@ -375,5 +422,6 @@ approximated by `F`.
 
 | Date | Action |
 |---|---|
+| 13 Sep 2026 | `D` ruled a **pure support**: local x and rz never restrained, in either state; only the perpendicular deadband. That forces a layout-adequacy rule, since a support that holds nothing while open cannot restrain a structure alone — checked against all six named systems with every gap open, and all six are adequate (`PS` exactly so: `P` gives local x, `S` gives rz). `ConnectionSystem` accepts any 5-tuple though, and `D/-/-/-/D` is legal to build and singular in both states, so the check is generic on the tuple rather than a whitelist. |
 | 13 Sep 2026 | Connector kinematics ruled. `S` slides along the EA-ST **local x** — the slope direction of the pipeline/IW it attaches to, not its own axis. `D` is a **symmetric ±`P_gap` deadband** on the perpendicular (local y) direction, bidirectional — which corrects the earlier claim that it is the same rule as roller contact: it shares the active-set machinery but not the condition, one being unilateral and the other a deadband. Both constraints live in a **co-rotating local frame**: the pipe slope runs 0° to 32.4° across the stinger at R = 85 m, so a globally-aligned constraint would be up to 32° wrong, and `apply_bcs_sparse` cannot express a skewed constraint — that, as much as the nonlinearity, is what makes the separate module necessary. Staging recorded: `F`-only first, which needs none of it. |
 | 13 Sep 2026 | Assembly ruled: four-pass build, 0.01 m merge tolerance within a pass and never across, two-layer node identity, connectors as recorded associations enforced by penalty constraints, connector stiffness from a 1 × OD length of pipeline. Merge tolerance verified against all 7 archetypes and 35 anchors — tightest distinct spacing 0.176 m, a 17.6× margin. G6 answered: the kernel keys nodes by ID, since deliberate merging now lives in the mesher. |
