@@ -790,8 +790,9 @@ gap decides where it goes.
 mirrored (G7), so this is an upstream item; every consumer of a `D` checks the
 gap itself. Recorded as L026, and **raised upstream 14 Sep 2026 as CUN-001**
 in `Slay-ILS-Designer-V1.0` (`docs/CRITICAL_UPDATE_NOTES.md`, branch
-`critical-update/p-gap-not-enforced`) with a verified patch — all 7 archetypes
-and all 39 anchors still validate clean under it. **Still open upstream:** do
+`critical-update/p-gap-not-enforced`, PR #1) with a verified patch — all 7
+archetypes and all 39 anchors still validate clean under it. That PR is **docs
+only**: it raises the defect, it does not fix it. **Still open upstream:** do
 not assume the check exists until CUN-001 is marked RESOLVED.
 
 ### The threshold is measured, and it calls every cell

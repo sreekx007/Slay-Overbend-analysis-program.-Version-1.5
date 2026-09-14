@@ -420,7 +420,8 @@
     where it goes. Both files are MIRRORED (G7), so the gap cannot be closed
     here; RAISED UPSTREAM 14 Sep 2026 as CUN-001 in Slay-ILS-Designer-V1.0
     (docs/CRITICAL_UPDATE_NOTES.md, branch
-    critical-update/p-gap-not-enforced), with a verified patch. Still OPEN
+    critical-update/p-gap-not-enforced, PR #1), with a verified patch. The
+    PR is DOCS ONLY -- it raises the defect, it does not fix it. Still OPEN
     upstream -- do not assume the check exists until CUN-001 says RESOLVED.
   detect: test_the_gap_is_component_data
   refs: [rebuild/component_spec.py:2582, rebuild/ils_builder.py]
