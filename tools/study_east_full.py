@@ -186,6 +186,32 @@ def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30):
     return U, load.index, fixed, viol
 
 
+def connector_forces(m, ms, U):
+    """End forces in each connector. REPORTED, because they were not.
+
+    `member_stress` covers only the kernel's beams, so the connectors -- the
+    elements assembled outside it -- were never checked at all. "Everything
+    stays elastic" was said without looking at them. They are in fact the
+    second most highly stressed part of the model, and at an F connection that
+    is not an accident: an all-DOF tie at both ends of a short stiff element,
+    between a pipe and a frame that rotate very differently, forces it to bend.
+    """
+    at = {n.index: n for n in m.nodes}
+    out = []
+    for e in m.elements:
+        if e.connector is None:
+            continue
+        a, b = at[e.n1], at[e.n2]
+        d = [dof(ms, e.n1, 0), dof(ms, e.n1, 1), dof(ms, e.n1, 2),
+             dof(ms, e.n2, 0), dof(ms, e.n2, 1), dof(ms, e.n2, 2)]
+        f = connector_k6(b.s - a.s, b.y - a.y) @ U[d]
+        out.append({'line_id': e.line_id,
+                    'axial': math.hypot(f[0], f[1]),
+                    'M_pipe_end': f[2], 'M_frame_end': f[5],
+                    'sigma': max(abs(f[2]), abs(f[5])) / Z_AN})
+    return out
+
+
 def member_stress(m, ms, U, beams):
     """Peak end moment per beam element, and the stress it implies."""
     M = np.zeros(ms.n_elems)
@@ -218,7 +244,7 @@ def main() -> int:
           f'penalty alpha = {ALPHA:.0e} x local diagonal\n')
 
     print(f'  {"P_kN":>6}{"d_pipe_mm":>12}{"d_frame_mm":>12}{"sumR_kN":>10}'
-          f'{"viol_mm":>10}{"sig_pipe":>10}{"sig_frame":>11}{"":>4}')
+          f'{"viol":>10}{"sig_pipe":>10}{"sig_frame":>11}{"sig_conn":>10}{"":>4}')
     out = {}
     for P in (20e3, 200e3):
         U, i_load, fixed, viol = solve(m, ms, P)
@@ -230,18 +256,58 @@ def main() -> int:
         M, sig = member_stress(m, ms, U, beams)
         sp, sf = sig[pipe_ix].max(), sig[frame_ix].max()
         out[P] = (U, sig)
-        flag = 'ok' if max(sp, sf) < SIG_YIELD else 'YIELD'
+        conns = connector_forces(m, ms, U)
+        sc = max(c['sigma'] for c in conns)
+        flag = 'ok' if max(sp, sf, sc) < SIG_YIELD else 'YIELD'
         print(f'  {P/1e3:6.0f}{d_pipe*1e3:12.5f}'
               f'{U[dof(ms, top.index, 1)]*1e3:12.5f}'
-              f'{-Ry/1e3:10.3f}{viol*1e3:10.2e}{sp/1e6:10.1f}'
-              f'{sf/1e6:11.1f}  {flag}')
+              f'{-Ry/1e3:10.3f}{viol:10.2e}{sp/1e6:10.1f}'
+              f'{sf/1e6:11.1f}{sc/1e6:10.1f}  {flag}')
 
+    print()
+    _rotation_check(m, ms, solve(m, ms, 200e3)[0])
     print()
     _bare_pipe_reference(L)
 
     if '--plot' in sys.argv:
         _plot(m, ms, beams, out, pipe_ix)
     return 0
+
+
+def _rotation_check(m, ms, U):
+    """Are the rz ties actually holding? The deformed-shape plot cannot say.
+
+    A plot draws each element as a straight chord between its end positions,
+    so it shows the element's RIGID-BODY tilt and never its end rotations. A
+    connector whose ends are tied in rz but which BENDS between them looks, in
+    a chord plot, exactly like one whose rotation is not tied at all. The only
+    way to tell is to read the numbers.
+    """
+    idx = m._part_index
+    at = {n.index: n for n in m.nodes}
+    print('Rotation ties, and why the plot cannot show them:')
+    for a in m.associations:
+        ia, ib = idx[a.node_a], idx[a.node_b]
+        ra, rb = U[dof(ms, ia, 2)], U[dof(ms, ib, 2)]
+        print(f'   {a.node_a:8} rz {ra:+.6e}  ==  {a.node_b:20} rz {rb:+.6e}'
+              f'   ({abs(ra-rb):.1e} rad apart)')
+    print()
+    for e in m.elements:
+        if e.connector is None:
+            continue
+        a, b = at[e.n1], at[e.n2]
+        th0 = math.atan2(b.y - a.y, b.s - a.s)
+        th = math.atan2((b.y + U[dof(ms, e.n2, 1)]) - (a.y + U[dof(ms, e.n1, 1)]),
+                        (b.s + U[dof(ms, e.n2, 0)]) - (a.s + U[dof(ms, e.n1, 0)]))
+        tilt = th - th0
+        tilt -= 2 * math.pi * round(tilt / (2 * math.pi))
+        print(f'   {e.line_id:16} chord tilt {tilt:+.3e} rad   '
+              f'pipe-end rz {U[dof(ms, e.n1, 2)]:+.3e}   '
+              f'frame-end rz {U[dof(ms, e.n2, 2)]:+.3e}')
+    print('   The chord tilt is what a plot draws. It lies between the two end')
+    print('   rotations because the connector BENDS -- the pipe rotates about')
+    print('   five times more than the frame at that station, and a stiff')
+    print('   0.61 m element tied to both has to take up the difference.')
 
 
 def _bare_pipe_reference(L):
@@ -255,6 +321,44 @@ def _bare_pipe_reference(L):
     for P in (20e3, 200e3):
         print(f'   P = {P/1e3:3.0f} kN  ->  d = {P*L**3/(192*EI_PIPE)*1e3:.5f} mm'
               f'   (linear closed form)')
+
+
+def deflected(a, b, U, ms, n1, n2, scale, n=14, ref=(0.0, 0.0)):
+    """The element's real deflected SHAPE, not the chord between its ends.
+
+    A chord plot draws each element straight, so it shows only rigid-body
+    tilt and hides the end rotations entirely -- which makes a connector that
+    is rz-tied but bending look identical to one that is not tied at all.
+    Hermite interpolation puts the rotations back in the picture, and the
+    connector then visibly leaves the pipe at the pipe's own slope.
+
+    Small-displacement interpolation in the element's undeformed frame, which
+    is what the magnified plot is showing anyway.
+    """
+    L = math.hypot(b.s - a.s, b.y - a.y)
+    c, sn = (b.s - a.s) / L, (b.y - a.y) / L
+    ux1, uy1, r1 = (U[dof(ms, n1, k)] for k in (0, 1, 2))
+    ux2, uy2, r2 = (U[dof(ms, n2, k)] for k in (0, 1, 2))
+    # `ref` subtracts a rigid translation so a zoomed view can show BENDING.
+    # Without it the whole assembly's 50 mm of sag, magnified enough to make a
+    # 0.2 mm connector tilt visible, lands 20 m off the picture.
+    ux1 -= ref[0]; uy1 -= ref[1]
+    ux2 -= ref[0]; uy2 -= ref[1]
+    u1, v1 = ux1*c + uy1*sn, -ux1*sn + uy1*c        # local axial, transverse
+    u2, v2 = ux2*c + uy2*sn, -ux2*sn + uy2*c
+    xs, ys = [], []
+    for k in range(n + 1):
+        t = k / n
+        N1 = 1 - 3*t**2 + 2*t**3
+        N2 = L * (t - 2*t**2 + t**3)
+        N3 = 3*t**2 - 2*t**3
+        N4 = L * (-t**2 + t**3)
+        v = N1*v1 + N2*r1 + N3*v2 + N4*r2
+        u = (1 - t)*u1 + t*u2
+        xl, yl = t*L + scale*u, scale*v
+        xs.append(a.s + xl*c - yl*sn)
+        ys.append(a.y + xl*sn + yl*c)
+    return xs, ys
 
 
 def _plot(m, ms, beams, out, pipe_ix):
@@ -275,23 +379,49 @@ def _plot(m, ms, beams, out, pipe_ix):
     for e in m.elements:
         a, b = at[e.n1], at[e.n2]
         col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
-        lw = 2.4 if e.connector is not None else 1.8
+        lw = 2.6 if e.connector is not None else 1.8
         ax.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.2, zorder=1)
-        ax.plot([a.s + scale*U[dof(ms, e.n1, 0)],
-                 b.s + scale*U[dof(ms, e.n2, 0)]],
-                [a.y + scale*U[dof(ms, e.n1, 1)],
-                 b.y + scale*U[dof(ms, e.n2, 1)]],
-                color=col, lw=lw, zorder=2)
+        xs, ys = deflected(a, b, U, ms, e.n1, e.n2, scale)
+        ax.plot(xs, ys, color=col, lw=lw, zorder=2)
     for lbl, col in (('pipeline', '#1f7a8c'), ('GD-ST frame', '#2f6f3e'),
                      ('connectors', '#6b4ea8')):
         ax.plot([], [], color=col, lw=2.2, label=lbl)
     ax.plot([], [], color='#c9d2d9', lw=1.2, label='undeformed')
     ax.invert_yaxis()
     ax.set_aspect('equal')
-    ax.legend(fontsize=8, ncol=4, loc='upper center',
-              bbox_to_anchor=(0.5, -0.02), frameon=False)
+    ax.legend(fontsize=8, ncol=4, loc='upper left', framealpha=0.92)
+
+    # An inset on one connector. The tilt there is 3.4e-04 rad over 0.61 m --
+    # about 0.2 mm, which at the whole-model scale is a fraction of a pixel.
+    # Nothing was wrong with the picture; it simply could not resolve the
+    # question being asked of it.
+    axz = ax.inset_axes([0.665, 0.06, 0.31, 0.52])
+    conn = next(e for e in m.elements if e.connector is not None)
+    cs_ = at[conn.n1].s
+    zs = 320.0                          # local magnification for the inset
+    ref = (U[dof(ms, conn.n1, 0)], U[dof(ms, conn.n1, 1)])
+    for e in m.elements:
+        a, b = at[e.n1], at[e.n2]
+        if min(a.s, b.s) > cs_ + 1.2 or max(a.s, b.s) < cs_ - 1.2:
+            continue
+        if a.y > 0.1 or b.y > 0.1:
+            continue
+        col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
+        axz.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.1)
+        xs, ys = deflected(a, b, U, ms, e.n1, e.n2, zs, n=40, ref=ref)
+        axz.plot(xs, ys, color=col, lw=2.4)
+    axz.set_xlim(cs_ - 0.9, cs_ + 0.9)
+    axz.set_ylim(-0.80, 0.16)
+    axz.invert_yaxis()
+    axz.set_xticks([]); axz.set_yticks([])
+    axz.set_title(f'connector 2 at x{zs:.0f}, drawn RELATIVE to its own base\n'
+                  f'so the rigid sag is removed and only the bending is left',
+                  fontsize=7.2)
+    for sp in axz.spines.values():
+        sp.set_edgecolor('#7b8794')
     ax.set_title(f'Deformed shape, P = {P/1e3:.0f} kN at the layout midpoint '
-                 f'(s = 0), deflection x{scale:.0f}', fontsize=10)
+                 f'(s = 0), deflection x{scale:.0f}  --  true element shapes, '
+                 f'not chords', fontsize=10)
     ax.set_ylabel('y (m), positive DOWN')
     ax.grid(alpha=0.22)
 
@@ -313,7 +443,7 @@ def _plot(m, ms, beams, out, pipe_ix):
     ax.grid(alpha=0.22)
 
     fig.suptitle('ILS-EAST complete: the frame is tied to the pipe through '
-                 'penalty-constrained connectors', fontsize=11)
+                 'penalty-constrained connectors (F2, all DOF)', fontsize=11)
     fig.tight_layout()
     fig.savefig(outp, dpi=140)
     print(f'wrote {outp.relative_to(REPO)}')

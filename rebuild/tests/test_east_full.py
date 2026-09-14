@@ -140,3 +140,80 @@ def test_everything_stays_elastic(built, solved, P):
     U, _i, _f, _v = solved[P]
     _, sig = east.member_stress(m, ms, U, beams)
     assert sig.max() < east.SIG_YIELD
+
+
+# ---------------------------------------------------------------------------
+# rotation ties -- the thing a deformed-shape plot cannot show
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('P', (20e3, 200e3))
+def test_rotations_are_tied_not_just_translations(built, solved, P):
+    """An F/W tie is all-DOF, and rz is the component a picture cannot check.
+
+    A plot draws each element as a chord between its end positions, so it
+    shows RIGID-BODY tilt and never end rotation. A connector that is rz-tied
+    but bending looks, in a chord plot, exactly like one whose rotation is not
+    tied at all. Only the numbers distinguish them.
+    """
+    m, L, ms, beams = built
+    U, _i, _f, _v = solved[P]
+    idx = m._part_index
+    for a in m.associations:
+        ia, ib = idx[a.node_a], idx[a.node_b]
+        ra = U[east.dof(ms, ia, 2)]
+        rb = U[east.dof(ms, ib, 2)]
+        assert abs(ra - rb) < 1e-7, f'{a.node_a} rz not tied to {a.node_b}'
+        assert abs(ra) > 1e-9, 'nothing rotated -- the check is vacuous'
+
+
+def test_connector_bends_because_pipe_and_frame_rotate_differently(built, solved):
+    """Why the connector does not simply tilt with the pipe.
+
+    Its lower end matches the PIPE's rotation and its upper end the FRAME's,
+    and at the connector station those differ by about 5.6x -- the frame is a
+    stiff closed portal and stays nearly flat while the pipe bends under it.
+    A 0.61 m element tied to both has to take up the difference, so its chord
+    tilt lies BETWEEN the two end rotations rather than matching either.
+    """
+    m, L, ms, beams = built
+    U, _i, _f, _v = solved[200e3]
+    at = {n.index: n for n in m.nodes}
+    conns = [e for e in m.elements if e.connector is not None]
+    assert conns
+    for e in conns:
+        a, b = at[e.n1], at[e.n2]
+        th0 = math.atan2(b.y - a.y, b.s - a.s)
+        th = math.atan2(
+            (b.y + U[east.dof(ms, e.n2, 1)]) - (a.y + U[east.dof(ms, e.n1, 1)]),
+            (b.s + U[east.dof(ms, e.n2, 0)]) - (a.s + U[east.dof(ms, e.n1, 0)]))
+        tilt = th - th0
+        tilt -= 2 * math.pi * round(tilt / (2 * math.pi))
+        r_pipe = U[east.dof(ms, e.n1, 2)]
+        r_frame = U[east.dof(ms, e.n2, 2)]
+        assert abs(r_pipe) > 3 * abs(r_frame), (
+            'pipe and frame rotate alike here, so the case being described '
+            'has changed shape')
+        lo, hi = sorted((r_pipe, r_frame))
+        assert lo < tilt < hi, 'chord tilt is not between the end rotations'
+
+
+@pytest.mark.parametrize('P', (20e3, 200e3))
+def test_connector_stress_is_reported_and_elastic(built, solved, P):
+    """The gap this closed. `member_stress` covers only the kernel's beams, so
+    the connectors -- assembled outside it -- were never checked at all, and
+    "everything stays elastic" was said without looking at them.
+
+    They are the second most stressed part of the model, and at an F
+    connection that is no accident: an all-DOF tie at both ends of a short
+    stiff element between members that rotate differently forces it to bend.
+    """
+    m, L, ms, beams = built
+    U, _i, _f, _v = solved[P]
+    conns = east.connector_forces(m, ms, U)
+    assert len(conns) == 2
+    for c in conns:
+        assert c['sigma'] < east.SIG_YIELD
+        assert abs(c['M_pipe_end']) > abs(c['M_frame_end']), (
+            'the pipe end should carry the larger moment -- it is the end '
+            'forced to follow the more sharply rotating member')
+    assert max(c['sigma'] for c in conns) > 0.5 * 152.1e6 * (P / 200e3)

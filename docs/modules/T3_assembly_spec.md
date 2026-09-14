@@ -595,6 +595,53 @@ The earlier studies escaped it by construction — their elements referenced
 nodes in id order — which is exactly why it surfaced only on the first model
 with a frame reached late.
 
+### The rotation ties, and what a deformed-shape plot cannot show
+
+Raised on reading the plot: the connectors do not appear to rotate with the
+pipe nodes they are tied to. Measured, at 200 kN:
+
+| tie | rz | rz | apart |
+|---|---|---|---|
+| `CST2-P` ↔ `PIPE-CST2` | −1.033627 × 10⁻³ | −1.033631 × 10⁻³ | 3.6 × 10⁻⁹ rad |
+| `CST2-E` ↔ `GDST-ST-sslot2` | −1.827427 × 10⁻⁴ | −1.827423 × 10⁻⁴ | 3.4 × 10⁻¹⁰ rad |
+
+**The rotations are tied.** What the plot showed was something else:
+
+    connector chord tilt   −3.390 × 10⁻⁴ rad
+    pipe-end rz            −1.034 × 10⁻³ rad
+    frame-end rz           −1.827 × 10⁻⁴ rad
+
+A plot draws each element as a **chord between its end positions**, so it
+shows rigid-body tilt and never end rotation. **A connector that is rz-tied
+but bending looks identical, in a chord plot, to one whose rotation is not
+tied at all.** Only the numbers separate them.
+
+And it does bend, for a real reason: its lower end must follow the PIPE's
+rotation and its upper end the FRAME's, and at that station those differ by
+**5.6×** — the frame is a stiff closed portal and stays nearly flat while the
+pipe bends under it. A 0.61 m element tied to both takes up the difference,
+so its chord tilt lies *between* the two end rotations rather than matching
+either.
+
+Two things changed as a result. The plot now draws the **true Hermite
+deflected shape** rather than chords, with an inset on one connector drawn
+*relative to its own base* — at whole-model scale a 0.2 mm tilt is a fraction
+of a pixel, so the rigid sag has to be removed before the bending is visible
+at all. And connector stress is now **reported**, which it was not:
+
+| P | σ pipe | σ frame | **σ connector** |
+|---|---|---|---|
+| 20 kN | 18.1 MPa | 1.6 MPa | **15.4 MPa** |
+| 200 kN | 180.5 MPa | 18.0 MPa | **152.1 MPa** |
+
+`member_stress` covers only the kernel's beams, and the connectors are
+assembled outside it — so "everything stays elastic" had been said **without
+looking at them**. They turn out to be the second most stressed part of the
+model, carrying 354 kN·m at the pipe end. At an `F` connection that is no
+accident: an all-DOF tie at both ends of a short stiff element, between
+members that rotate differently, forces it to bend. **A `P` connector exists
+precisely to relieve this**, and would.
+
 ### Group B's blocker test is not contradicted
 
 `test_group_b_cannot_yet_be_solved` still asserts ILS-EAST's own elements are
