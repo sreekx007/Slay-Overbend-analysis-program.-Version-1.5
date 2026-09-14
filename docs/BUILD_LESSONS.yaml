@@ -1,0 +1,380 @@
+# SLAY Overbend -- build lessons register
+# MACHINE REFERENCE. Terse by design. Not prose; do not expand.
+#
+# Purpose: every entry is a defect that produced RUNNING CODE WITH WRONG
+# NUMBERS, or a measured fact that a later session would otherwise re-derive.
+# Read before touching the area named in `area`. G8 ("it ran" is not
+# verification) is why this file exists.
+#
+# schema:
+#   id         L###                     stable, never reused
+#   area       kernel|model|solve|joint|plot|process|measure
+#   class      defect|finding|ruling
+#   symptom    what was OBSERVED (numbers, not adjectives)
+#   cause      the actual mechanism
+#   rule       the invariant to hold from now on
+#   detect     test name / check that fails if it regresses ('-' = none yet)
+#   refs       files that carry the fix or the evidence
+#   date       when recorded
+#
+# version: 1
+# entries: 24
+
+- id: L001
+  area: kernel
+  class: defect
+  symptom: >-
+    ILS-EASB GD-SB slot3 node welded into the pipeline centreline at EVERY
+    element size (4xOD..0.5xOD) and every pad length (5..8 m); DOF count short
+    by 3 per straddle node.
+  cause: >-
+    nlfea_v4 MeshedStructure._mesh keyed mesh nodes by rounded coordinate
+    (round(x,10), round(y,10)); GD-SB at P_vt=0 puts 7 part nodes exactly on
+    the pipe centreline, so distinct part nodes collapsed into one.
+  rule: >-
+    Mesh nodes key on USER NODE ID, never on coordinate. Coincident nodes are
+    legal and must stay distinct; physical connectivity comes only from
+    explicit elements or penalty ties.
+  detect: test_coincident_nodes_across_passes_stay_distinct, test_easb_straddle_does_not_weld_into_the_pipe, test_kernel_leaves_the_model_intact
+  refs: [nlfea_v4.py::MeshedStructure._mesh, rebuild/tests/test_model.py]
+  date: 2026-09-13
+  note: G6 amended for this. Validated set re-run after patch -- every figure bit-identical.
+
+- id: L002
+  area: model
+  class: defect
+  symptom: ILS-ILT failed to assemble; GD-B tee had no header node to attach to.
+  cause: >-
+    GD-B declares a junction onto `pipeline` but owns no line ON the pipeline,
+    so pass 1 (header) never created a station there.
+  rule: >-
+    Pass 0 collects junction targets AND connector stations before pass 1 lays
+    the header, so every declared attachment has a station.
+  detect: test_mandatory_stations_are_nodes, test_archetype_assembles
+  refs: [rebuild/slay/model/assemble.py, docs/modules/T3_assembly_spec.md]
+  date: 2026-09-13
+
+- id: L003
+  area: model
+  class: defect
+  symptom: Zero-length connector vanished -- both end nodes merged into one.
+  cause: Connector part-node and connector element node fell in the same merge pass at 0.01 m.
+  rule: >-
+    PASS_CONN_P (4) and PASS_CONN_E (5) are separate passes. Merge WITHIN a
+    pass at MERGE_TOL=0.01, NEVER across, one exception only: a declared junction.
+  detect: test_zero_length_connector_is_still_an_element, test_declared_junction_does_cross_the_pass_boundary
+  refs: [rebuild/slay/model/assemble.py]
+  date: 2026-09-13
+
+- id: L004
+  area: model
+  class: finding
+  symptom: Spec claimed shift invariance of the discretisation; a +6 m shift changed the element count.
+  cause: >-
+    Component-owned elements ARE shift invariant (bit-identical at s_centre
+    0, +6, -11.5). The plain-pipe filler is not: a 6 m shift is 7.38 elements
+    at the current target length, so the filler re-divides.
+  rule: >-
+    State shift invariance only for component-owned elements. The filler
+    absorbs the remainder by construction.
+  detect: test_ils_discretisation_is_shift_invariant, test_plain_pipe_filler_absorbs_the_shift
+  refs: [docs/modules/T3_model_spec.md, rebuild/tests/test_model.py]
+  date: 2026-09-13
+
+- id: L005
+  area: joint
+  class: ruling
+  symptom: >-
+    Zero-length connector had been written as "no element at all, only the
+    penalty tie".
+  cause: Treated the legal DEFAULT geometry as a degenerate case.
+  rule: >-
+    Connector stiffness == stiffness of a 1 x OD pipeline element, ALWAYS.
+    Never derived from the connector's own length. A zero-length connector is
+    still an element and still carries that stiffness. Connectors are routed
+    PAST the line mesher.
+  detect: test_connector_stiffness_is_a_rule_not_a_number, test_connector_stiffness_is_independent_of_length, test_connector_stiffness_ignores_its_own_length, test_nonzero_connector_becomes_an_element
+  refs: [rebuild/slay/model/parts.py, tools/study_connectors.py::connector_k6]
+  date: 2026-09-14
+
+- id: L006
+  area: model
+  class: defect
+  symptom: >-
+    ILS-EAST showed exactly 12 zero modes = 4 dangling nodes x 3 DOF.
+  cause: >-
+    Frame-line filter used line_id.startswith('ST:'), which also matched
+    'ST:connector2' and dragged 2 unattached connector stubs into the frame.
+  rule: >-
+    Match frame lines with endswith(':frame') AND e.connector is None.
+    Prefix matching on composite ids is a defect.
+  detect: test_frame_is_a_closed_ring, test_no_spurious_long_members, test_group_a_is_not_singular
+  refs: [tools/study_ea_st.py, rebuild/tests/test_ea_st_frame.py]
+  date: 2026-09-14
+
+- id: L007
+  area: kernel
+  class: defect
+  symptom: >-
+    8.6e6 kN.m member moments, IDENTICAL under two different load levels;
+    reactions 22% over the applied load; asymmetric response on a symmetric
+    structure.
+  cause: >-
+    De Souza rotation unwrap was disabled because theta_states came in as NaN.
+    Elements whose chain runs in -s read theta0 = +pi against an incoming
+    ~-pi, so every increment unwrapped by 2*pi.
+  rule: >-
+    Unwrap explicitly in member_forces/recover, AND seed assemble with theta0
+    (never NaN) in reactions. Moments that do not scale with load are the
+    tell.
+  detect: test_moments_scale_with_load, test_reactions_balance, test_reactions_balance_the_applied_load
+  refs: [nlfea_v4.py, rebuild/tests/test_ea_st_frame.py]
+  date: 2026-09-14
+
+- id: L008
+  area: solve
+  class: defect
+  symptom: >-
+    Engaged D connector flipped state 4 times and never settled; reported
+    state disagreed with the returned displacement.
+  cause: >-
+    Engaged D enforced u_a - u_b = 0, which dragged the gap back to
+    coincidence -> released -> separated -> re-engaged (chatter).
+  rule: >-
+    Engaged D targets +/- P_gap, not 0. Release on FORCE DIRECTION (tension in
+    a compression-only support), never on separation distance.
+  detect: test_deadband_engages_and_stiffens, test_open_deadbands_change_nothing
+  refs: [tools/study_connectors.py, rebuild/tests/test_connectors.py]
+  date: 2026-09-14
+
+- id: L009
+  area: kernel
+  class: defect
+  symptom: >-
+    Exactly 12 zero diagonals in K; 4 frame nodes had empty stiffness rows.
+  cause: >-
+    Connector stiffness written at 3*node_id. MeshedStructure._mesh assigns
+    mesh indices in ELEMENT-ENCOUNTER order, so user_node_to_mesh is a
+    PERMUTATION, not the identity.
+  rule: >-
+    Every external write into K/f goes through dof(ms, node, comp) =
+    3*ms.user_node_to_mesh[node] + comp. Never 3*node_id.
+  detect: test_node_map_is_not_the_identity, test_it_solves
+  refs: [tools/study_east_full.py::dof, rebuild/tests/test_east_full.py]
+  date: 2026-09-14
+
+- id: L010
+  area: measure
+  class: defect
+  symptom: >-
+    "Everything stays elastic" was asserted without connector stress ever
+    being computed. Connectors are the SECOND most stressed part of the model.
+  cause: nlfea member_stress covers kernel beams only; connectors are not kernel beams.
+  rule: >-
+    Any elastic/utilisation claim enumerates connectors explicitly. A stress
+    report that silently omits a part class is a G8 violation.
+  detect: test_connector_stress_is_reported_and_elastic, test_everything_stays_elastic
+  refs: [tools/study_east_full.py::connector_forces]
+  date: 2026-09-14
+
+- id: L011
+  area: plot
+  class: defect
+  symptom: >-
+    Chord plots could not distinguish a rotation-tied connector from an
+    untied one -- both draw as the same straight line. First Hermite inset
+    came out EMPTY.
+  cause: >-
+    Chords show end translations only. Empty inset: x400 magnification put a
+    50 mm sag 20 m off-screen.
+  rule: >-
+    Rotation ties are shown with Hermite deflected shapes, drawn RELATIVE to
+    the member base (ref offset), never in absolute magnified coordinates.
+  detect: test_rotations_are_tied_not_just_translations, test_connector_bends_because_pipe_and_frame_rotate_differently
+  refs: [tools/study_east_full.py::deflected, docs/diagrams/east_full_study.png]
+  date: 2026-09-14
+
+- id: L012
+  area: joint
+  class: defect
+  symptom: 146 kN.m moment residual -- the connector element was not self-equilibrating.
+  cause: >-
+    Element stiffness built at L = OD while spanning L_real = 0.6096 m. Rigid
+    body rotation was not in the null space of the 6x6.
+  rule: >-
+    Build the connector as a 3-DOF COROTATIONAL basis: k at L = OD (per
+    L005), kinematics T at L_real. Section scaling CANNOT fix this -- matching
+    EA/L and 4EI/L leaves 12EI/L^3 at 0.444x; matching 12EI/L^3 leaves 4EI/L
+    at 2.25x.
+  detect: test_reactions_balance, test_constraints_are_satisfied
+  refs: [tools/study_connectors.py::connector_k6]
+  date: 2026-09-14
+
+- id: L013
+  area: joint
+  class: defect
+  symptom: >-
+    On PS, the S connector carried a PURE COUPLE of 338.79 kN.m at exactly
+    zero shear. A bolt in a slot cannot provide a couple.
+  cause: S was tying rz. S = (False, True, True) instead of (False, True, False).
+  rule: >-
+    S = (False, True, False) -- slides along the EA-ST local x AND turns.
+    TIES_OPEN/TIES_SHUT/SKEWED live ONLY in slay/model/parts.py; studies
+    import them. A duplicate table in a tool is a defect by itself.
+  detect: test_s_is_a_roller_not_a_prismatic_pair, test_ps_connectors_carry_neither_moment_nor_shear, test_p_connector_carries_no_moment, test_d_is_a_pure_support
+  refs: [rebuild/slay/model/parts.py:149, tools/study_connectors.py]
+  date: 2026-09-14
+
+- id: L014
+  area: process
+  class: defect
+  symptom: Background job died with exit 144; long-running job output never appeared.
+  cause: >-
+    pkill -f "rig.py" matched its OWN command line and killed the job.
+    `| tail -N` buffers, so a long background job shows nothing until exit.
+  rule: >-
+    Never pkill on a pattern that matches the killing command. Do not pipe a
+    long background job through tail; redirect to a file and read it.
+  detect: '-'
+  refs: []
+  date: 2026-09-13
+
+- id: L015
+  area: solve
+  class: finding
+  symptom: A 0.02 s solve ran for 15 minutes and returned nothing.
+  cause: >-
+    solve_step halves the increment and retries WITHOUT BOUND, raising
+    nothing. Requested tolerance was below the reachable plateau.
+  rule: >-
+    Tolerance landscape: default 5e-4 UNDER-CONVERGES; 1e-5..1e-7 is a flat
+    plateau; below that is unreachable. Fixture: tol=1e-6, n_increments=20.
+    Any new solve loop must bound its retries and raise.
+  detect: test_layout_solves, test_it_solves
+  refs: [nlfea_v4.py::solve_step, docs/modules/T3_mesher_test_plan.md:494]
+  date: 2026-09-14
+
+- id: L016
+  area: solve
+  class: finding
+  symptom: Penalty ALPHA chosen by sweep, not by guess.
+  cause: '-'
+  rule: >-
+    ALPHA = 1e5, scaled to the LOCAL diagonal (not the kernel's global max).
+    At 1e5: displacement converged to six figures, constraint violation
+    4.8e-7 mm, cond(K) 3.9e13.
+  detect: test_constraints_are_satisfied
+  refs: [tools/study_connectors.py, docs/modules/T3_assembly_spec.md:403]
+  date: 2026-09-14
+
+- id: L017
+  area: solve
+  class: finding
+  symptom: Group B layouts are mechanisms, and the eigenvalues say so.
+  cause: Support-only layouts have rigid body modes with all gaps open.
+  rule: >-
+    Singularity is PROVED with measured eigenvalues, never inferred from a
+    solver error. Group A: 5.6e2..6.7e2. Group B: 1.7e-7, 2.8e-7; EASB
+    exactly 0.0.
+  detect: test_group_a_is_not_singular, test_group_b_cannot_yet_be_solved, test_a_support_only_layout_is_a_mechanism
+  refs: [rebuild/tests/test_connectors.py, rebuild/slay/model/parts.py::layout_is_adequate]
+  date: 2026-09-14
+
+- id: L018
+  area: joint
+  class: finding
+  symptom: >-
+    PS connectors carry ZERO shear and ZERO moment; ILS deflection
+    65.47250 mm == exactly the bare pipe; frame carries no bending.
+  cause: >-
+    Correct and expected. A rigid frame held at two points by a pin and a
+    roller is statically determinate against any motion of those points --
+    the ILS rides as a passenger.
+  rule: >-
+    PS is the null case. If PS shows bending moment or shear, the joint table
+    or the connector element is wrong (see L012, L013). F2 must show
+    substantially more than PS.
+  detect: test_ps_makes_the_ils_a_passenger, test_ps_does_not_shield_the_pipe_at_all, test_f2_connectors_carry_far_more_than_ps, test_f2_stiffens_where_ps_does_not
+  refs: [tools/study_east_full.py, rebuild/tests/test_east_full.py]
+  date: 2026-09-14
+
+- id: L019
+  area: measure
+  class: finding
+  symptom: Fibre integration count changes I non-monotonically.
+  cause: '-'
+  rule: >-
+    n_fibres error on I: 20 -> +0.397%, 30 -> +6.587%, 40 -> +0.007%.
+    NON-MONOTONE. Never pick n_fibres by "more is better"; measure.
+  detect: '-'
+  refs: [nlfea_v4.py]
+  date: 2026-09-13
+
+- id: L020
+  area: model
+  class: finding
+  symptom: NodeReason has no member for a load point or a restraint.
+  cause: Taxonomy was written for geometry provenance only.
+  rule: >-
+    Load and restraint stations are carried via extra_stations, not as a
+    NodeReason. Do not invent a NodeReason member for them without a ruling.
+  detect: test_load_station_is_not_a_contact_slot, test_fixed_station_is_not_a_contact_slot
+  refs: [rebuild/slay/model/parts.py, rebuild/slay/model/assemble.py]
+  date: 2026-09-13
+
+- id: L021
+  area: model
+  class: finding
+  symptom: Merge tolerance margin was never measured.
+  cause: '-'
+  rule: >-
+    Tightest DISTINCT part-node spacing in the published archetype set is
+    0.176 m = 17.6 x MERGE_TOL (0.01). Raising MERGE_TOL erodes that margin;
+    it does NOT fix cross-pass welds (see L001, L003) and makes them worse.
+  detect: test_merge_tolerance_has_margin_over_the_published_set
+  refs: [rebuild/slay/model/parts.py::MERGE_TOL, rebuild/tests/test_model.py]
+  date: 2026-09-13
+
+- id: L022
+  area: model
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    Node identity is TWO LAYERS. Part nodes are named and physical. Mesh
+    nodes are integer indices assigned by the mesher. Coincident mesh nodes
+    getting separate numbers is correct -- they occupy separate stiffness
+    rows, and connect only through penalty constraints where physically
+    joined.
+  detect: test_part_node_produces_exactly_one_model_node, test_coincident_nodes_across_passes_stay_distinct
+  refs: [docs/modules/T3_assembly_spec.md, rebuild/slay/model/parts.py]
+  date: 2026-09-13
+
+- id: L023
+  area: model
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    Frame: +x toward the vessel, +y down, +z into the page (right-handed).
+    s increases toward the STINGER, so ds/dx < 0. ILS placement is a PURE
+    TRANSLATION: s = s_centre - x_local, y_offset = y_local. No reflection.
+    The meshed pipe is STRAIGHT -- bending onto the arc is the solver's job.
+  detect: test_frame_is_right_handed_with_z_into_the_page, test_stinger_appears_left_and_vessel_right_without_an_axis_flip, test_tangent_points_toward_the_stinger_tip
+  refs: [rebuild/slay/model/assemble.py, rebuild/tests/test_scene.py]
+  date: 2026-09-13
+
+- id: L024
+  area: joint
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    G9 stands: never substitute F for P/S/D -- refuse, do not approximate.
+    SUPPORTED_CONN_TYPES in assemble.py is currently {F, W}; P/S/D are
+    refused there by name until the co-rotating (skewed) constraint lands.
+    S and D need it before anything sits on the stinger arc (local axis turns
+    up to 32.4 deg).
+  detect: test_unsupported_connector_type_is_refused, test_refusal_names_the_valid_set
+  refs: [rebuild/slay/model/assemble.py::SUPPORTED_CONN_TYPES, rebuild/slay/model/parts.py::SKEWED]
+  date: 2026-09-14

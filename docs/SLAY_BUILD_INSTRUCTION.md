@@ -38,6 +38,7 @@ anything in §9 — raise it.
 | Module aims + resolved decisions | `docs/SLAY_FRESH_BUILD_SPEC.md` | Current. |
 | Per-module process + build order | `docs/SLAY_FRESH_BUILD_TASKLIST.md` | Current; superseded on *ordering only* by §5 below (see §5 note). |
 | Open design items | `docs/SLAY_MODEL_BUILDING_TRACKER.md` | Item numbers are cited throughout this document. |
+| Build lessons register (defects that produced wrong numbers) | `docs/BUILD_LESSONS.yaml` | **MACHINE REFERENCE.** Read the entries whose `area` matches what you are about to touch, before you touch it. |
 
 **What does not exist:** everything in layers L3, L5, L6, L7 and most of L8.
 That is the work.
