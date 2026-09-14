@@ -30,6 +30,20 @@ def entries():
 
 
 def _detect_names(entry):
+    """Local test names only.
+
+    A name may be prefixed `upstream:` when the guarding test lives in
+    `Slay-ILS-Designer-V1.0` rather than here -- L037's does, because the
+    defect is in a mirrored file we are forbidden to edit (G7). Those are
+    recorded so the pointer is not lost, but this repo cannot check them.
+    """
+    if entry['detect'] == '-':
+        return []
+    return [t.strip() for t in entry['detect'].split(',')
+            if not t.strip().startswith('upstream:')]
+
+
+def _all_detect(entry):
     if entry['detect'] == '-':
         return []
     return [t.strip() for t in entry['detect'].split(',')]
@@ -67,10 +81,19 @@ def test_every_referenced_file_still_exists(entries):
     assert not missing, missing
 
 
+def test_upstream_pointers_are_well_formed(entries):
+    """An `upstream:` name is a pointer this repo cannot follow, so the
+    least it can do is be shaped like a test name."""
+    for e in entries:
+        for t in _all_detect(e):
+            if t.startswith('upstream:'):
+                assert re.fullmatch(r'upstream:test_\w+', t), (e['id'], t)
+
+
 def test_every_defect_is_detectable(entries):
     """A finding may be unguarded. A defect that once produced wrong numbers
     may not -- it names the test that fails if it comes back."""
     undetected = [e['id'] for e in entries
-                  if e['class'] == 'defect' and not _detect_names(e)
+                  if e['class'] == 'defect' and not _all_detect(e)
                   and e['area'] != 'process']
     assert not undetected, undetected

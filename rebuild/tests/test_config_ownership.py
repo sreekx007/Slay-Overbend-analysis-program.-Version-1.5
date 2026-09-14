@@ -189,3 +189,48 @@ def test_physical_layout_of_the_one_sided_pair():
     one_sided_x = sorted(x_of(int(n[2:])) for n in config.ONE_SIDED_ROLLERS_DEFAULT
                          if n.startswith('VR'))
     assert one_sided_x == [spacing, 2 * spacing] == [8.0, 16.0]
+
+
+# ---------------------------------------------------------------------------
+# The mirrored files themselves (G7)
+# ---------------------------------------------------------------------------
+
+def _provenance():
+    import json
+    return json.loads(
+        (Path(__file__).resolve().parents[1] / 'fixtures'
+         / 'mirror_provenance.json').read_text())
+
+
+def test_the_mirrored_files_have_not_been_edited_here():
+    """G7 in the one form a test can check.
+
+    `test_shared_constants_still_agree_with_upstream` covers the five VALUES
+    the mirrored code reads. It says nothing about the mirrored FILES, so an
+    edit to `component_spec.py` or `ils_builder.py` in this repo -- the thing
+    G7 forbids outright -- passed silently. This hashes them.
+
+    What it CANNOT check is upstream drift: the mirror is already behind
+    (`Boss`/GD-BOSS is present upstream and absent here as of e7e0e80), and
+    only a deliberate re-sync fixes that. When you re-sync, update the
+    recorded hash in the same commit and say which upstream sha it came from
+    -- that is the point of the file, not the hash.
+    """
+    import hashlib
+    rec = _provenance()
+    repo = Path(__file__).resolve().parents[2]
+    for name, entry in rec['files'].items():
+        data = (repo / entry['path']).read_bytes()
+        assert hashlib.sha256(data).hexdigest() == entry['sha256'], (
+            f'{name} has changed since it was mirrored. If you edited it '
+            f'here, that is a G7 violation -- raise the change upstream '
+            f'instead. If you re-synced it, update '
+            f'fixtures/mirror_provenance.json in the same commit.')
+
+
+def test_the_provenance_record_covers_every_mirrored_file():
+    rec = _provenance()
+    assert set(rec['files']) == {'component_spec.py', 'ils_builder.py',
+                                 'standard_ils_layouts.json'}
+    assert rec['upstream_repo'] == 'sreekx007/Slay-ILS-Designer-V1.0'
+    assert all(len(e['sha256']) == 64 for e in rec['files'].values())

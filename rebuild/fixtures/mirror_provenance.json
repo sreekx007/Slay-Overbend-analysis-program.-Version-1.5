@@ -1,0 +1,26 @@
+{
+  "note": "Provenance of the MIRRORED files (G7). They belong to Slay-ILS-Designer-V1.0 and are never edited here. `sha256` is of the local copy, so a local edit -- a G7 violation -- is caught by test_config_ownership.py. Upstream drift is NOT caught by it and needs a deliberate re-sync; `upstream` records what is known about where each copy came from.",
+  "upstream_repo": "sreekx007/Slay-ILS-Designer-V1.0",
+  "checked_against_upstream_main": "e7e0e80",
+  "checked_on": "2026-09-14",
+  "files": {
+    "component_spec.py": {
+      "path": "rebuild/component_spec.py",
+      "sha256": "03670d54867d600ba8782eef298d68c2421fc3e160baf34d4f7e8c93de81a8bb",
+      "bytes": 184604,
+      "upstream": "BEHIND upstream main as of e7e0e80: the GD-BOSS `Boss` component (89 lines) is present upstream and absent here, and one ThickPipeBody docstring differs. Re-syncing therefore pulls GD-BOSS in, which decision D4 puts out of scope -- so it is a decision, not a refresh."
+    },
+    "ils_builder.py": {
+      "path": "rebuild/ils_builder.py",
+      "sha256": "609ab0f5454ba9683847dddfef98593e3faef3a6314211cb9b9359fccca4c619",
+      "bytes": 54126,
+      "upstream": "Upstream main moved on 14 Sep 2026 (+74 lines). Not re-synced."
+    },
+    "standard_ils_layouts.json": {
+      "path": "rebuild/fixtures/standard_ils_layouts.json",
+      "sha256": "fd07fe2d186d43bfcb8109e75f82eaf8863c4afea02f407a335842d16e05863b",
+      "bytes": 79419,
+      "upstream": "Mirrored DATA. 7 archetypes, 39 anchors."
+    }
+  }
+}

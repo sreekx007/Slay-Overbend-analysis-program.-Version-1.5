@@ -150,7 +150,7 @@ Each rule below exists because it was violated once and cost real work.
 | G4 | **Never drop a MANDATORY station.** | Slivers from snap-vs-regular collisions made one case fail to converge outright and shifted another's peak by +30% on pure numerical artefact. |
 | G5 | **No `k_spring`.** | Tested, rejected 12 Aug 2026 (NaN on a shroud contact-release case). Not reintroduced with any value, including 0. |
 | G6 | **`nlfea_v4.py` is frozen against *convenience* changes.** A change is permitted only with (a) a failing test written first, (b) the change scoped as narrowly as the defect, and (c) the validated case set re-run and recorded. **AMENDED 13 Sep 2026.** | Frozen because it carries independent validation evidence — so editing it means that evidence must be re-established, not assumed. One change is authorised under this clause: the kernel keys nodes by **id** rather than by coordinate, because deliberate merging now belongs to the mesher (`docs/modules/T3_assembly_spec.md` §9). |
-| G7 | **Never edit the mirrored files** — `component_spec.py`, `ils_builder.py`. | They belong to `Slay-ILS-Designer-V1.0` and are actively developed there. Local edits desync silently. Needed change → raise it upstream, don't patch. **`config.py` / `slay_config.yaml` came OUT of the mirror on 12 Sep 2026 and are ours to edit** — the mirrored code reads only five constants from them (OD_PIPE_DEF, T_WALL_DEF, STEEL_E, G, RHO_STEEL), guarded by `tests/test_config_ownership.py`. |
+| G7 | **Never edit the mirrored files** — `component_spec.py`, `ils_builder.py`. | They belong to `Slay-ILS-Designer-V1.0` and are actively developed there. Local edits desync silently. Needed change → raise it upstream, don't patch. **`config.py` / `slay_config.yaml` came OUT of the mirror on 12 Sep 2026 and are ours to edit** — the mirrored code reads only five constants from them (OD_PIPE_DEF, T_WALL_DEF, STEEL_E, G, RHO_STEEL), guarded by `tests/test_config_ownership.py`. The mirrored FILES are hashed against `fixtures/mirror_provenance.json` by the same module, so a local edit fails a test rather than desyncing silently. |
 | G8 | **"It ran without error" is not verification.** | This codebase has a documented silent-failure mode (`phase1_peak=0.0`, no exception). Every card requires a *number*. |
 | G9 | **Never substitute F for P/S/D connectors.** | The solver implements F only. A P/S/D case must be refused, not approximated — it would silently answer a different question. *`T3_assembly_spec.md` §7 is the route to implementing them: the joint type selects which DOF a connector's penalty constraint ties. Until that lands G9 stands unchanged; all seven archetypes use F, so F-only comes first.* |
 | G10 | **Mesh density is 2×OD.** | Matches the paper's own basis. Refining to 1×OD moved *away* from apples-to-apples and was reverted. Do not "improve" it without changing the comparison basis too. |
@@ -568,15 +568,25 @@ declared junctions, with `MeshElement.owner` already carrying identity.
 *Recommendation: drop it; T3 proves chain identity is recoverable
 without it.* **Awaiting user.**
 
-**D3 — GD-SB `validate()`.** `BaseStructure.validate()` in the mirrored
-`component_spec.py` does not call `super().validate()`, so a negative
-`P_c1` builds crossed connector slots. User deferred the fix on 10 Sep
-2026. It is a **mirrored file (G7)** — do not fix it here. Raise it
-against the source repo when GD-SB work begins.
+**D3 — GD-SB `validate()`. RESOLVED 14 Sep 2026 — fix raised upstream,
+awaiting merge.** `BaseStructure.validate()` did not call
+`super().validate()`, so a negative `P_c1` built crossed connector slots.
+Measured on ILS-EASB at 200 kN: built, validated and **solved clean at
+78.477 mm against the healthy component's 70.395** — an 11.5% error with
+nothing objecting, because the mesher sorts stations and erases the
+crossing. Fixed as `Slay-ILS-Designer-V1.0` **PR #2** (one line plus a
+test; all 7 archetypes and 39 anchors still validate). **Not mirrored
+down yet** — see D4.
 
-**D4 — Boss component.** `component_spec.py` marks the Boss (structural
-pipe welded to a GD-PIP outer-pipe end node, carrying the connector) as
-out of scope. Confirm it stays out before T9.
+**D4 — Boss component. NOW COUPLED TO THE MIRROR.** Our copy of
+`component_spec.py` still marks the Boss out of scope; upstream `main` has
+since **implemented it** as a coaxial sleeve (`Boss`/GD-BOSS, 89 lines
+absent here as of `e7e0e80`). So re-syncing the mirror — which D3's fix
+needs — pulls GD-BOSS in. It is a decision, not a refresh. Confirm before
+T9 and before any re-sync. Provenance is recorded in
+`rebuild/fixtures/mirror_provenance.json`; local edits are caught by
+`test_the_mirrored_files_have_not_been_edited_here`, upstream drift is
+caught by nothing and needs a deliberate check.
 
 **D5 — Which source governs the milestone ladder?** §7 now has two, and
 they disagree on at least one spot-checked case. Options: keep §6 as the

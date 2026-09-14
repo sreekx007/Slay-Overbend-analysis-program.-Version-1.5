@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 36
+# entries: 38
 
 - id: L001
   area: kernel
@@ -639,4 +639,52 @@
     rather than inventing extent for it.
   detect: test_the_archetype_assembles_and_every_connector_is_zero_length, test_the_deadband_systems_build_here
   refs: [tools/study_east_full.py, tools/study_east_deadband.py, tools/study_easb.py]
+  date: 2026-09-14
+
+- id: L037
+  area: model
+  class: defect
+  symptom: >-
+    GD-SB accepted a negative P_c1 and built crossed, unordered connector
+    slots. On ILS-EASB at 200 kN it built, validated and SOLVED clean at
+    78.477 mm against the healthy component's 70.395 -- an 11.5% error with
+    nothing objecting anywhere.
+  cause: >-
+    BaseStructure.validate() did not call super().validate(), discarding the
+    inherited P_c1/P_c2/P_gap positivity checks. A negative P_c1 puts inL
+    right of inR and places the outer slots relative to the swapped pair, so
+    it is a DIFFERENT, SMALLER structure, not a relabelling
+    (-1.0 -> slots at -0.5837, +0.50, 0, -0.50, +0.5837). The mesher then
+    SORTS stations, which straightens the crossing out and erases it,
+    leaving only connectors in the wrong places.
+  rule: >-
+    A subclass validate() that does not call super() silently drops every
+    inherited check; the reason for skipping must be re-checked whenever the
+    parent changes. Fixed upstream as Slay-ILS-Designer-V1.0 PR #2 (one line
+    plus a test). Until that merges AND the mirror is re-synced, a negative
+    P_c1 is still accepted here -- do not assume the check exists.
+  detect: upstream:test_base_structure_inherits_the_connector_span_checks
+  refs: [rebuild/component_spec.py, docs/SLAY_BUILD_INSTRUCTION.md]
+  date: 2026-09-14
+
+- id: L038
+  area: process
+  class: finding
+  symptom: >-
+    The mirrored component_spec.py is BEHIND upstream main and nothing
+    noticed. Upstream e7e0e80 carries a Boss/GD-BOSS component (89 lines)
+    that our copy does not have, plus a changed docstring.
+  cause: >-
+    test_shared_constants_still_agree_with_upstream checks the five shared
+    VALUES, not the mirrored FILES. A local edit to a mirrored file -- the
+    thing G7 forbids outright -- also passed silently.
+  rule: >-
+    fixtures/mirror_provenance.json records each mirrored file's sha256 and
+    what is known about its upstream origin; the hash guard catches a LOCAL
+    edit (a G7 violation). Upstream drift is still caught by nothing and
+    needs a deliberate check. Re-syncing is a DECISION, not a refresh: it
+    pulls GD-BOSS in, which D4 puts out of scope. Update the recorded hash
+    and the upstream sha in the same commit as any re-sync.
+  detect: test_the_mirrored_files_have_not_been_edited_here, test_the_provenance_record_covers_every_mirrored_file
+  refs: [rebuild/fixtures/mirror_provenance.json, rebuild/tests/test_config_ownership.py]
   date: 2026-09-14
