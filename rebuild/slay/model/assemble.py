@@ -234,7 +234,8 @@ def build_model(scene,
                 target_len: float = None,
                 max_ratio: float = 2.0,
                 merge_tol: float = MERGE_TOL,
-                extra_stations=()) -> Model:
+                extra_stations=(),
+                emit_unenforced_conn_types=frozenset()) -> Model:
     """Assemble one Model. See `docs/modules/T3_assembly_spec.md`.
 
     `scene` supplies the extent and the forced-elastic zone boundaries; `ils`
@@ -249,6 +250,21 @@ def build_model(scene,
     node under it cannot be applied at all. `NodeReason` has no member for
     either (finding 4 of the test plan), so they arrive here as bare arc
     positions until it does.
+
+    `emit_unenforced_conn_types` is a NARROW, OPT-IN widening of
+    `SUPPORTED_CONN_TYPES`, and it is not a way around G9. What it buys is
+    GEOMETRY ONLY: the connector nodes, the connector element and the
+    declared `Association` -- its type, its tie pattern, its gap, its
+    `skewed` flag. It buys no enforcement whatever, and every connector it
+    lets through is recorded in `Model.warnings` saying so, because a
+    caller that assembles the result with no deadband machinery and no
+    co-rotating frame gets an F in all but name -- the exact substitution
+    G9 forbids.
+
+    So the caller takes the enforcement on, in full, and has to be able to
+    show it did: the study that turns this on for `D` carries an active-set
+    deadband and reports the engaged state of every D at every gap it runs.
+    Default empty, so no existing caller's refusal changes.
     """
     target_len = (config.OD_MULTIPLE * config.OD_PIPE_DEF
                   if target_len is None else target_len)
@@ -388,13 +404,19 @@ def build_model(scene,
         _check_layout(cid, [t for (_s, _x, t, _a, _e) in conns],
                       [x for (_s, x, _t, _a, _e) in conns])
 
-        for (slot, x_slot, ctype, arm, _extra) in conns:
+        for (slot, x_slot, ctype, arm, gap) in conns:
             if ctype not in SUPPORTED_CONN_TYPES:
-                raise AssemblyError(
-                    f'{cid}: connector type {ctype!r} at slot {slot} is not '
-                    f'implemented. G9 -- a P/S/D case is refused, never '
-                    f'approximated by F. Supported: '
-                    f'{sorted(SUPPORTED_CONN_TYPES)}')
+                if ctype not in emit_unenforced_conn_types:
+                    raise AssemblyError(
+                        f'{cid}: connector type {ctype!r} at slot {slot} '
+                        f'is not implemented. G9 -- a P/S/D case is '
+                        f'refused, never approximated by F. Supported: '
+                        f'{sorted(SUPPORTED_CONN_TYPES)}')
+                warnings.append(
+                    f'{cid} slot {slot}: {ctype!r} emitted as GEOMETRY '
+                    f'ONLY (emit_unenforced_conn_types). This layer does '
+                    f'not enforce it -- the caller must, or it is an F in '
+                    f'all but name, which is what G9 forbids.')
             s_c = s_of(x_slot)
             y_struct = _y_struct(c, arm)
 
@@ -414,7 +436,7 @@ def build_model(scene,
             # The pipe side is always all-DOF, whatever the joint type is.
             assocs.append(Association(p_id, pipe_node, 'W', (True, True, True)))
             assocs.append(Association(e_id, ea_node, ctype, TIES_OPEN[ctype],
-                                      skewed=SKEWED[ctype]))
+                                      gap=gap, skewed=SKEWED[ctype]))
 
             # ALWAYS an element, zero length included. Its stiffness is that
             # of a 1 x OD length of pipeline whatever its own length is, so

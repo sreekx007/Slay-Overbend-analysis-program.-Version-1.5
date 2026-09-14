@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 24
+# entries: 29
 
 - id: L001
   area: kernel
@@ -141,10 +141,13 @@
     Engaged D enforced u_a - u_b = 0, which dragged the gap back to
     coincidence -> released -> separated -> re-engaged (chatter).
   rule: >-
-    Engaged D targets +/- P_gap, not 0. Release on FORCE DIRECTION (tension in
-    a compression-only support), never on separation distance.
-  detect: test_deadband_engages_and_stiffens, test_open_deadbands_change_nothing
-  refs: [tools/study_connectors.py, rebuild/tests/test_connectors.py]
+    Engaged D targets +/- P_gap, not 0. Release on FORCE DIRECTION -- the tie
+    would have to PULL in the direction it engaged -- never on separation
+    distance, which sits at the gap edge by construction and so can never
+    release. study_connectors.py used the separation SIGN until 14 Sep; the
+    force test replaced it with bit-identical output on every row.
+  detect: test_deadband_engages_and_stiffens, test_open_deadbands_change_nothing, test_the_active_set_settles_without_chatter, test_constraints_are_satisfied_at_the_gap_edge
+  refs: [tools/study_connectors.py, tools/study_east_f2d.py, rebuild/tests/test_connectors.py]
   date: 2026-09-14
 
 - id: L009
@@ -377,4 +380,100 @@
     up to 32.4 deg).
   detect: test_unsupported_connector_type_is_refused, test_refusal_names_the_valid_set
   refs: [rebuild/slay/model/assemble.py::SUPPORTED_CONN_TYPES, rebuild/slay/model/parts.py::SKEWED]
+  date: 2026-09-14
+
+- id: L025
+  area: process
+  class: defect
+  symptom: >-
+    An F2 model with stations added at the outer slots deflected 48.398 mm
+    against F2D's 49.429 -- a 2% gap that looked like physics on identical
+    pipeline meshes.
+  cause: >-
+    study_east_full.solve picked the load node with
+    next(n for n in m.nodes if n.part_id.startswith('PIPE-X')) -- the FIRST
+    externally-requested station in node order. With one extra_station that is
+    the layout midpoint; with three it was s = -2.1675, so the load silently
+    moved off-centre and every number in the run was for a different problem.
+  rule: >-
+    Name the load position and take the nearest matching station; raise if
+    none is within 1e-6. A load location selected by iteration order is a
+    defect even when it happens to be right.
+  detect: test_open_f2d_is_f2_exactly
+  refs: [tools/study_east_full.py, rebuild/tests/test_east_f2d.py]
+  date: 2026-09-14
+
+- id: L026
+  area: model
+  class: finding
+  symptom: >-
+    ILS-EAST declared with connection_system='F2D' and NO P_gap builds,
+    validates and assembles. Association.gap comes through as None.
+  cause: >-
+    component_spec states the "P_gap required when D" check "lives in
+    ils_builder.validate()". It is not there -- grep for P_gap in
+    ils_builder.py returns nothing.
+  rule: >-
+    Never rely on that check. Any consumer of a D connector verifies
+    Association.gap is not None and refuses otherwise -- P_gap has no default
+    BY DESIGN, because a deadband redistributes strain and the gap decides
+    where it goes. Both files are MIRRORED (G7), so the gap cannot be closed
+    here; it is an upstream item.
+  detect: test_the_gap_is_component_data
+  refs: [rebuild/component_spec.py:2582, rebuild/ils_builder.py]
+  date: 2026-09-14
+
+- id: L027
+  area: model
+  class: finding
+  symptom: >-
+    F2D with every deadband open came out 3.79e-04 mm off plain F2 at 200 kN,
+    not zero, though an open D restrains nothing.
+  cause: >-
+    Not the joint -- the mesh. A connector forces a header STATION at its
+    slot, so F2D discretises the pipeline at +/-2.1675 m where F2 does not.
+  rule: >-
+    Compare like with like: F2 given the same two stations matches F2D-open to
+    every digit printed (49.42922334 mm both). A residual that small is still
+    a claim; identify it, never call it tolerance.
+  detect: test_open_f2d_is_f2_exactly
+  refs: [tools/study_east_f2d.py, rebuild/tests/test_east_f2d.py]
+  date: 2026-09-14
+
+- id: L028
+  area: joint
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    G9 is not widened by emit_unenforced_conn_types. It grants GEOMETRY ONLY
+    -- nodes, connector element, declared Association (type, ties, gap,
+    skewed) -- for a type this layer cannot enforce, records every one in
+    Model.warnings, and defaults empty. The CALLER owes the enforcement and
+    must report it: the F2D study carries an active-set deadband and prints
+    the engaged state of every D at every gap. A D emitted this way and solved
+    without a deadband is an F in all but name, which is the substitution G9
+    forbids.
+  detect: test_the_d_geometry_is_opt_in_and_says_so, test_unsupported_connector_type_is_refused
+  refs: [rebuild/slay/model/assemble.py, tools/study_east_f2d.py]
+  date: 2026-09-14
+
+- id: L029
+  area: joint
+  class: finding
+  symptom: >-
+    Deadband engagement is decided by ONE measured number per load, and it
+    calls every cell of the sweep.
+  cause: '-'
+  rule: >-
+    Free separation at the outer slots with all D open: 0.3002 mm at 20 kN,
+    3.0041 mm at 200 kN. A gap wider than that cannot close; narrower must.
+    So engagement is a property of the gap AND the load, never the gap alone
+    (1 mm is open at 20 kN, shut at 200 kN). 200 kN deflection against gap
+    (mm): 5.00/3.50 -> 49.4292 (= F2), 2.50 -> 47.5135, 1.00 -> 41.8067,
+    0.25 -> 38.9502; rigid-roller limit 38.0014. A shut D is a ROLLER, not an
+    F -- it ties the perpendicular and nothing else, and a zero gap is refused
+    by the component as a different system.
+  detect: test_the_threshold_predicts_every_cell, test_engagement_is_load_dependent, test_engagement_stiffens_monotonically
+  refs: [tools/study_east_f2d.py, docs/diagrams/east_f2d_study.png]
   date: 2026-09-14

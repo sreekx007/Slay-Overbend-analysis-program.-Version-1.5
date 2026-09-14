@@ -34,6 +34,7 @@ are gone and the assembly carries load.
 
 from __future__ import annotations
 
+import copy
 import json
 import math
 import sys
@@ -54,7 +55,7 @@ from slay.model.assemble import build_model                # noqa: E402
 from slay.scene.path import LayPath                        # noqa: E402
 from slay.scene.scene import Scene                         # noqa: E402
 import component_spec as cs                              # noqa: E402
-from slay.model.parts import TIES_OPEN                   # noqa: E402
+from slay.model.parts import TIES_OPEN, TIES_SHUT        # noqa: E402
 from study_connectors import ALPHA, connector_k6         # noqa: E402
 
 FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
@@ -70,15 +71,39 @@ EI_PIPE = E_PIPE * I_AN
 Z_AN = I_AN / (OD / 2)
 
 
-def build():
-    """ILS-EAST over a bare-beam extent, with a node at the layout midpoint."""
+def build(system: str = 'F2', p_gap: float = None, extra_stations=(0.0,),
+          emit_d: bool = True):
+    """ILS-EAST over a bare-beam extent, with a node at the layout midpoint.
+
+    `system` names the connection system the ARCHETYPE declares, which is what
+    decides how many connectors exist and where. That is a different knob from
+    `constraint_pairs(layout=...)`, which re-patterns the ties on connectors
+    that are already there. F2 and PS populate the same two slots, so PS is a
+    tie override; F2D populates FOUR (D at the outer pair), so it has to be
+    built, not overridden.
+
+    `emit_d=False` turns the geometry-only grant back off, so the refusal
+    `build_model` gives every other caller stays reachable from here: a D with
+    no deadband behind it is an F in all but name, and that is what G9 is for.
+
+    `p_gap` is GD-ST's own deadband parameter, carried on the component and
+    read back off `Association.gap`. It is passed here rather than held in the
+    solver because it is component data: the gap decides where a deadband
+    sends strain, so it belongs to the structure, not to the run.
+    """
     A = {a['id']: a for a in json.loads(FIXTURE.read_text())['archetypes']}
-    ils = ils_builder.build_ils(A['ILS-EAST']['definition'])
+    d = copy.deepcopy(A['ILS-EAST']['definition'])
+    d['ils']['connection_system'] = system
+    if p_gap is not None:
+        d['components'][0]['P_gap'] = p_gap
+    ils = ils_builder.build_ils(d)
     lo, hi = ils.extent
     s_lo, s_hi = -(hi + PAD), -(lo - PAD)
     scene = Scene(path=LayPath(R=85.0), stations=(), extent=(s_lo, s_hi),
                   elastic_zones=((s_lo, s_lo), (s_hi, s_hi)), spacing=0.0)
-    m = build_model(scene, ils, s_centre=0.0, extra_stations=(0.0,))
+    m = build_model(scene, ils, s_centre=0.0, extra_stations=extra_stations,
+                    emit_unenforced_conn_types=(frozenset({'D'}) if emit_d
+                                                else frozenset()))
     return m, s_hi - s_lo
 
 
@@ -114,8 +139,24 @@ def kernel_mesh(m):
     return ms, beams
 
 
-def constraint_pairs(m, layout: str = None):
-    """(node_a, node_b, component) to tie. Node indices, not DOFs.
+def constraint_pairs(m, layout: str = None, engaged=None):
+    """(node_a, node_b, component, target) to tie. Node indices, not DOFs.
+
+    `target` is the value of (u_a - u_b) the constraint enforces. It is 0.0
+    everywhere except at an ENGAGED `D`, and that exception is the whole of
+    what a deadband means: a D carries nothing until the two sides have moved
+    +/- P_gap apart, and at engagement it holds AT the gap edge --
+
+        u_a - u_b = +/- P_gap,      NOT      u_a - u_b = 0
+
+    Enforcing 0 would drag the sides back into coincidence, dropping the
+    separation below the gap, releasing the connector, letting it separate
+    again: the chatter measured in `study_connectors.py` and recorded as L008.
+
+    `engaged` maps an association's EA-side part node to its state -- 0 open,
+    +1/-1 engaged and which way. Absent, every D is open, which is what the
+    model's own declared `TIES_OPEN['D'] = (False, False, False)` already
+    says: an open D ties NOTHING, so it needs no special case here.
 
     With no `layout` the model's own declared associations are used -- ILS-EAST
     is F2, so every tie is all-DOF.
@@ -142,19 +183,33 @@ def constraint_pairs(m, layout: str = None):
             slot_of[at[e.n2].part_id] = e.connector.slot
 
     types = cs.NAMED_CONNECTION_SYSTEMS[layout] if layout else None
+    engaged = engaged or {}
     out = []
     for a in m.associations:
         ia, ib = idx[a.node_a], idx[a.node_b]
+        ctype = a.conn_type
         if types is None or a.node_a not in slot_of:
             ties = a.ties                       # pipe side, or no override
         else:
             t = types[slot_of[a.node_a] - 1]
             if t is None:
                 continue                        # slot not populated: no tie
-            ties = TIES_OPEN[t]
+            ctype, ties = t, TIES_OPEN[t]
+        state = engaged.get(a.node_a, 0)
+        if ctype == 'D' and state:
+            ties = TIES_SHUT['D']
         for k, on in enumerate(ties):
-            if on:
-                out.append((ia, ib, k))
+            if not on:
+                continue
+            target = 0.0
+            if ctype == 'D' and state and k == 1:
+                if a.gap is None:
+                    raise ValueError(
+                        f'{a.node_a}: a D engaged with no P_gap. The gap is '
+                        f'component data (GD-ST.P_gap) and has no default -- '
+                        f'a silent one would choose where the strain goes.')
+                target = math.copysign(a.gap, state)
+            out.append((ia, ib, k, target))
     return out
 
 
@@ -178,12 +233,29 @@ def assemble(m, ms, U):
 
 
 def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
-          layout=None):
+          layout=None, engaged=None, load_s: float = 0.0):
+    """`load_s` is WHERE the load goes, and it is not optional in spirit.
+
+    This used to be `next(n for n in m.nodes if n.part_id.startswith('PIPE-X'))`
+    -- the first externally-requested station in node order, which is the one
+    at the layout midpoint only while there is exactly one of them. Add a
+    second `extra_station` and the load silently moves to whichever came
+    first, off-centre, and every number in the run is for a different problem.
+    It was caught comparing an F2 model with stations added at the outer slots
+    against F2D: 48.398 mm where F2D gave 49.429, a 2% gap that looked like
+    physics and was a misplaced load. Name the position; take the nearest.
+    """
     ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
     fixed = [dof(ms, n.index, k) for n in ends for k in (0, 1, 2)]
-    load = next(n for n in m.nodes
-                if n.part_id and n.part_id.startswith('PIPE-X'))
-    pairs = constraint_pairs(m, layout)
+    cands = [n for n in m.nodes
+             if n.part_id and n.part_id.startswith('PIPE-X')]
+    if not cands:
+        raise ValueError('no externally-requested pipeline station to load')
+    load = min(cands, key=lambda n: abs(n.s - load_s))
+    if abs(load.s - load_s) > 1e-6:
+        raise ValueError(f'no PIPE-X station at s={load_s}; nearest is '
+                         f'{load.s:.6f}')
+    pairs = constraint_pairs(m, layout, engaged)
 
     U = np.zeros(3 * m.n_nodes)
     for inc in range(1, n_inc + 1):
@@ -193,12 +265,12 @@ def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
             Fext = np.zeros_like(U)
             Fext[dof(ms, load.index, 1)] = P * lam
             R = Fext - Fint
-            for (na, nb, comp) in pairs:
+            for (na, nb, comp, target) in pairs:
                 a, b = dof(ms, na, comp), dof(ms, nb, comp)
                 kp = alpha * max(K[a, a], K[b, b], 1.0)
                 K[a, a] += kp; K[b, b] += kp
                 K[a, b] -= kp; K[b, a] -= kp
-                g = U[a] - U[b]
+                g = (U[a] - U[b]) - target
                 R[a] -= kp * g
                 R[b] += kp * g
             kf = alpha * max(K.diagonal().max(), 1.0)
@@ -212,8 +284,8 @@ def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
                 raise RuntimeError('singular system')
             U += dU
 
-    viol = max((abs(U[dof(ms, na, c)] - U[dof(ms, nb, c)])
-                for (na, nb, c) in pairs), default=0.0)
+    viol = max((abs((U[dof(ms, na, c)] - U[dof(ms, nb, c)]) - t)
+                for (na, nb, c, t) in pairs), default=0.0)
     return U, load.index, fixed, viol
 
 

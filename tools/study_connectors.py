@@ -304,21 +304,28 @@ def solve(rig: Rig, P: float, alpha: float = ALPHA, n_inc: int = 10,
 
         # Engage on SEPARATION, release on FORCE. A D that is open engages
         # once the two sides have moved further than P_gap apart. A D that is
-        # engaged stays engaged while it is still being pushed apart -- the
-        # separation sits AT the gap by construction, so testing separation
-        # again would release it every time. Release needs the force sign.
+        # engaged sits AT the gap by construction -- that is what the +/-P_gap
+        # target means -- so testing separation again would say "still at the
+        # gap" forever and it could never let go. What tells you it should is
+        # the sign of the force it carries: a support PUSHES, and when the tie
+        # would have to pull in the direction it engaged, the sides are coming
+        # back inside the gap and the D is open.
+        K, _ = rig.assemble(U)
         new_engaged = []
         for state, (t, _ib, i_top, i_frame) in zip(engaged, rig.conns):
             if t != 'D':
                 new_engaged.append(0)
                 continue
-            sep = U[3*i_top+1] - U[3*i_frame+1]
+            a, b = 3*i_top + 1, 3*i_frame + 1
+            sep = U[a] - U[b]
             if not state:
                 new_engaged.append(int(math.copysign(1, sep))
                                    if abs(sep) > P_GAP else 0)
             else:
-                # still pushed outward in the direction it engaged?
-                new_engaged.append(state if sep * state > 0.0 else 0)
+                kp = alpha * max(K[a, a], K[b, b], 1.0)
+                f_on_a = -kp * (sep - math.copysign(P_GAP, state))
+                new_engaged.append(0 if f_on_a * state > 1e-6 * abs(P)
+                                   else state)
         if new_engaged == engaged:
             break
         info['active_flips'] += 1

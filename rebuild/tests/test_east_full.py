@@ -270,7 +270,7 @@ def test_ps_ties_are_what_ps_means(built):
     pairs = east.constraint_pairs(m, 'PS')
     tied = {}
     for name, sl in slot.items():
-        tied[sl] = sorted(c for (na, nb, c) in pairs if na == idx[name])
+        tied[sl] = sorted(c for (na, nb, c, _t) in pairs if na == idx[name])
     assert tied[2] == [0, 1], 'P is a pin: both translations tied, rz free'
     assert tied[4] == [1], 'S is a roller: only the perpendicular is tied'
 
