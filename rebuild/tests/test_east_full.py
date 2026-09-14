@@ -217,3 +217,104 @@ def test_connector_stress_is_reported_and_elastic(built, solved, P):
             'the pipe end should carry the larger moment -- it is the end '
             'forced to follow the more sharply rotating member')
     assert max(c['sigma'] for c in conns) > 0.5 * 152.1e6 * (P / 200e3)
+
+
+# ---------------------------------------------------------------------------
+# PS -- the joint type is the only thing that changes
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope='module')
+def ps(built):
+    m, L, ms, beams = built
+    return {P: east.solve(m, ms, P, layout='PS') for P in (20e3, 200e3)}
+
+
+def test_ps_ties_are_what_ps_means(built):
+    """P frees rotation, S frees sliding along the frame. Same model, same
+    mesh, same connector elements -- only which DOF are tied."""
+    m, L, ms, beams = built
+    at = {n.index: n for n in m.nodes}
+    slot = {at[e.n2].part_id: e.connector.slot
+            for e in m.elements if e.connector is not None}
+    idx = m._part_index
+    pairs = east.constraint_pairs(m, 'PS')
+    tied = {}
+    for name, sl in slot.items():
+        tied[sl] = sorted(c for (na, nb, c) in pairs if na == idx[name])
+    assert tied[2] == [0, 1], 'P must free rz and tie both translations'
+    assert tied[4] == [1, 2], 'S must free local x and tie uy and rz'
+
+
+def test_p_connector_carries_no_moment(built, ps):
+    """A revolute is a revolute. Freeing rz at the EA end makes the whole
+    connector a two-force member -- zero moment at BOTH ends, not just the
+    released one."""
+    m, L, ms, beams = built
+    U, _i, _f, _v = ps[200e3]
+    conns = {c['line_id']: c for c in east.connector_forces(m, ms, U)}
+    p_conn = conns['ST:connector2']
+    assert abs(p_conn['M_pipe_end']) < 1e3
+    assert abs(p_conn['M_frame_end']) < 1e3
+
+
+def test_s_connector_carries_no_shear(built, ps):
+    """A prismatic transmits no force along the direction it frees, so the
+    connector carries no transverse shear -- which shows up as end moments
+    that are equal and opposite rather than related by a shear couple."""
+    m, L, ms, beams = built
+    U, _i, _f, _v = ps[200e3]
+    conns = {c['line_id']: c for c in east.connector_forces(m, ms, U)}
+    s_conn = conns['ST:connector4']
+    assert s_conn['M_pipe_end'] == pytest.approx(-s_conn['M_frame_end'],
+                                                 rel=1e-6)
+    assert abs(s_conn['M_pipe_end']) > 100e3, 'it should still carry moment'
+
+
+@pytest.mark.parametrize('P', (20e3, 200e3))
+def test_ps_reactions_balance(built, ps, P):
+    m, L, ms, beams = built
+    U, _i, fixed, _v = ps[P]
+    _, Fint = east.assemble(m, ms, U)
+    assert -sum(Fint[d] for d in fixed if d % 3 == 1) == pytest.approx(P,
+                                                                      rel=1e-4)
+
+
+def test_ps_is_softer_than_f2(built, solved, ps):
+    """Less restraint, more deflection. If PS ever came out stiffer than F2
+    the tie pattern would be inverted somewhere."""
+    m, L, ms, beams = built
+    d_f2 = solved[200e3][0][east.dof(ms, solved[200e3][1], 1)]
+    d_ps = ps[200e3][0][east.dof(ms, ps[200e3][1], 1)]
+    assert d_ps > d_f2
+    assert d_ps / d_f2 == pytest.approx(1.152, rel=0.02)
+
+
+def test_ps_frame_bends_far_harder(built, solved, ps):
+    """F2 ties rotation at BOTH slots, so the frame is held flat and barely
+    bends. PS ties it at one, so the frame is rotated bodily by that point and
+    has to bend to accommodate -- 18 MPa becomes 124."""
+    m, L, ms, beams = built
+    frame_ix = [k for k, e in enumerate(beams) if e.owner == 'ST']
+    s_f2 = east.member_stress(m, ms, solved[200e3][0], beams)[1][frame_ix].max()
+    s_ps = east.member_stress(m, ms, ps[200e3][0], beams)[1][frame_ix].max()
+    assert s_ps / s_f2 > 4.0
+    assert s_ps < east.SIG_YIELD
+
+
+def test_ps_barely_shields_the_pipe(built, solved, ps):
+    """The result that matters for the program's purpose. F2 drops the pipe's
+    stress to 64 MPa between its connectors; PS leaves it near 159. Same
+    geometry, same mesh, same connector stiffness -- 2.5x on the pipe's stress
+    in the ILS region, from the joint type alone."""
+    m, L, ms, beams = built
+    pipe_ix = [k for k, e in enumerate(beams) if e.owner == 'pipeline']
+    at = {n.index: n for n in m.nodes}
+    mid = np.array([0.5 * (at[beams[k].n1].s + at[beams[k].n2].s)
+                    for k in pipe_ix])
+    inner = np.abs(mid) < 0.8 * 1.0837333333333332
+
+    s_f2 = east.member_stress(m, ms, solved[200e3][0], beams)[1][pipe_ix][inner]
+    s_ps = east.member_stress(m, ms, ps[200e3][0], beams)[1][pipe_ix][inner]
+    assert s_ps.max() > 2.0 * s_f2.max(), (
+        'PS is shielding the pipe as much as F2 -- the released DOF are not '
+        'being released')

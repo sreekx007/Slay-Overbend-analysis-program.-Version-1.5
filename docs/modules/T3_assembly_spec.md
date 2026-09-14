@@ -642,6 +642,49 @@ accident: an all-DOF tie at both ends of a short stiff element, between
 members that rotate differently, forces it to bend. **A `P` connector exists
 precisely to relieve this**, and would.
 
+### PS on the same model — the joint type is the only variable
+
+Same geometry, same mesh, same connector elements; only the tied DOF differ.
+At 200 kN:
+
+| layout | δ pipe | δ frame | σ pipe | σ frame | σ conn | M conn |
+|---|---|---|---|---|---|---|
+| **F2** | 50.49 mm | 49.54 mm | 180.5 MPa | 18.0 MPa | 152.1 MPa | 354.5 kN·m |
+| **PS** | 58.17 mm | 55.81 mm | 189.3 MPa | **124.0 MPa** | 145.4 MPa | 338.8 kN·m |
+
+**Both joints behave exactly as their kinematics demand.**
+
+- **`P` carries no moment at either end** — +0.0 / +0.0 kN·m. Freeing rz at
+  the EA end makes the whole connector a two-force member, not just the
+  released end. In the inset it is visibly *straight* where F2's bends.
+- **`S` carries equal and opposite end moments** — +338.8 / −338.8 kN·m. Equal
+  and opposite means **zero transverse shear**, which is what "transmits no
+  force along the freed direction" looks like in the element.
+
+Two consequences worth keeping:
+
+**The frame bends 6.9× harder under PS** (18.0 → 124.0 MPa). F2 ties rotation
+at *both* slots, so the frame is held flat and barely bends. PS ties it at
+one, so the frame is rotated bodily by that point and must bend to
+accommodate — visible as a tilted frame in the plot, where F2's stays level.
+
+**PS barely shields the pipe.** F2 drops the pipe's stress to 64 MPa between
+its connectors; PS leaves it near 159. **2.5× on the pipe's stress in the ILS
+region, from the joint type alone** — which is the comparison this whole
+program exists to make.
+
+### G9 still stands, and this does not breach it
+
+`build_model` continues to **refuse** P/S/D. That refusal is right: `S` frees
+the translation along the EA component's **local x**, and the co-rotating
+frame that defines is not built. The tie pattern is overridden *in the study*,
+in **global axes**, which is exact only because this rig's reference
+configuration is horizontal — local x *is* global s, and the error is the size
+of the rotations, about 10⁻³ rad.
+
+On the stinger the local axis turns up to **32.4°** and this would be wrong.
+`P` would be fine there (rz is frame-free); `S` would not.
+
 ### Group B's blocker test is not contradicted
 
 `test_group_b_cannot_yet_be_solved` still asserts ILS-EAST's own elements are

@@ -53,7 +53,9 @@ import nlfea_v4 as fe                                      # noqa: E402
 from slay.model.assemble import build_model                # noqa: E402
 from slay.scene.path import LayPath                        # noqa: E402
 from slay.scene.scene import Scene                         # noqa: E402
-from study_connectors import ALPHA, connector_k6           # noqa: E402
+import component_spec as cs                              # noqa: E402
+from slay.model.parts import TIES_OPEN                   # noqa: E402
+from study_connectors import ALPHA, connector_k6         # noqa: E402
 
 FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
 
@@ -112,17 +114,45 @@ def kernel_mesh(m):
     return ms, beams
 
 
-def constraint_pairs(m):
-    """(node_a, node_b, component) from the model's declared associations.
+def constraint_pairs(m, layout: str = None):
+    """(node_a, node_b, component) to tie. Node indices, not DOFs.
 
-    Node indices, not DOFs -- the caller maps them through `dof()`, because
-    our indices are not the kernel's.
+    With no `layout` the model's own declared associations are used -- ILS-EAST
+    is F2, so every tie is all-DOF.
+
+    With one, the EA-SIDE tie pattern is replaced by that named system's, while
+    the geometry, the mesh and the connector elements stay exactly as
+    `build_model` produced them. Only which DOF are tied changes, which makes
+    the comparison between layouts exact rather than nearly so. The pipe-side
+    tie is always all-DOF whatever the joint is.
+
+    WHY THIS IS DONE HERE AND NOT IN `build_model`. The package still refuses
+    P/S/D (`SUPPORTED_CONN_TYPES`), and that refusal is right: `S` frees the
+    translation along the EA component's LOCAL x, and the co-rotating frame
+    that defines is not built. On this rig the reference configuration is
+    horizontal, so local x IS global s and the error is the size of the
+    rotations -- about 1e-3 rad. On the stinger the local axis turns up to
+    32.4 degrees and this would be wrong. G9 stands.
     """
     idx = m._part_index
+    slot_of = {}
+    at = {n.index: n for n in m.nodes}
+    for e in m.elements:
+        if e.connector is not None:
+            slot_of[at[e.n2].part_id] = e.connector.slot
+
+    types = cs.NAMED_CONNECTION_SYSTEMS[layout] if layout else None
     out = []
     for a in m.associations:
         ia, ib = idx[a.node_a], idx[a.node_b]
-        for k, on in enumerate(a.ties):
+        if types is None or a.node_a not in slot_of:
+            ties = a.ties                       # pipe side, or no override
+        else:
+            t = types[slot_of[a.node_a] - 1]
+            if t is None:
+                continue                        # slot not populated: no tie
+            ties = TIES_OPEN[t]
+        for k, on in enumerate(ties):
             if on:
                 out.append((ia, ib, k))
     return out
@@ -147,12 +177,13 @@ def assemble(m, ms, U):
     return K, Fint
 
 
-def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30):
+def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
+          layout=None):
     ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
     fixed = [dof(ms, n.index, k) for n in ends for k in (0, 1, 2)]
     load = next(n for n in m.nodes
                 if n.part_id and n.part_id.startswith('PIPE-X'))
-    pairs = constraint_pairs(m)
+    pairs = constraint_pairs(m, layout)
 
     U = np.zeros(3 * m.n_nodes)
     for inc in range(1, n_inc + 1):
@@ -243,26 +274,31 @@ def main() -> int:
     print(f'  {len(m.associations)} associations, all all-DOF, '
           f'penalty alpha = {ALPHA:.0e} x local diagonal\n')
 
-    print(f'  {"P_kN":>6}{"d_pipe_mm":>12}{"d_frame_mm":>12}{"sumR_kN":>10}'
-          f'{"viol":>10}{"sig_pipe":>10}{"sig_frame":>11}{"sig_conn":>10}{"":>4}')
+    print(f'  {"layout":7}{"P_kN":>6}{"d_pipe_mm":>12}{"d_frame_mm":>12}'
+          f'{"sumR_kN":>10}{"viol":>10}{"sig_pipe":>10}{"sig_frame":>11}'
+          f'{"sig_conn":>10}{"M_conn":>10}{"":>4}')
     out = {}
-    for P in (20e3, 200e3):
-        U, i_load, fixed, viol = solve(m, ms, P)
-        _, Fint = assemble(m, ms, U)
-        Ry = sum(Fint[d] for d in fixed if d % 3 == 1)
-        d_pipe = U[dof(ms, i_load, 1)]
-        top = next(n for n in m.nodes
-                   if n.part_id and n.part_id.endswith('stop1'))
-        M, sig = member_stress(m, ms, U, beams)
-        sp, sf = sig[pipe_ix].max(), sig[frame_ix].max()
-        out[P] = (U, sig)
-        conns = connector_forces(m, ms, U)
-        sc = max(c['sigma'] for c in conns)
-        flag = 'ok' if max(sp, sf, sc) < SIG_YIELD else 'YIELD'
-        print(f'  {P/1e3:6.0f}{d_pipe*1e3:12.5f}'
-              f'{U[dof(ms, top.index, 1)]*1e3:12.5f}'
-              f'{-Ry/1e3:10.3f}{viol:10.2e}{sp/1e6:10.1f}'
-              f'{sf/1e6:11.1f}{sc/1e6:10.1f}  {flag}')
+    for layout in ('F2', 'PS'):
+        for P in (20e3, 200e3):
+            U, i_load, fixed, viol = solve(m, ms, P, layout=layout)
+            _, Fint = assemble(m, ms, U)
+            Ry = sum(Fint[d] for d in fixed if d % 3 == 1)
+            d_pipe = U[dof(ms, i_load, 1)]
+            top = next(n for n in m.nodes
+                       if n.part_id and n.part_id.endswith('stop1'))
+            _, sig = member_stress(m, ms, U, beams)
+            sp, sf = sig[pipe_ix].max(), sig[frame_ix].max()
+            conns = connector_forces(m, ms, U)
+            sc = max(c['sigma'] for c in conns)
+            mc = max(abs(c['M_pipe_end']) for c in conns)
+            out[(layout, P)] = (U, sig)
+            flag = 'ok' if max(sp, sf, sc) < SIG_YIELD else 'YIELD'
+            print(f'  {layout:7}{P/1e3:6.0f}{d_pipe*1e3:12.5f}'
+                  f'{U[dof(ms, top.index, 1)]*1e3:12.5f}{-Ry/1e3:10.3f}'
+                  f'{viol:10.2e}{sp/1e6:10.1f}{sf/1e6:11.1f}{sc/1e6:10.1f}'
+                  f'{mc/1e3:10.1f}  {flag}')
+        print()
+    _compare(out)
 
     print()
     _rotation_check(m, ms, solve(m, ms, 200e3)[0])
@@ -270,8 +306,18 @@ def main() -> int:
     _bare_pipe_reference(L)
 
     if '--plot' in sys.argv:
-        _plot(m, ms, beams, out, pipe_ix)
+        _plot(m, ms, beams,
+              {lay: out[(lay, 200e3)] for lay in ('F2', 'PS')}, pipe_ix)
     return 0
+
+
+def _compare(out):
+    """What the joint type actually bought, at 200 kN."""
+    (_, sf2), (_, sps) = out[('F2', 200e3)], out[('PS', 200e3)]
+    print('F2 against PS, same mesh, same connectors, only the ties differ:')
+    print('  P frees rotation at slot 2; S frees sliding along the frame at')
+    print('  slot 4. Both relieve the connector, and both hand load back to')
+    print('  the pipe -- which is what the sig_pipe column shows.')
 
 
 def _rotation_check(m, ms, U):
@@ -366,84 +412,87 @@ def _plot(m, ms, beams, out, pipe_ix):
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    P = 200e3
-    U, sig = out[P]
     at = {n.index: n for n in m.nodes}
     outp = REPO / 'docs' / 'diagrams' / 'east_full_study.png'
+    P = 200e3
+    fig, axes = plt.subplots(3, 1, figsize=(11.5, 11.0),
+                             gridspec_kw={'height_ratios': [1, 1, 0.95]})
 
-    fig, axes = plt.subplots(2, 1, figsize=(11, 7.6),
-                             gridspec_kw={'height_ratios': [1.15, 1]})
+    # ONE scale for both panels. Per-panel scaling would make the softer
+    # layout look like the stiffer one, which is the comparison being drawn.
+    common = 1.2 / max(abs(out[l][0][1::3]).max() for l in ('F2', 'PS'))
+    for ax, layout, note in (
+            (axes[0], 'F2', 'both ties all-DOF: the connector must bend'),
+            (axes[1], 'PS', 'P frees rotation at slot 2 -- that connector '
+                            'carries NO moment and stays straight')):
+        U, _sig = out[layout]
+        scale = common
+        for e in m.elements:
+            a, b = at[e.n1], at[e.n2]
+            col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
+            lw = 2.6 if e.connector is not None else 1.8
+            ax.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.1, zorder=1)
+            xs, ys = deflected(a, b, U, ms, e.n1, e.n2, scale)
+            ax.plot(xs, ys, color=col, lw=lw, zorder=2)
+        ax.invert_yaxis()
+        ax.set_aspect('equal')
+        ax.set_ylabel('y (m), down')
+        ax.grid(alpha=0.22)
+        ax.set_title(f'{layout}  --  {note}   (deflection x{scale:.0f})',
+                     fontsize=9.5, loc='left')
 
-    ax = axes[0]
-    scale = 1.2 / max(abs(U[1::3]).max(), 1e-12)
-    for e in m.elements:
-        a, b = at[e.n1], at[e.n2]
-        col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
-        lw = 2.6 if e.connector is not None else 1.8
-        ax.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.2, zorder=1)
-        xs, ys = deflected(a, b, U, ms, e.n1, e.n2, scale)
-        ax.plot(xs, ys, color=col, lw=lw, zorder=2)
-    for lbl, col in (('pipeline', '#1f7a8c'), ('GD-ST frame', '#2f6f3e'),
-                     ('connectors', '#6b4ea8')):
-        ax.plot([], [], color=col, lw=2.2, label=lbl)
-    ax.plot([], [], color='#c9d2d9', lw=1.2, label='undeformed')
-    ax.invert_yaxis()
-    ax.set_aspect('equal')
-    ax.legend(fontsize=8, ncol=4, loc='upper left', framealpha=0.92)
+        # inset on the slot-2 connector, drawn relative to its own base so the
+        # rigid sag is removed and only bending is left
+        conn = min((e for e in m.elements if e.connector is not None),
+                   key=lambda e: e.connector.slot)
+        cs_ = at[conn.n1].s
+        axz = ax.inset_axes([0.70, 0.05, 0.28, 0.56])
+        ref = (U[dof(ms, conn.n1, 0)], U[dof(ms, conn.n1, 1)])
+        for e in m.elements:
+            a, b = at[e.n1], at[e.n2]
+            if min(a.s, b.s) > cs_ + 1.2 or max(a.s, b.s) < cs_ - 1.2:
+                continue
+            if a.y > 0.1 or b.y > 0.1:
+                continue
+            col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
+            axz.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.0)
+            xs, ys = deflected(a, b, U, ms, e.n1, e.n2, 320.0, n=40, ref=ref)
+            axz.plot(xs, ys, color=col, lw=2.3)
+        axz.set_xlim(cs_ - 0.9, cs_ + 0.9)
+        axz.set_ylim(-0.80, 0.16)
+        axz.invert_yaxis()
+        axz.set_xticks([]); axz.set_yticks([])
+        axz.set_title('slot-2 connector, x320, relative to its base',
+                      fontsize=7)
+        for sp in axz.spines.values():
+            sp.set_edgecolor('#7b8794')
+    axes[0].legend(handles=[
+        plt.Line2D([], [], color=c, lw=2.2, label=l)
+        for l, c in (('pipeline', '#1f7a8c'), ('GD-ST frame', '#2f6f3e'),
+                     ('connectors', '#6b4ea8'), ('undeformed', '#c9d2d9'))],
+        fontsize=8, ncol=4, loc='upper left', framealpha=0.92)
 
-    # An inset on one connector. The tilt there is 3.4e-04 rad over 0.61 m --
-    # about 0.2 mm, which at the whole-model scale is a fraction of a pixel.
-    # Nothing was wrong with the picture; it simply could not resolve the
-    # question being asked of it.
-    axz = ax.inset_axes([0.665, 0.06, 0.31, 0.52])
-    conn = next(e for e in m.elements if e.connector is not None)
-    cs_ = at[conn.n1].s
-    zs = 320.0                          # local magnification for the inset
-    ref = (U[dof(ms, conn.n1, 0)], U[dof(ms, conn.n1, 1)])
-    for e in m.elements:
-        a, b = at[e.n1], at[e.n2]
-        if min(a.s, b.s) > cs_ + 1.2 or max(a.s, b.s) < cs_ - 1.2:
-            continue
-        if a.y > 0.1 or b.y > 0.1:
-            continue
-        col = {'pipeline': '#1f7a8c', 'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
-        axz.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.1)
-        xs, ys = deflected(a, b, U, ms, e.n1, e.n2, zs, n=40, ref=ref)
-        axz.plot(xs, ys, color=col, lw=2.4)
-    axz.set_xlim(cs_ - 0.9, cs_ + 0.9)
-    axz.set_ylim(-0.80, 0.16)
-    axz.invert_yaxis()
-    axz.set_xticks([]); axz.set_yticks([])
-    axz.set_title(f'connector 2 at x{zs:.0f}, drawn RELATIVE to its own base\n'
-                  f'so the rigid sag is removed and only the bending is left',
-                  fontsize=7.2)
-    for sp in axz.spines.values():
-        sp.set_edgecolor('#7b8794')
-    ax.set_title(f'Deformed shape, P = {P/1e3:.0f} kN at the layout midpoint '
-                 f'(s = 0), deflection x{scale:.0f}  --  true element shapes, '
-                 f'not chords', fontsize=10)
-    ax.set_ylabel('y (m), positive DOWN')
-    ax.grid(alpha=0.22)
-
-    ax = axes[1]
-    mid = np.array([0.5*(ms.elem_coords[i][0] + ms.elem_coords[i][2])
-                    for i in pipe_ix])
-    order = np.argsort(mid)
-    ax.plot(mid[order], sig[pipe_ix][order]/1e6, color='#1f7a8c', lw=1.7,
-            marker='.', ms=5, label='pipeline')
+    ax = axes[2]
+    for layout, col, ls in (('F2', '#1f7a8c', '-'), ('PS', '#b44d12', '-')):
+        _U, sig = out[layout]
+        mid = np.array([0.5*(ms.elem_coords[i][0] + ms.elem_coords[i][2])
+                        for i in pipe_ix])
+        o = np.argsort(mid)
+        ax.plot(mid[o], sig[pipe_ix][o]/1e6, color=col, ls=ls, lw=1.8,
+                marker='.', ms=5, label=f'pipeline, {layout}')
     for e in m.elements:
         if e.connector is not None:
             ax.axvline(at[e.n1].s, color='#6b4ea8', ls=':', lw=1.2)
     ax.plot([], [], color='#6b4ea8', ls=':', lw=1.2, label='connector station')
-    ax.set_title('Peak fibre stress along the pipeline -- note the shielded '
-                 'span between the two connectors', fontsize=10)
+    ax.set_title('Peak fibre stress along the pipeline. PS restrains less, so '
+                 'it shields less.', fontsize=9.5, loc='left')
     ax.set_xlabel('s (m)   --   +s toward the stinger')
     ax.set_ylabel('sigma (MPa)')
     ax.legend(fontsize=8)
     ax.grid(alpha=0.22)
 
-    fig.suptitle('ILS-EAST complete: the frame is tied to the pipe through '
-                 'penalty-constrained connectors (F2, all DOF)', fontsize=11)
+    fig.suptitle('ILS-EAST: the same model on two connector systems. '
+                 'Only the tied DOF differ.', fontsize=11)
     fig.tight_layout()
     fig.savefig(outp, dpi=140)
     print(f'wrote {outp.relative_to(REPO)}')
