@@ -80,7 +80,7 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / 'tools'))
 
 import study_east_full as east                             # noqa: E402
-from study_connectors import ALPHA                         # noqa: E402
+from study_connectors import ALPHA, ZERO_LEN_TOL           # noqa: E402
 
 SIG_YIELD = east.SIG_YIELD
 
@@ -92,10 +92,22 @@ SIG_YIELD = east.SIG_YIELD
 # and measure nothing there.
 SYSTEMS = {
     'F2D': {'base': 'F2', 'slots': (1, 2, 4, 5),
-            'gaps': (5.0e-3, 3.5e-3, 2.5e-3, 1.0e-3, 0.25e-3)},
+            'gaps': {'ILS-EAST': (5.0e-3, 3.5e-3, 2.5e-3, 1.0e-3, 0.25e-3),
+                     'ILS-EASB': (6.0e-3, 4.5e-3, 3.0e-3, 1.2e-3, 0.30e-3)}},
     'F1D': {'base': 'F1', 'slots': (1, 3, 5),
-            'gaps': (15.0e-3, 10.0e-3, 7.5e-3, 3.0e-3, 0.75e-3)},
+            'gaps': {'ILS-EAST': (15.0e-3, 10.0e-3, 7.5e-3, 3.0e-3, 0.75e-3),
+                     'ILS-EASB': (16.0e-3, 12.0e-3, 8.0e-3, 3.5e-3, 0.80e-3)}},
 }
+
+# ILS-EASB's frame is longer and hangs BELOW the pipe from a top chord on the
+# centreline, so its outer slots travel further before they touch: 9.975 mm
+# against ILS-EAST's 9.105 on F1D, 3.667 against 3.004 on F2D. Same shape,
+# different numbers, and each archetype is swept against its own.
+DEFAULT_ARCHETYPE = 'ILS-EAST'
+
+
+def gaps_for(name: str, archetype: str = DEFAULT_ARCHETYPE):
+    return SYSTEMS[name]['gaps'][archetype]
 
 # The outer slot, |s| = |x|. Both systems put a D there, and both therefore
 # force a header station there that their base system does not have.
@@ -196,24 +208,27 @@ def _row(m, ms, beams, pipe_ix, frame_ix, U, i_load, fixed, info):
     Ry = sum(Fint[d] for d in fixed if d % 3 == 1)
     _, sig = east.member_stress(m, ms, U, beams)
     conns = {c['line_id']: c for c in east.connector_forces(m, ms, U)}
-    d_slots = [e.connector.slot for e in m.elements
-               if e.connector is not None and e.connector.conn_type == 'D']
-    f_slots = [e.connector.slot for e in m.elements
-               if e.connector is not None and e.connector.conn_type == 'F']
+    # Keyed by the ELEMENT's own line_id, never by a reconstructed
+    # 'ST:connector<n>'. The owner tag is 'ST' on ILS-EAST and 'SB' on
+    # ILS-EASB, so a rebuilt string works on one archetype and raises a
+    # KeyError on the other.
+    by_type = {'F': [], 'D': []}
+    for e in m.elements:
+        if e.connector is not None:
+            by_type[e.connector.conn_type].append(conns[e.line_id])
     return {
         'd_pipe': U[east.dof(ms, i_load, 1)],
         'sumR': -Ry,
         'sig_pipe': sig[pipe_ix].max(),
         'sig_frame': sig[frame_ix].max(),
-        'M_F': max(abs(conns[f'ST:connector{s}']['M_frame_end'])
-                   for s in f_slots),
+        'M_F': max(abs(c['M_frame_end']) for c in by_type['F']),
         # axial in BOTH classes. Without the F column an F1D table reads as
         # all zeros in every connector column -- its single F sits at the
         # midspan, where symmetry gives zero relative rotation and so zero
         # moment, and a table showing only moment cannot tell that apart
         # from a connector doing nothing at all.
-        'N_F': max(abs(conns[f'ST:connector{s}']['axial']) for s in f_slots),
-        'N_D': max(abs(conns[f'ST:connector{s}']['axial']) for s in d_slots),
+        'N_F': max(abs(c['axial']) for c in by_type['F']),
+        'N_D': max(abs(c['axial']) for c in by_type['D']),
         'sig_conn': max(c['sigma'] for c in conns.values()),
         'state': ''.join({0: '.', 1: '+', -1: '-'}[v]
                          for v in info['engaged'].values()),
@@ -222,16 +237,16 @@ def _row(m, ms, beams, pipe_ix, frame_ix, U, i_load, fixed, info):
     }
 
 
-def sweep(name: str):
+def sweep(name: str, archetype: str = DEFAULT_ARCHETYPE):
     """Every gap of one system, both loads. Each gap is a REBUILD, because
     P_gap is component data and rides on the component, not on the solver."""
-    spec = SYSTEMS[name]
     out = {}
-    for gap in spec['gaps']:
-        m, _L = east.build(system=name, p_gap=gap)
+    for gap in gaps_for(name, archetype):
+        m, _L = east.build(system=name, p_gap=gap, archetype=archetype)
         ms, beams = east.kernel_mesh(m)
+        ea = east.ea_owner(m)
         pipe_ix = [k for k, e in enumerate(beams) if e.owner == 'pipeline']
-        frame_ix = [k for k, e in enumerate(beams) if e.owner == 'ST']
+        frame_ix = [k for k, e in enumerate(beams) if e.owner == ea]
         for P in (20e3, 200e3):
             U, i_load, fixed, info = solve_deadband(m, ms, P)
             r = _row(m, ms, beams, pipe_ix, frame_ix, U, i_load, fixed, info)
@@ -240,31 +255,34 @@ def sweep(name: str):
 
 
 def main() -> int:
+    archetype = DEFAULT_ARCHETYPE
+    if '--archetype' in sys.argv:
+        archetype = sys.argv[sys.argv.index('--archetype') + 1]
     tables, thresholds = {}, {}
     for name in ('F2D', 'F1D'):
-        tables[name], thresholds[name] = _one_system(name)
+        tables[name], thresholds[name] = _one_system(name, archetype)
 
     print()
-    _compare_systems(tables, thresholds)
+    _compare_systems(tables, thresholds, archetype)
 
     if '--plot' in sys.argv:
-        _plot(tables, thresholds)
+        _plot(tables, thresholds, archetype)
     return 0
 
 
-def _one_system(name: str):
-    spec = SYSTEMS[name]
-    gaps = spec['gaps']
-    m, L = east.build(system=name, p_gap=gaps[0])
+def _one_system(name: str, archetype: str = DEFAULT_ARCHETYPE):
+    gaps = gaps_for(name, archetype)
+    m, L = east.build(system=name, p_gap=gaps[0], archetype=archetype)
     ms, beams = east.kernel_mesh(m)
     pipe_ix = [k for k, e in enumerate(beams) if e.owner == 'pipeline']
-    frame_ix = [k for k, e in enumerate(beams) if e.owner == 'ST']
+    ea = east.ea_owner(m)
+    frame_ix = [k for k, e in enumerate(beams) if e.owner == ea]
     conns = sorted((e for e in m.elements if e.connector is not None),
                    key=lambda e: e.connector.slot)
     layout = ' '.join(f'{e.connector.conn_type}@{e.connector.slot}'
                       for e in conns)
 
-    print(f'=========  ILS-EAST on {name}  =========')
+    print(f'=========  {archetype} on {name}  =========')
     print(f'  {m.n_nodes} nodes, {m.n_elems} elements, '
           f'{len(conns)} connectors: {layout}')
     print(f'  pipeline {len(pipe_ix)} el, frame {len(frame_ix)} el, '
@@ -290,7 +308,7 @@ def _one_system(name: str):
           f'{"sumR_kN":>10}{"N_D_kN":>9}{"N_F_kN":>9}{"M_F_kNm":>10}'
           f'{"sig_pipe":>10}'
           f'{"sig_frame":>11}{"sig_conn":>10}{"flips":>7}{"viol":>10}')
-    table = sweep(name)
+    table = sweep(name, archetype)
     for gap in gaps:
         for P in (20e3, 200e3):
             r = table[(gap, P)][1]
@@ -306,14 +324,14 @@ def _one_system(name: str):
         print()
     print("  D column: '+'/'-' engaged and which way, '.' open.")
     print()
-    _against_base(name, table)
+    _against_base(name, table, archetype)
     print()
-    _rigid_limit(name)
+    _rigid_limit(name, archetype)
     print()
     return table, thr
 
 
-def _against_base(name: str, table):
+def _against_base(name: str, table, archetype=DEFAULT_ARCHETYPE):
     """The claim that has to hold EXACTLY, and the one that has to hold
     monotonically.
 
@@ -325,11 +343,10 @@ def _against_base(name: str, table):
     system's is not. Give the base those two stations and the two agree to the
     last digit printed.
     """
-    spec = SYSTEMS[name]
-    base = spec['base']
-    mb, _L = east.build(system=base)
+    base = SYSTEMS[name]['base']
+    mb, _L = east.build(system=base, archetype=archetype)
     msb, _bb = east.kernel_mesh(mb)
-    mst, _L2 = east.build(system=base,
+    mst, _L2 = east.build(system=base, archetype=archetype,
                           extra_stations=(0.0, -X_OUTER, X_OUTER))
     msst, _bs = east.kernel_mesh(mst)
 
@@ -341,7 +358,7 @@ def _against_base(name: str, table):
         U2, i2, _f, _v = east.solve(mst, msst, P)
         d1 = U1[east.dof(msb, i1, 1)] * 1e3
         d2 = U2[east.dof(msst, i2, 1)] * 1e3
-        d3 = table[(max(spec['gaps']), P)][1]['d_pipe'] * 1e3
+        d3 = table[(max(gaps_for(name, archetype)), P)][1]['d_pipe'] * 1e3
         print(f'  {P/1e3:6.0f}{d1:16.8f}{d2:20.8f}{d3:18.8f}'
               f'   ({abs(d3-d2)*1e6:.1f} nm apart)')
     print('   An open D restrains NOTHING -- not the perpendicular, not')
@@ -352,7 +369,8 @@ def _against_base(name: str, table):
     print(f'   +/-2.1675 m where {base} does not. Give {base} those two')
     print('   stations and the answers agree to every digit printed.')
     print()
-    ds = [table[(g, 200e3)][1]['d_pipe'] * 1e3 for g in spec['gaps']]
+    ds = [table[(g, 200e3)][1]['d_pipe'] * 1e3
+          for g in gaps_for(name, archetype)]
     print('   200 kN deflection against gap: '
           + ' -> '.join(f'{d:.4f}' for d in ds))
     mono = all(b <= a + 1e-9 for a, b in zip(ds, ds[1:]))
@@ -360,7 +378,7 @@ def _against_base(name: str, table):
           f'from the open end to the tightest gap.')
 
 
-def _rigid_limit(name: str):
+def _rigid_limit(name: str, archetype=DEFAULT_ARCHETYPE):
     """What the deadband is approaching as the gap closes.
 
     NOT the same system with F at the outer slots. A shut D ties the
@@ -372,7 +390,7 @@ def _rigid_limit(name: str):
     """
     print(f'The limit {name} approaches as the gap closes, at 200 kN:')
     for gap in (1e-4, 1e-5, 1e-6):
-        mg, _L = east.build(system=name, p_gap=gap)
+        mg, _L = east.build(system=name, p_gap=gap, archetype=archetype)
         msg, _bg = east.kernel_mesh(mg)
         U, i_load, _f, info = solve_deadband(mg, msg, 200e3)
         state = ''.join({0: '.', 1: '+', -1: '-'}[v]
@@ -385,16 +403,16 @@ def _rigid_limit(name: str):
     print('   is a different connection system, not a D that shuts at once.')
 
 
-def _compare_systems(tables, thresholds):
+def _compare_systems(tables, thresholds, archetype=DEFAULT_ARCHETYPE):
     """F1D against F2D. Same frame, same connectors, same gap rule -- the
     only difference is how much work the BASE system was already doing."""
-    print('=========  F1D against F2D  =========')
+    print(f'=========  F1D against F2D on {archetype}  =========')
     print()
     print('At 200 kN, each system open and at its tightest gap:')
     print(f'  {"system":8}{"base":6}{"conns":7}{"open_mm":>10}'
           f'{"tight_mm":>10}{"drop":>8}{"threshold_mm":>14}')
     for name in ('F2D', 'F1D'):
-        gaps = SYSTEMS[name]['gaps']
+        gaps = gaps_for(name, archetype)
         t = tables[name]
         d_open = t[(gaps[0], 200e3)][1]['d_pipe'] * 1e3
         d_tight = t[(gaps[-1], 200e3)][1]['d_pipe'] * 1e3
@@ -417,17 +435,18 @@ def _compare_systems(tables, thresholds):
     print()
     print('  Where they end up is the test of that reading:')
     for name in ('F2D', 'F1D'):
-        gaps = SYSTEMS[name]['gaps']
+        gaps = gaps_for(name, archetype)
         d = tables[name][(gaps[-1], 200e3)][1]['d_pipe'] * 1e3
         print(f'    {name} at {gaps[-1]*1e3:.2f} mm gap -> {d:.4f} mm')
 
 
-def _plot(tables, thresholds):
+def _plot(tables, thresholds, archetype=DEFAULT_ARCHETYPE):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
-    outp = REPO / 'docs' / 'diagrams' / 'east_deadband_study.png'
+    tag = 'east' if archetype == 'ILS-EAST' else 'easb'
+    outp = REPO / 'docs' / 'diagrams' / f'{tag}_deadband_study.png'
     fig, axes = plt.subplots(3, 2, figsize=(14.0, 11.8),
                              gridspec_kw={'height_ratios': [1, 1, 1.25]})
 
@@ -435,11 +454,11 @@ def _plot(tables, thresholds):
     # make the softest layout look like the stiffest, which is the comparison.
     common = 1.6 / max(
         abs(tables[n][(g, 200e3)][0][1::3]).max()
-        for n in ('F2D', 'F1D') for g in (SYSTEMS[n]['gaps'][0],
-                                          SYSTEMS[n]['gaps'][-1]))
+        for n in ('F2D', 'F1D')
+        for g in (gaps_for(n, archetype)[0], gaps_for(n, archetype)[-1]))
 
     for col, name in enumerate(('F2D', 'F1D')):
-        gaps = SYSTEMS[name]['gaps']
+        gaps = gaps_for(name, archetype)
         for row, gap in enumerate((gaps[0], gaps[-1])):
             ax = axes[row][col]
             U, r, mg, msg, _b = tables[name][(gap, 200e3)]
@@ -448,10 +467,22 @@ def _plot(tables, thresholds):
                 a, b = at[e.n1], at[e.n2]
                 ctype = (e.connector.conn_type
                          if e.connector is not None else None)
-                col_ = {'pipeline': '#1f7a8c',
-                        'ST': '#2f6f3e'}.get(e.owner, '#6b4ea8')
+                col_ = {'pipeline': '#1f7a8c'}.get(
+                    e.owner, '#2f6f3e' if e.connector is None else '#6b4ea8')
                 if ctype == 'D':
                     col_ = '#b44d12'
+                if (e.connector is not None
+                        and math.hypot(b.s - a.s, b.y - a.y) < ZERO_LEN_TOL):
+                    # ILS-EASB's connectors have no length, so there is no
+                    # chord to draw and `deflected` would divide by it. Mark
+                    # where the connector is rather than invent extent for it.
+                    ax.plot([a.s + U[east.dof(msg, e.n1, 0)] * common],
+                            [a.y + U[east.dof(msg, e.n1, 1)] * common],
+                            marker='D', ms=7,
+                            mfc='none' if (ctype == 'D'
+                                           and '.' in r['state']) else col_,
+                            mec=col_, zorder=4)
+                    continue
                 ax.plot([a.s, b.s], [a.y, b.y], color='#c9d2d9', lw=1.0,
                         zorder=1)
                 xs, ys = east.deflected(a, b, U, msg, e.n1, e.n2, common)
@@ -477,7 +508,8 @@ def _plot(tables, thresholds):
     axes[0][0].legend(handles=[
         plt.Line2D([], [], color=c, lw=2.2, ls=st, label=l)
         for l, c, st in (('pipeline', '#1f7a8c', '-'),
-                         ('GD-ST frame', '#2f6f3e', '-'),
+                         (f'GD-{"ST" if archetype == "ILS-EAST" else "SB"} '
+                          f'frame', '#2f6f3e', '-'),
                          ('F connectors', '#6b4ea8', '-'),
                          ('D (dotted = open)', '#b44d12', ':'),
                          ('undeformed', '#c9d2d9', '-'))],
@@ -490,7 +522,7 @@ def _plot(tables, thresholds):
     style = {('F2D', 20e3): ('#1f7a8c', '--'), ('F2D', 200e3): ('#b44d12', '-'),
              ('F1D', 20e3): ('#4c8c2b', '--'), ('F1D', 200e3): ('#7a4bb8', '-')}
     for name in ('F2D', 'F1D'):
-        gaps = SYSTEMS[name]['gaps']
+        gaps = gaps_for(name, archetype)
         for P in (20e3, 200e3):
             col_, ls = style[(name, P)]
             d = [tables[name][(g, P)][1]['d_pipe'] * 1e3 for g in gaps]
@@ -518,7 +550,7 @@ def _plot(tables, thresholds):
                  fontsize=9.5, loc='left')
     ax.legend(fontsize=8, ncol=2); ax.grid(alpha=0.22, which='both')
 
-    fig.suptitle('ILS-EAST on F2D and F1D: the deadband gap is the only '
+    fig.suptitle(f'{archetype} on F2D and F1D: the deadband gap is the only '
                  'variable, and each system is swept against its own '
                  'threshold.', fontsize=11)
     fig.tight_layout()

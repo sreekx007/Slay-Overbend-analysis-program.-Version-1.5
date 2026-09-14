@@ -914,10 +914,157 @@ the change left every row of that study's output bit-identical.
 
 ---
 
+## ILS-EASB — the zero-length connector, measured 14 Sep 2026
+
+`tools/study_easb.py`, `rebuild/tests/test_easb.py` (27 tests),
+`docs/diagrams/easb_study.png`, `docs/diagrams/easb_deadband_study.png`.
+Deadband sweeps: `study_east_deadband.py --archetype ILS-EASB`.
+
+### The archetype the connector rule was written for
+
+GD-ST stands its frame 0.6096 m off the pipe. GD-SB sets `P_vt = 0`, which
+puts its **top chord on the pipe centreline**, so every one of its connectors
+is zero length:
+
+| | frame | connector length | nodes / elements |
+|---|---|---|---|
+| ILS-EAST | 0.6096 m below the pipe | 0.6096 m | 45 / 42 |
+| ILS-EASB | top chord **on** the pipe | **0.0 m** | 49 / 46 |
+
+That is the DEFAULT here, not an edge case, and it is exactly what the rule —
+*stiffness of a 1 × OD length of pipeline, never derived from length* — exists
+to make ordinary. A length-derived stiffness would be undefined precisely
+where it is most needed.
+
+### A zero-length connector is not the limit of a beam
+
+A beam's transverse stiffness is entirely a moment arm: a rigid rotation moves
+its ends `L·φ` apart, so `Δ_transverse` is not a deformation of a beam at all,
+only `Δ_transverse − L·φ` is. Drive `L` to zero and the corotational basis
+divides by it, because the mode it measures has ceased to exist.
+
+At `L = 0` the arithmetic changes shape. A rigid rotation of two **coincident**
+nodes moves neither, so all three relative freedoms are genuine deformations
+and the element is a relative-DOF spring:
+
+```
+K = [[ k, -k ],
+     [-k,  k ]]
+```
+
+which annihilates both rigid-body modes by construction — measured: exactly
+three zero eigenvalues, and `max|f| = 0.0` for equal translation in either
+direction and for equal rotation. It is self-equilibrating however `k` is
+chosen, which is L012's requirement met a different way.
+
+**Which three numbers is the judgement call, and it is stated rather than
+buried.** A beam's three relative modes are coupled, so three independent
+values can only be had by taking each mode's own stiffness with the other two
+relative freedoms restrained:
+
+| | | value |
+|---|---|---|
+| `k_axial` | `EA/L₀` | 1.3139e10 N/m |
+| `k_transverse` | `12EI/L₀³` | 1.7776e10 N/m |
+| `k_rotation` | `EI/L₀` | 2.4466e8 N·m/rad |
+
+all at `L₀ = OD`. The last is `EI/L₀` and **not** `4EI/L₀`: with both ends'
+translations held and a relative rotation `φ` imposed as `(−φ/2, +φ/2)`, a
+beam's strain energy is `(EI/L₀)φ²/2`. `4EI/L₀` is the stiffness against *one*
+end's rotation with the other held — not a relative mode, and four times too
+stiff. Recorded as L033.
+
+**The axis is the `P_vt` direction.** `k_axial` and `k_transverse` differ by
+1.35×, so which global direction each acts in has to be said. A connector runs
+from the pipe to the structure — the direction `P_vt` measures — and `P_vt = 0`
+means the structure sits *on* the centreline, not that the connector points
+somewhere else. So the zero-length case keeps the same axis convention as
+every other connector rather than inventing one. Sign is irrelevant; a zero
+axis vector refuses. On the stinger the axis turns with the slope, which is
+the same co-rotating frame `S` and `D` need. Recorded as L034.
+
+### Seven coincident node pairs, all distinct
+
+GD-SB's slot nodes sit exactly on the pipe centreline, so pipe nodes,
+connector nodes and structure nodes land on the same point:
+
+| at (s, y) | nodes |
+|---|---|
+| (−1.0837, 0) | 15 · 2 · 3 · 44 |
+| (0, 0) | 16 · 45 |
+| (+1.0837, 0) | 17 · 0 · 1 · 46 |
+
+This is the archetype that found the kernel keying mesh nodes by rounded
+**coordinate** (L001) — `sslot3` welded itself to the pipe's load node at
+every element size and pad length tried. Merging happens within a pass and
+never across; the kernel keys on node id; the count is asserted, and so is
+`ms.n_nodes == m.n_nodes`.
+
+### Every system EA-ST was taken through, on the same code path
+
+Nothing switched but the archetype parameter. At 200 kN:
+
+| system | conns | d (200 kN) | of its own bare pipe | σ pipe | σ frame | σ conn |
+|---|---|---|---|---|---|---|
+| F2 | 2 | 70.395 mm | 82.4% | 200.2 | 92.9 | 120.8 |
+| PS | 2 | 83.582 mm | 97.8% | 212.0 | 0.0 | 0.0 |
+| F1D open | 3 | 83.576 mm | 97.8% | 212.0 | 0.0 | 0.0 |
+| F1D shut (0.80 mm) | 3 | 59.609 mm | 69.8% | 189.6 | 176.4 | 0.0 |
+| F2D open | 4 | 70.396 mm | 82.4% | 200.2 | 92.9 | 120.8 |
+| F2D shut (0.30 mm) | 4 | 55.972 mm | 65.5% | 185.2 | 124.1 | 8.8 |
+
+Bare pipe of the same span (20.128 m): 85.430 mm. **PS is a passenger here
+too** — a rigid frame held by a pin and a roller is statically determinate
+against any motion of those points, so it can never be forced to deform. The
+zero-length connector changes none of that: the joint **type** decides whether
+the frame works, not the connector's geometry.
+
+Deadband thresholds are larger than EA-ST's, because EA-SB's frame is longer
+and hangs below a chord on the centreline: **3.6669 mm** (F2D) and
+**9.9751 mm** (F1D) at 200 kN, against 3.0041 and 9.1049. Each archetype is
+swept against its own. Open-D equals the base system to 0.002 nm; `N_F == N_D`
+on F2D and `N_F == 2·N_D` on F1D hold here exactly as they do on EA-ST.
+
+### The frame acts compositely, and one trend reverses
+
+At 200 kN on F2, each connector carries **zero vertical force**, ±112.343 kN
+horizontal and ±281.528 kN·m of moment. GD-SB's top chord is coincident with
+the pipe and its body is below, so the two bend as one deep section and the
+connectors transfer the interface shear. The vertical force is zero for the
+same reason it is on EA-ST F2 — two mirror-image connectors that must sum to
+zero are each zero.
+
+Two consequences, both measured:
+
+- **EA-SB shields its pipe less than EA-ST** — 82.4% of its own bare pipe
+  against 74.5%. GD-ST stands its frame off on a 0.61 m lever; GD-SB lies
+  along it. The lever is what turns a frame into a second flange.
+- **The deadband relieves EA-SB's F connectors and loads EA-ST's.** `M_F`
+  falls 281.53 → 20.40 kN·m as the D engage here; on EA-ST it rises
+  9.29 → 179.30. Same system, same rule, opposite trend — because the load
+  path is a different shape. On EA-SB the two F connectors were carrying the
+  whole composite interface alone and the D pair takes it over; on EA-ST the
+  outer supports extend a frame that already works by bending. Recorded as
+  L035.
+
+### Three crashes moving the code across, all the same mistake
+
+A zero-size array from `frame_ix`, a `KeyError` on `'ST:connector2'`, and a
+`ZeroDivisionError` in the deflected-shape plot — each a hardcoded assumption
+about ILS-EAST. The EA owner tag is `ST` there and `SB` here, so both
+`e.owner == 'ST'` filters and rebuilt `'ST:connector<n>'` line ids fail; and
+`deflected` divides by the element length, which is zero for every EA-SB
+connector. Read the EA owner off the model (`east.ea_owner`), key connector
+results by the element's own `line_id`, and mark a zero-length connector's
+position rather than inventing extent for it. Recorded as L036.
+
+---
+
 ## Action log
 
 | Date | Action |
 |---|---|
+| 14 Sep 2026 | **ILS-EASB implemented and run on every system EA-ST was taken through** — F2, PS, F1D, F2D — with the archetype as a parameter and nothing else switched. Its connectors are ALL zero length (`P_vt = 0` puts GD-SB's top chord on the pipe centreline), which is the default here and the case pass 4's length-independent rule exists for. Zero length ruled a **relative-DOF spring**, not a beam limit: `K = [[k,-k],[-k,k]]`, three rigid-body modes annihilated by construction, stiffnesses `EA/L0`, `12EI/L0^3`, `EI/L0` at `L0 = OD` — `EI/L0` and not `4EI/L0`, which is one end's rotation and not a relative mode. Axis ruled the `P_vt` direction. Seven coincident node pairs confirmed distinct (L001's own case, on the archetype that found it). The frame acts COMPOSITELY: zero vertical force in the connectors, ±112.343 kN horizontal and ±281.528 kN.m. EA-SB shields its pipe less than EA-ST (82.4% of its own bare pipe against 74.5%) because GD-ST has a 0.61 m lever and GD-SB has none, and the deadband RELIEVES EA-SB's F connectors while it LOADS EA-ST's. |
 | 14 Sep 2026 | **F1D added alongside F2D**, each swept against its own measured threshold (F1D 0.9220 / 9.1049 mm against F2D's 0.3002 / 3.0041). F1 ruled a PASSENGER: its single F sits at the layout midpoint where a symmetric fixed-fixed beam has zero rotation, so it transmits no moment and F1 leaves the pipe at its bare-beam 65.4708 mm — the same outcome as PS by a different mechanism. F1D therefore starts softer, travels 3x further before its supports touch, and gains more when they do (31.9% against 21.2%) without overtaking F2D (44.5648 against 38.9502 mm). Frame equilibrium read off the connector axials differs by system and is now a test: F2D `N_F == N_D`, F1D `N_F == 2*N_D`. Connector AXIAL reported alongside moment — every F1D connector carries zero moment at every gap, so a moment-only table cannot tell a working strut from a dead one. F1D is also the case measurably into the membrane regime: 9.876x separation for a 10x load, against F2D's 10.007x. Load-node selection corrected a second time — F1D's slot-3 connector claims the midpoint station, so there is no `PIPE-X` node and the load is found by position among pipeline element endpoints. |
 | 14 Sep 2026 | F2D measured on the complete ILS-EAST model over five deadband gaps. `emit_unenforced_conn_types` added to `build_model` as a **geometry-only** grant that leaves G9's refusal in place and warns on every connector it emits. `P_gap` confirmed as component data, carried on `Association.gap`; the "required when D" check `component_spec` attributes to `ils_builder.validate()` does not exist there. Free separation at the outer slots (0.3002 mm at 20 kN, 3.0041 mm at 200 kN) predicts every engaged/open cell at both loads. An open D is F2 exactly once F2 is given the two stations the D connectors force into the header mesh — 49.42922334 mm both. A shut D is a rigid roller, limit 38.0014 mm, approached monotonically. |
 | 13 Sep 2026 | Connector stiffness rule restated as ABSOLUTE: every connector carries the stiffness of a 1 × OD length of pipeline whatever its own length, so a zero-length one is an ordinary case and an ordinary element. Corrects an earlier claim in this spec that a zero-length connector was no element at all — the legal default was being treated as a degenerate case needing an exception, which is the opposite of what the rule is for. Implementation follows: all three Group B archetypes now carry connector elements, ILS-EASB's at length 0. Confirms L5 needs a prescribed-stiffness element type: the corotational kernel divides by the deformed length and returns inf for a zero-length element, observed at `nlfea_v4.py:1216`. |

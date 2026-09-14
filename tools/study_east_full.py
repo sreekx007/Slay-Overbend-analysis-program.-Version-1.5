@@ -56,7 +56,17 @@ from slay.scene.path import LayPath                        # noqa: E402
 from slay.scene.scene import Scene                         # noqa: E402
 import component_spec as cs                              # noqa: E402
 from slay.model.parts import TIES_OPEN, TIES_SHUT        # noqa: E402
-from study_connectors import ALPHA, connector_k6         # noqa: E402
+from study_connectors import (ALPHA, connector_k6,        # noqa: E402
+                              ZERO_LEN_TOL)               # noqa: E402
+
+# A connector's NOMINAL direction: the component's local y, which is the
+# direction P_vt measures and the direction a connector runs from the pipe
+# to the structure. It matters only for a ZERO-LENGTH connector, where the
+# chord has no direction of its own to read -- GD-SB's P_vt = 0 is that
+# case. Both EA archetypes sit square to the pipe in the reference
+# configuration, so local y is model y here; on the stinger arc it turns
+# with the slope, which is the same co-rotating frame S and D need.
+CONN_AXIS = (0.0, 1.0)
 
 FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
 
@@ -72,8 +82,15 @@ Z_AN = I_AN / (OD / 2)
 
 
 def build(system: str = 'F2', p_gap: float = None, extra_stations=(0.0,),
-          emit_d: bool = True):
-    """ILS-EAST over a bare-beam extent, with a node at the layout midpoint.
+          emit_d: bool = True, archetype: str = 'ILS-EAST'):
+    """One EA archetype over a bare-beam extent, with a node at the midpoint.
+
+    `archetype` is ILS-EAST or ILS-EASB. They are the two EA cases and they
+    differ in the one way that matters to a connector: GD-ST stands the frame
+    0.6096 m off the pipe, GD-SB sets `P_vt = 0` and puts its top chord ON the
+    pipe centreline, so every connector is ZERO LENGTH. Same code path, and
+    that is the point -- the connector rule never derives stiffness from
+    length, so the degenerate geometry is an ordinary case.
 
     `system` names the connection system the ARCHETYPE declares, which is what
     decides how many connectors exist and where. That is a different knob from
@@ -92,7 +109,7 @@ def build(system: str = 'F2', p_gap: float = None, extra_stations=(0.0,),
     sends strain, so it belongs to the structure, not to the run.
     """
     A = {a['id']: a for a in json.loads(FIXTURE.read_text())['archetypes']}
-    d = copy.deepcopy(A['ILS-EAST']['definition'])
+    d = copy.deepcopy(A[archetype]['definition'])
     d['ils']['connection_system'] = system
     if p_gap is not None:
         d['components'][0]['P_gap'] = p_gap
@@ -123,13 +140,27 @@ def dof(ms, node_index: int, comp: int) -> int:
     return 3 * ms.user_node_to_mesh[node_index] + comp
 
 
+def ea_owner(m) -> str:
+    """Which owner tag the EA structure carries in THIS model: 'ST' or 'SB'.
+
+    Read off the elements rather than assumed, because the whole point of
+    running both archetypes through one code path is that nothing downstream
+    should have to know which it got.
+    """
+    owners = {e.owner for e in m.elements} - {'pipeline', 'GD-Con'}
+    if len(owners) != 1:
+        raise ValueError(f'expected exactly one EA owner, got {owners}')
+    return owners.pop()
+
+
 def kernel_mesh(m):
     """Frame and pipeline only. Connectors are assembled separately."""
     beams = [e for e in m.elements if e.connector is None]
+    ea = ea_owner(m)
     mdl = fe.Model(
         nodes=[fe.Node(n.index, n.s, n.y) for n in m.nodes],
         elements=[fe.UserElement(k, e.n1, e.n2,
-                                 2 if e.owner == 'ST' else 1, 1, seed=1)
+                                 2 if e.owner == ea else 1, 1, seed=1)
                   for k, e in enumerate(beams)],
         sections=[fe.PipeSection(1, OD, T_WALL)],
         materials=[fe.Material(1, E_PIPE),           # pipeline
@@ -224,7 +255,7 @@ def assemble(m, ms, U):
         if e.connector is None:
             continue
         a, b = at[e.n1], at[e.n2]
-        k6 = connector_k6(b.s - a.s, b.y - a.y)
+        k6 = connector_k6(b.s - a.s, b.y - a.y, axis=CONN_AXIS)
         d = [dof(ms, e.n1, 0), dof(ms, e.n1, 1), dof(ms, e.n1, 2),
              dof(ms, e.n2, 0), dof(ms, e.n2, 1), dof(ms, e.n2, 2)]
         K[np.ix_(d, d)] += k6
@@ -323,14 +354,19 @@ def connector_forces(m, ms, U):
         a, b = at[e.n1], at[e.n2]
         d = [dof(ms, e.n1, 0), dof(ms, e.n1, 1), dof(ms, e.n1, 2),
              dof(ms, e.n2, 0), dof(ms, e.n2, 1), dof(ms, e.n2, 2)]
-        f = connector_k6(b.s - a.s, b.y - a.y) @ U[d]
+        f = connector_k6(b.s - a.s, b.y - a.y, axis=CONN_AXIS) @ U[d]
         dx, dy = b.s - a.s, b.y - a.y
         Lc = math.hypot(dx, dy)
-        c, sn = dx / Lc, dy / Lc
+        # A zero-length connector has no chord to resolve along, so axial and
+        # shear are taken in its NOMINAL axis -- the same frame its stiffness
+        # was built in. Without this the report would divide by zero on every
+        # ILS-EASB connector, which is all of them.
+        c, sn = (dx / Lc, dy / Lc) if Lc >= ZERO_LEN_TOL else CONN_AXIS
         out.append({'line_id': e.line_id,
                     'axial': f[0] * c + f[1] * sn,
                     'shear': -f[0] * sn + f[1] * c,
                     'M_pipe_end': f[2], 'M_frame_end': f[5],
+                    'length': Lc,
                     'sigma': max(abs(f[2]), abs(f[5])) / Z_AN})
     return out
 

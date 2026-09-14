@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 32
+# entries: 36
 
 - id: L001
   area: kernel
@@ -547,4 +547,96 @@
     Second correction to the same line -- see L025.
   detect: test_the_load_lands_on_the_header_not_the_connector
   refs: [tools/study_east_full.py, rebuild/tests/test_east_deadband.py]
+  date: 2026-09-14
+
+- id: L033
+  area: joint
+  class: ruling
+  symptom: >-
+    ILS-EASB's connectors are ALL zero length (GD-SB sets P_vt = 0, putting
+    its top chord on the pipe centreline). connector_k6 raised ValueError --
+    the corotational basis divides by the chord length.
+  cause: >-
+    A zero-length connector is NOT the limit of a beam. A beam's transverse
+    stiffness is entirely a moment arm: rigid rotation moves its ends L*phi
+    apart, so Delta_transverse is not a deformation of a beam, only
+    Delta_transverse - L*phi is. At L = 0 that mode ceases to exist.
+  rule: >-
+    At L = 0 use a relative-DOF spring K = [[k,-k],[-k,k]], which annihilates
+    both rigid-body modes by construction (equal translation -> Delta u = 0;
+    equal rotation of COINCIDENT nodes -> Delta rz = 0), so it is
+    self-equilibrating however k is chosen. Three stiffnesses, all at
+    L0 = OD per pass 4's rule, each the beam's own stiffness in that mode
+    with the other two relative freedoms restrained:
+    k_axial = EA/L0, k_transverse = 12EI/L0^3, k_rotation = EI/L0.
+    k_rotation is EI/L0 and NOT 4EI/L0 -- 4EI/L0 is the stiffness against ONE
+    end's rotation with the other held, which is not a relative mode and
+    would make the connector 4x too stiff in bending.
+  detect: test_the_zero_length_element_is_a_relative_dof_spring, test_the_three_stiffnesses_come_from_the_rule, test_the_rotation_stiffness_is_the_relative_mode_not_one_end
+  refs: [tools/study_connectors.py, rebuild/tests/test_easb.py]
+  date: 2026-09-14
+
+- id: L034
+  area: joint
+  class: ruling
+  symptom: >-
+    k_axial and k_transverse differ by 1.35x, so which global direction each
+    acts in has to be stated for a connector with no chord to read.
+  cause: '-'
+  rule: >-
+    A zero-length connector's axis is the P_vt DIRECTION -- the component's
+    local y, the direction a connector runs from the pipe to the structure.
+    P_vt = 0 means the structure sits ON the centreline, not that the
+    connector points elsewhere, so the zero-length case keeps the same axis
+    convention as every other connector. Sign is irrelevant (the stiffness is
+    even in the axis); a zero axis vector refuses. On the stinger arc this
+    axis turns with the slope -- the same co-rotating frame S and D need.
+  detect: test_the_axis_is_the_pvt_direction_and_its_sign_does_not_matter
+  refs: [tools/study_connectors.py, tools/study_east_full.py]
+  date: 2026-09-14
+
+- id: L035
+  area: joint
+  class: finding
+  symptom: >-
+    EA-SB's connectors carry ZERO vertical force, equal-and-opposite
+    horizontal force (112.343 kN) and equal-and-opposite moment
+    (281.528 kN.m) under F2 at 200 kN.
+  cause: >-
+    GD-SB's top chord is COINCIDENT with the pipe and its body is below, so
+    pipe and frame bend as one deep section and the connectors transfer the
+    interface shear. Composite action, not a frame hanging off the pipe.
+  rule: >-
+    Consequences that hold together. EA-SB shields its pipe LESS than EA-ST
+    (82.4% of its own bare pipe against 74.5%): GD-ST stands its frame off on
+    a 0.61 m lever, GD-SB lies along it, and the lever is what turns a frame
+    into a second flange. The deadband RELIEVES EA-SB's F connectors
+    (M_F 281.53 -> 20.40 kN.m as the D engage) while it LOADS EA-ST's
+    (9.29 -> 179.30) -- a sign flip from the same system and the same rule,
+    because the load path is a different shape. Compare archetypes as a
+    fraction of each one's OWN bare pipe; the spans differ (20.128 m against
+    18.502 m).
+  detect: test_the_connectors_act_compositely, test_ea_sb_shields_its_pipe_less_than_ea_st, test_the_deadband_relieves_the_f_connectors_here
+  refs: [tools/study_easb.py, rebuild/tests/test_easb.py]
+  date: 2026-09-14
+
+- id: L036
+  area: process
+  class: defect
+  symptom: >-
+    Three separate crashes moving ILS-EAST code to ILS-EASB: a zero-size
+    array from frame_ix, a KeyError on 'ST:connector2', and a
+    ZeroDivisionError in the deflected-shape plot.
+  cause: >-
+    Each was a hardcoded assumption about ILS-EAST. The EA owner tag is 'ST'
+    there and 'SB' here, so both `e.owner == 'ST'` filters and rebuilt
+    'ST:connector<n>' line ids fail. And `deflected` divides by the element
+    length, which is zero for every EA-SB connector.
+  rule: >-
+    Read the EA owner off the model (`east.ea_owner`), never assume it. Key
+    connector results by the ELEMENT's own line_id, never by a reconstructed
+    string. A zero-length connector has no chord to draw -- mark its position
+    rather than inventing extent for it.
+  detect: test_the_archetype_assembles_and_every_connector_is_zero_length, test_the_deadband_systems_build_here
+  refs: [tools/study_east_full.py, tools/study_east_deadband.py, tools/study_easb.py]
   date: 2026-09-14

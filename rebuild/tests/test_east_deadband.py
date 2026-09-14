@@ -42,7 +42,7 @@ X_OUTER = db.X_OUTER
 def built():
     out = {}
     for name in SYSTEMS:
-        m, L = east.build(system=name, p_gap=max(db.SYSTEMS[name]['gaps']))
+        m, L = east.build(system=name, p_gap=max(db.gaps_for(name)))
         ms, beams = east.kernel_mesh(m)
         out[name] = (m, L, ms, beams)
     return out
@@ -60,11 +60,11 @@ def _d(rec):
 
 
 def _open_gap(name):
-    return max(db.SYSTEMS[name]['gaps'])
+    return max(db.gaps_for(name))
 
 
 def _tight_gap(name):
-    return min(db.SYSTEMS[name]['gaps'])
+    return min(db.gaps_for(name))
 
 
 # -- the assembly ---------------------------------------------------------
@@ -259,7 +259,7 @@ def test_open_is_the_base_system_exactly(swept, name, base):
     m_st, _L = east.build(system=base,
                           extra_stations=(0.0, -X_OUTER, X_OUTER))
     ms_st, _b = east.kernel_mesh(m_st)
-    gaps = db.SYSTEMS[name]['gaps']
+    gaps = db.gaps_for(name)
     for P in (20e3, 200e3):
         U, i_load, _f, _v = east.solve(m_st, ms_st, P)
         d_base = U[east.dof(ms_st, i_load, 1)]
@@ -286,7 +286,7 @@ def test_open_d_carries_no_force(swept, name):
 def test_engagement_stiffens_monotonically(swept, name):
     """Tighter gap -> the outer supports engage sooner -> the frame spans
     more of the load -> the pipe sags less. Flat above the threshold."""
-    gaps = db.SYSTEMS[name]['gaps']
+    gaps = db.gaps_for(name)
     d = [_d(swept[name][(g, 200e3)]) for g in gaps]
     assert all(b <= a + 1e-12 for a, b in zip(d, d[1:]))
     assert d[0] == pytest.approx(d[1], rel=1e-12), 'both above threshold'

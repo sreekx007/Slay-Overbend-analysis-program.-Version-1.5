@@ -143,5 +143,17 @@ def test_connector_stiffness_ignores_its_own_length():
                   np.array([0, 0, 1, -0.6096, 0, 1.])):
         assert np.abs(K @ rigid).max() < 1e-6, 'not self-equilibrating'
 
-    with pytest.raises(ValueError, match='zero-length'):
-        conn.connector_k6(0.0, 0.0)
+    # Zero length no longer refuses -- ILS-EASB's P_vt = 0 makes it the
+    # DEFAULT, not an edge, and implementing it is what closed that. It takes
+    # a different FORM (a relative-DOF spring; a beam's transverse stiffness
+    # is entirely a moment arm and there is none) but the same RULE: every
+    # stiffness at L0 = OD, none at the element's own length. The form is
+    # tested in `test_easb.py`; what belongs here is that the rule did not
+    # change and the element is still an element.
+    K0 = conn.connector_k6(0.0, 0.0)
+    EA, EI = conn.E_PIPE * conn.A_PIPE, conn.E_PIPE * conn.I_PIPE
+    assert K0[1, 1] == pytest.approx(EA / conn.OD, rel=1e-9)
+    for rigid in (np.array([1, 0, 0, 1, 0, 0.]),
+                  np.array([0, 1, 0, 0, 1, 0.]),
+                  np.array([0, 0, 1, 0, 0, 1.])):
+        assert np.abs(K0 @ rigid).max() == 0.0, 'not self-equilibrating'
