@@ -642,36 +642,83 @@ accident: an all-DOF tie at both ends of a short stiff element, between
 members that rotate differently, forces it to bend. **A `P` connector exists
 precisely to relieve this**, and would.
 
-### PS on the same model — the joint type is the only variable
+### PS on the same model, and two corrections it forced
 
-Same geometry, same mesh, same connector elements; only the tied DOF differ.
-At 200 kN:
+Running PS raised a challenge: *PS should not lead to any bending moment or
+shear in the connectors.* It was right, and getting there exposed a defect in
+the connector element as well.
 
-| layout | δ pipe | δ frame | σ pipe | σ frame | σ conn | M conn |
-|---|---|---|---|---|---|---|
-| **F2** | 50.49 mm | 49.54 mm | 180.5 MPa | 18.0 MPa | 152.1 MPa | 354.5 kN·m |
-| **PS** | 58.17 mm | 55.81 mm | 189.3 MPa | **124.0 MPa** | 145.4 MPa | 338.8 kN·m |
+#### Correction 1 — the connector element was not in equilibrium
 
-**Both joints behave exactly as their kinematics demand.**
+The prescribed-stiffness element was built as a textbook beam matrix with
+`L = OD` throughout. **A beam matrix is self-equilibrating only when the `L`
+in its terms is the `L` of its own geometry.** A rigid rotation θ about end 1
+moves end 2 by `L_real · θ`, while a matrix built at `L_OD` has zero force
+only for `L_OD · θ`. With `L_real = 0.6096` and `OD = 0.4064` the
+`0.2032 · θ` mismatch produced spurious shear, and ILS-EAST's connectors came
+out **146 kN·m short of moment equilibrium** under F2.
 
-- **`P` carries no moment at either end** — +0.0 / +0.0 kN·m. Freeing rz at
-  the EA end makes the whole connector a two-force member, not just the
-  released end. In the inset it is visibly *straight* where F2's bends.
-- **`S` carries equal and opposite end moments** — +338.8 / −338.8 kN·m. Equal
-  and opposite means **zero transverse shear**, which is what "transmits no
-  force along the freed direction" looks like in the element.
+Scaling the section cannot fix it — a beam's terms scale differently with
+length. Matching `EA/L` and `4EI/L` leaves `12EI/L³` at 0.444×; matching
+`12EI/L³` leaves `4EI/L` at 2.25×.
 
-Two consequences worth keeping:
+**The form that works separates the two**: constitutive law at `L = OD`
+(the rule), kinematics at the real length (equilibrium). The 3-DOF
+corotational local basis — axial elongation plus the two end rotations
+measured from the chord — annihilates rigid-body motion by construction, so
+`Tᵀ k T` is self-equilibrating whatever `L` sits inside `k`. It is the same
+basis `nlfea_v4.assemble` uses. Verified: exactly three zero eigenvalues and
+no force from any rigid mode, at every length.
 
-**The frame bends 6.9× harder under PS** (18.0 → 124.0 MPa). F2 ties rotation
-at *both* slots, so the frame is held flat and barely bends. PS ties it at
-one, so the frame is rotated bodily by that point and must bend to
-accommodate — visible as a tilted frame in the plot, where F2's stays level.
+#### Correction 2 — `S` is a roller, not a prismatic pair
 
-**PS barely shields the pipe.** F2 drops the pipe's stress to 64 MPa between
-its connectors; PS leaves it near 159. **2.5× on the pipe's stress in the ILS
-region, from the joint type alone** — which is the comparison this whole
-program exists to make.
+With the element fixed, the `S` connector still carried **338.79 kN·m with
+exactly zero shear** — a *pure couple*. A bolt in a slot has no way to
+provide one. It slides and it turns.
+
+So **`P` and `S` are a pin and a roller**, both moment-free, differing only in
+whether the translation along the slot is released:
+
+    S: (local x free, local y tied, rz FREE)     was (.., .., rz tied)
+
+This reads against `component_spec`'s comment calling `S` a "prismatic pair",
+which in strict kinematics does lock rotation. That file is mirrored (**G7**),
+so the disagreement is recorded rather than edited there.
+
+Adequacy survives it, checked against all six named systems: under PS neither
+joint ties rz, so rotation is restrained by the **couple of two local-y ties
+at different x** — exactly how a pin and a roller restrain a beam.
+
+#### The result
+
+Connector forces at 200 kN, in the connector's own axes:
+
+| layout | connector | axial | **shear** | M pipe end | M frame end |
+|---|---|---|---|---|---|
+| F2 | slot 2 | ~0 | **−604.0 kN** | −377.5 kN·m | +9.3 kN·m |
+| F2 | slot 4 | ~0 | **+604.0 kN** | +377.5 kN·m | −9.3 kN·m |
+| PS | slot 2 | ~0 | **0.0000** | 0.00 | 0.00 |
+| PS | slot 4 | ~0 | **0.0000** | 0.00 | 0.00 |
+
+And the consequence is larger than the connectors:
+
+| | δ pipe at 200 kN | against a bare pipe |
+|---|---|---|
+| bare pipe, solved the same way | 65.47250 mm | — |
+| **F2** | 49.42884 mm | **24.5 % stiffer** |
+| **PS** | 65.47250 mm | **0.00 %** |
+
+**Under PS the ILS is a passenger** — the pipe deflects *exactly* as if the
+structure were not there, to five decimal places, and the frame carries no
+bending at all. That is not a numerical coincidence: a rigid frame held at
+**two** points by a pin and a roller is statically determinate against any
+motion of those points. It translates, rotates, and the roller absorbs the
+change in spacing. It can never be forced to deform, so it can never carry
+force.
+
+Which makes the engineering point sharply: **F2 and PS are not two settings of
+one connection — they are the difference between a structure that carries load
+and one that does not.**
 
 ### G9 still stands, and this does not breach it
 

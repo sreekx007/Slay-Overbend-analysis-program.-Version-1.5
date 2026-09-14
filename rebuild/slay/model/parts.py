@@ -150,9 +150,30 @@ TIES_OPEN = {
     'F': (True,  True,  True),
     'W': (True,  True,  True),
     'P': (True,  True,  False),      # revolute -- rz free
-    'S': (False, True,  True),       # slides along the slope
+    'S': (False, True,  False),      # slides along the slope, AND rz free
     'D': (False, False, False),      # pure support, gap open
 }
+
+# WHY `S` FREES rz -- corrected 14 Sep 2026, and the correction matters.
+#
+# It tied rz until an ILS-EAST run on PS showed the S connector carrying a
+# PURE COUPLE: 338.79 kN.m with exactly zero shear. A slotted connection
+# cannot do that. A bolt in a slot slides AND turns; restraining its rotation
+# would need a moment couple the slot has no way to provide.
+#
+# So P and S are a PIN and a ROLLER -- both moment-free, differing only in
+# whether the translation along the slot is released. PS is then the classic
+# simply-supported pair and carries no moment in either connector, which is
+# what a bolted structure should give.
+#
+# This reads against `component_spec`'s comment calling S a "prismatic pair",
+# which in strict kinematics does lock rotation. That file is mirrored (G7),
+# so the disagreement is noted rather than edited there.
+#
+# Adequacy survives it: under PS neither joint ties rz, so rotation is
+# restrained by the COUPLE of two local-y ties at different x -- which is
+# exactly how a pin and a roller restrain a beam. Checked against all six
+# named systems.
 TIES_SHUT = dict(TIES_OPEN, D=(False, True, False))
 
 # F and W tie all three, so no local frame is needed. P frees only rz, which

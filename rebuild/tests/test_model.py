@@ -314,8 +314,18 @@ def test_d_is_a_pure_support():
     assert TIES_SHUT['D'] == (False, True, False)
 
 
-def test_s_slides_along_the_slope_not_its_own_axis():
-    assert TIES_OPEN['S'] == (False, True, True)
+def test_s_is_a_roller_not_a_prismatic_pair():
+    """S slides along the slope AND turns: a bolt in a slot does both.
+
+    It tied rz until an ILS-EAST run on PS showed the S connector carrying a
+    PURE COUPLE -- 338.79 kN.m with exactly zero shear. A slot cannot provide
+    a couple. P and S are a pin and a roller, both moment-free, differing only
+    in whether the translation along the slot is released.
+    """
+    assert TIES_OPEN['S'] == (False, True, False)
+    assert TIES_OPEN['P'] == (True, True, False)
+    assert TIES_OPEN['S'][2] is False and TIES_OPEN['P'][2] is False, (
+        'neither a pin nor a roller may carry moment')
 
 
 def test_p_frees_only_rotation():

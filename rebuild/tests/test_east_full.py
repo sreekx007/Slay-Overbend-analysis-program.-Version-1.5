@@ -90,7 +90,7 @@ def test_the_ils_stiffens_the_pipe(built, solved, P):
     d = U[east.dof(ms, i_load, 1)]
     bare = P * L**3 / (192 * east.EI_PIPE)
     assert d < bare, 'the ILS made no difference -- connectors not carrying'
-    assert d / bare == pytest.approx(0.760, rel=0.02)
+    assert d / bare == pytest.approx(0.745, rel=0.02)
 
 
 @pytest.mark.parametrize('P', (20e3, 200e3))
@@ -224,6 +224,36 @@ def test_connector_stress_is_reported_and_elastic(built, solved, P):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope='module')
+def bare_pipe(built):
+    """The same pipe, same mesh, same BCs, with no ILS attached."""
+    import nlfea_v4 as fe
+    m, L, ms, beams = built
+    pipe = [e for e in m.elements if e.owner == 'pipeline']
+    keep, ren = [], {}
+    for e in pipe:
+        for g in (e.n1, e.n2):
+            if g not in ren:
+                ren[g] = len(keep)
+                keep.append(m.nodes[g])
+    mdl = fe.Model(
+        nodes=[fe.Node(i, n.s, n.y) for i, n in enumerate(keep)],
+        elements=[fe.UserElement(k, ren[e.n1], ren[e.n2], 1, 1, seed=1)
+                  for k, e in enumerate(pipe)],
+        sections=[fe.PipeSection(1, east.OD, east.T_WALL)],
+        materials=[fe.Material(1, east.E_PIPE)])
+    b = fe.MeshedStructure(mdl)
+    ends = [min(range(len(keep)), key=lambda i: keep[i].s),
+            max(range(len(keep)), key=lambda i: keep[i].s)]
+    bc = [3 * b.user_node_to_mesh[i] + k for i in ends for k in (0, 1, 2)]
+    il = min(range(len(keep)), key=lambda i: abs(keep[i].s))
+    U, _, _ = fe.solve_step(
+        b, np.zeros(b.n_dofs),
+        {'joint_init': [fe.JointLoad(1, il, 0.0, 200e3, 0.0)]},
+        bc, [0.0] * len(bc), n_increments=20, tol=1e-6, max_iter=60)
+    return U[3 * b.user_node_to_mesh[il] + 1]
+
+
+@pytest.fixture(scope='module')
 def ps(built):
     m, L, ms, beams = built
     return {P: east.solve(m, ms, P, layout='PS') for P in (20e3, 200e3)}
@@ -241,8 +271,8 @@ def test_ps_ties_are_what_ps_means(built):
     tied = {}
     for name, sl in slot.items():
         tied[sl] = sorted(c for (na, nb, c) in pairs if na == idx[name])
-    assert tied[2] == [0, 1], 'P must free rz and tie both translations'
-    assert tied[4] == [1, 2], 'S must free local x and tie uy and rz'
+    assert tied[2] == [0, 1], 'P is a pin: both translations tied, rz free'
+    assert tied[4] == [1], 'S is a roller: only the perpendicular is tied'
 
 
 def test_p_connector_carries_no_moment(built, ps):
@@ -257,17 +287,33 @@ def test_p_connector_carries_no_moment(built, ps):
     assert abs(p_conn['M_frame_end']) < 1e3
 
 
-def test_s_connector_carries_no_shear(built, ps):
-    """A prismatic transmits no force along the direction it frees, so the
-    connector carries no transverse shear -- which shows up as end moments
-    that are equal and opposite rather than related by a shear couple."""
+def test_ps_connectors_carry_neither_moment_nor_shear(built, ps):
+    """The correction, pinned. PS must leave the connectors as pure struts.
+
+    They did not, until 14 Sep: with S tying rz the slot-4 connector carried
+    338.79 kN.m with exactly zero shear -- a PURE COUPLE, which a bolt in a
+    slot has no way to provide. P and S are a pin and a roller; neither can
+    transmit moment, and with one translation released no shear can build up
+    either.
+    """
     m, L, ms, beams = built
     U, _i, _f, _v = ps[200e3]
-    conns = {c['line_id']: c for c in east.connector_forces(m, ms, U)}
-    s_conn = conns['ST:connector4']
-    assert s_conn['M_pipe_end'] == pytest.approx(-s_conn['M_frame_end'],
-                                                 rel=1e-6)
-    assert abs(s_conn['M_pipe_end']) > 100e3, 'it should still carry moment'
+    for c in east.connector_forces(m, ms, U):
+        assert abs(c['M_pipe_end']) < 1.0, c['line_id']
+        assert abs(c['M_frame_end']) < 1.0, c['line_id']
+        assert abs(c['shear']) < 1.0, c['line_id']
+
+
+def test_f2_connectors_carry_far_more_than_ps(built, solved, ps):
+    """F2 locks rotation at both ends of a short stiff element between members
+    that rotate differently, so it must bend hard. PS releases exactly that."""
+    m, L, ms, beams = built
+    f2 = east.connector_forces(m, ms, solved[200e3][0])
+    p_s = east.connector_forces(m, ms, ps[200e3][0])
+    assert max(abs(c['M_pipe_end']) for c in f2) > 300e3
+    assert max(abs(c['shear']) for c in f2) > 500e3
+    assert max(abs(c['M_pipe_end']) for c in p_s) < 1.0
+    assert max(abs(c['shear']) for c in p_s) < 1.0
 
 
 @pytest.mark.parametrize('P', (20e3, 200e3))
@@ -279,33 +325,39 @@ def test_ps_reactions_balance(built, ps, P):
                                                                       rel=1e-4)
 
 
-def test_ps_is_softer_than_f2(built, solved, ps):
-    """Less restraint, more deflection. If PS ever came out stiffer than F2
-    the tie pattern would be inverted somewhere."""
+def test_ps_makes_the_ils_a_passenger(built, solved, ps, bare_pipe):
+    """The result, and it is exact rather than approximate.
+
+    A rigid frame held at TWO points by a pin and a roller is statically
+    determinate against any motion of those points: it translates, rotates,
+    and the roller absorbs the change in spacing. It can never be forced to
+    deform, so it can never carry force. The pipe therefore behaves exactly as
+    if the ILS were not there -- not nearly, exactly.
+    """
+    m, L, ms, beams = built
+    d_ps = ps[200e3][0][east.dof(ms, ps[200e3][1], 1)]
+    assert d_ps == pytest.approx(bare_pipe, rel=1e-6)
+
+    frame_ix = [k for k, e in enumerate(beams) if e.owner == 'ST']
+    s_ps = east.member_stress(m, ms, ps[200e3][0], beams)[1][frame_ix].max()
+    assert s_ps < 1e3, 'the frame should carry no bending at all'
+
+
+def test_f2_stiffens_where_ps_does_not(built, solved, ps, bare_pipe):
+    """The engineering comparison, against a bare pipe solved the same way."""
     m, L, ms, beams = built
     d_f2 = solved[200e3][0][east.dof(ms, solved[200e3][1], 1)]
     d_ps = ps[200e3][0][east.dof(ms, ps[200e3][1], 1)]
+    assert 1 - d_f2 / bare_pipe == pytest.approx(0.245, abs=0.01)
+    assert 1 - d_ps / bare_pipe == pytest.approx(0.0, abs=1e-5)
     assert d_ps > d_f2
-    assert d_ps / d_f2 == pytest.approx(1.152, rel=0.02)
 
 
-def test_ps_frame_bends_far_harder(built, solved, ps):
-    """F2 ties rotation at BOTH slots, so the frame is held flat and barely
-    bends. PS ties it at one, so the frame is rotated bodily by that point and
-    has to bend to accommodate -- 18 MPa becomes 124."""
-    m, L, ms, beams = built
-    frame_ix = [k for k, e in enumerate(beams) if e.owner == 'ST']
-    s_f2 = east.member_stress(m, ms, solved[200e3][0], beams)[1][frame_ix].max()
-    s_ps = east.member_stress(m, ms, ps[200e3][0], beams)[1][frame_ix].max()
-    assert s_ps / s_f2 > 4.0
-    assert s_ps < east.SIG_YIELD
-
-
-def test_ps_barely_shields_the_pipe(built, solved, ps):
+def test_ps_does_not_shield_the_pipe_at_all(built, solved, ps):
     """The result that matters for the program's purpose. F2 drops the pipe's
-    stress to 64 MPa between its connectors; PS leaves it near 159. Same
-    geometry, same mesh, same connector stiffness -- 2.5x on the pipe's stress
-    in the ILS region, from the joint type alone."""
+    stress sharply between its connectors; PS leaves it on the plain
+    fixed-fixed diagram. Same geometry, same mesh, same connector stiffness --
+    the difference is the joint type alone."""
     m, L, ms, beams = built
     pipe_ix = [k for k, e in enumerate(beams) if e.owner == 'pipeline']
     at = {n.index: n for n in m.nodes}

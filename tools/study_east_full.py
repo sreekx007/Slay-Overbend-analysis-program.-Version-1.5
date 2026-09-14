@@ -236,8 +236,12 @@ def connector_forces(m, ms, U):
         d = [dof(ms, e.n1, 0), dof(ms, e.n1, 1), dof(ms, e.n1, 2),
              dof(ms, e.n2, 0), dof(ms, e.n2, 1), dof(ms, e.n2, 2)]
         f = connector_k6(b.s - a.s, b.y - a.y) @ U[d]
+        dx, dy = b.s - a.s, b.y - a.y
+        Lc = math.hypot(dx, dy)
+        c, sn = dx / Lc, dy / Lc
         out.append({'line_id': e.line_id,
-                    'axial': math.hypot(f[0], f[1]),
+                    'axial': f[0] * c + f[1] * sn,
+                    'shear': -f[0] * sn + f[1] * c,
                     'M_pipe_end': f[2], 'M_frame_end': f[5],
                     'sigma': max(abs(f[2]), abs(f[5])) / Z_AN})
     return out
@@ -315,9 +319,16 @@ def _compare(out):
     """What the joint type actually bought, at 200 kN."""
     (_, sf2), (_, sps) = out[('F2', 200e3)], out[('PS', 200e3)]
     print('F2 against PS, same mesh, same connectors, only the ties differ:')
-    print('  P frees rotation at slot 2; S frees sliding along the frame at')
-    print('  slot 4. Both relieve the connector, and both hand load back to')
-    print('  the pipe -- which is what the sig_pipe column shows.')
+    print('  P is a pin and S a roller -- neither can carry moment, and with')
+    print('  one translation released no shear builds up either. So under PS')
+    print('  BOTH connectors are pure axial struts, and they carry nothing.')
+    print()
+    print('  A rigid frame held at TWO points by a pin and a roller is')
+    print('  statically determinate against any motion of those points: it')
+    print('  translates, rotates, and the roller takes up the change in')
+    print('  spacing. It can never be forced to deform, so it can never carry')
+    print('  force. Under PS the ILS is a PASSENGER -- the pipe deflects')
+    print('  65.47250 mm, which is the bare pipe to five decimals.')
 
 
 def _rotation_check(m, ms, U):
@@ -351,9 +362,10 @@ def _rotation_check(m, ms, U):
               f'pipe-end rz {U[dof(ms, e.n1, 2)]:+.3e}   '
               f'frame-end rz {U[dof(ms, e.n2, 2)]:+.3e}')
     print('   The chord tilt is what a plot draws. It lies between the two end')
-    print('   rotations because the connector BENDS -- the pipe rotates about')
-    print('   five times more than the frame at that station, and a stiff')
-    print('   0.61 m element tied to both has to take up the difference.')
+    print('   rotations because the connector BENDS -- under F2 the pipe rotates')
+    print('   about 40x more than the frame at that station, and an element')
+    print('   tied to both in rz has to take up the difference. That is what')
+    print('   P and S release, and why PS leaves the connectors straight.')
 
 
 def _bare_pipe_reference(L):
@@ -423,8 +435,8 @@ def _plot(m, ms, beams, out, pipe_ix):
     common = 1.2 / max(abs(out[l][0][1::3]).max() for l in ('F2', 'PS'))
     for ax, layout, note in (
             (axes[0], 'F2', 'both ties all-DOF: the connector must bend'),
-            (axes[1], 'PS', 'P frees rotation at slot 2 -- that connector '
-                            'carries NO moment and stays straight')):
+            (axes[1], 'PS', 'pin + roller: neither connector can carry '
+                            'moment, so the frame carries nothing at all')):
         U, _sig = out[layout]
         scale = common
         for e in m.elements:
@@ -484,8 +496,9 @@ def _plot(m, ms, beams, out, pipe_ix):
         if e.connector is not None:
             ax.axvline(at[e.n1].s, color='#6b4ea8', ls=':', lw=1.2)
     ax.plot([], [], color='#6b4ea8', ls=':', lw=1.2, label='connector station')
-    ax.set_title('Peak fibre stress along the pipeline. PS restrains less, so '
-                 'it shields less.', fontsize=9.5, loc='left')
+    ax.set_title('Peak fibre stress along the pipeline. Under PS the ILS is '
+                 'a passenger, so the pipe is the bare pipe.',
+                 fontsize=9.5, loc='left')
     ax.set_xlabel('s (m)   --   +s toward the stinger')
     ax.set_ylabel('sigma (MPa)')
     ax.legend(fontsize=8)

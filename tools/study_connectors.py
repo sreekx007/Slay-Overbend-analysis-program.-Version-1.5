@@ -79,12 +79,9 @@ ALPHA = 1e5
 # The order asked for.
 LAYOUTS = ('F1', 'F2', 'PS', 'PSD', 'F2D')
 
-# (local x along the frame, local y perpendicular, rz). D is a PURE SUPPORT:
-# it restrains local x and rz in neither state, and local y only once its
-# deadband closes.
-TIES_OPEN = {'F': (1, 1, 1), 'W': (1, 1, 1), 'P': (1, 1, 0),
-             'S': (0, 1, 1), 'D': (0, 0, 0)}
-TIES_SHUT = dict(TIES_OPEN, D=(0, 1, 0))
+# Imported, not restated. A second copy of the joint kinematics is a second
+# thing to correct, and this one would have been missed when `S` was fixed.
+from slay.model.parts import TIES_OPEN, TIES_SHUT          # noqa: E402
 
 
 # ---------------------------------------------------------------------------
@@ -92,32 +89,53 @@ TIES_SHUT = dict(TIES_OPEN, D=(0, 1, 0))
 # ---------------------------------------------------------------------------
 
 def connector_k6(dx: float, dy: float) -> np.ndarray:
-    """The 6x6 of a connector, formed at L0 = OD and placed at (dx, dy).
+    """The 6x6 of a connector: 1 x OD stiffness, REAL geometry, in equilibrium.
 
-    Pass 4's rule in code: `L` below is OD, never the element's own length.
-    The geometry supplies orientation and nothing else, which is exactly why
-    a zero-length connector is not a special case -- at dx = dy = 0 only the
-    rotation is undefined, and the caller supplies it.
+    THE FIRST VERSION OF THIS WAS WRONG and the error is worth keeping. It
+    built the textbook beam matrix with L = OD throughout. A beam matrix is
+    self-equilibrating only when the L in its terms is the L of its own
+    geometry: a rigid rotation theta about end 1 moves end 2 by L_real*theta,
+    while a matrix built at L_OD has zero force only for L_OD*theta. With
+    L_real = 0.6096 and OD = 0.4064 the 0.2032*theta mismatch produced
+    spurious shear, and ILS-EAST's connectors came out 146 kN.m short of
+    moment equilibrium under F2.
+
+    Nor can a section scale fix it, because a beam's terms scale differently
+    with length -- matching EA/L and 4EI/L leaves 12EI/L^3 at 0.444x, and
+    matching 12EI/L^3 leaves 4EI/L at 2.25x.
+
+    THE FORM THAT WORKS separates the two. Constitutive law at L = OD, which
+    is the rule; KINEMATICS at the real length, which is equilibrium. The
+    3-DOF corotational local basis -- axial elongation and the two end
+    rotations measured from the chord -- annihilates rigid-body motion by
+    construction, so `T.T @ k @ T` is self-equilibrating whatever L is used
+    inside `k`. It is the same basis `nlfea_v4.assemble` uses.
+
+    What this costs, stated: the axial and rotational stiffnesses are those
+    of a 1 x OD pipe exactly; the transverse stiffness follows from the real
+    geometry, as it must for the element to be an element at all.
     """
-    L = OD                                    # NOT hypot(dx, dy)
+    L_real = math.hypot(dx, dy)
+    if L_real < 1e-12:
+        raise ValueError(
+            'zero-length connector: the chord has no direction, so the local '
+            'basis is undefined. ILS-EASB needs this case and it needs a '
+            'decision, not a default -- see T3_assembly_spec.md section 8.')
+    c, sn = dx / L_real, dy / L_real
+
     EA, EI = E_PIPE * A_PIPE, E_PIPE * I_PIPE
-    k = np.zeros((6, 6))
-    a, b, c, d = EA/L, 12*EI/L**3, 6*EI/L**2, 4*EI/L
-    k[0, 0] = k[3, 3] = a
-    k[0, 3] = k[3, 0] = -a
-    k[1, 1] = k[4, 4] = b
-    k[1, 4] = k[4, 1] = -b
-    k[2, 2] = k[5, 5] = d
-    k[2, 5] = k[5, 2] = d / 2
-    k[1, 2] = k[2, 1] = k[1, 5] = k[5, 1] = c
-    k[2, 4] = k[4, 2] = k[4, 5] = k[5, 4] = -c
-    Ln = math.hypot(dx, dy)
-    cs_, sn = (dx / Ln, dy / Ln) if Ln > 1e-12 else (0.0, 1.0)
-    T = np.zeros((6, 6))
-    for blk in (0, 3):
-        T[blk, blk] = cs_;   T[blk, blk+1] = sn
-        T[blk+1, blk] = -sn; T[blk+1, blk+1] = cs_
-        T[blk+2, blk+2] = 1.0
+    L = OD                                    # the RULE: stiffness at 1 x OD
+    k = np.array([[EA / L, 0.0, 0.0],
+                  [0.0, 4 * EI / L, 2 * EI / L],
+                  [0.0, 2 * EI / L, 4 * EI / L]])
+
+    T = np.zeros((3, 6))                      # kinematics at the REAL length
+    T[0, 0] = -c;         T[0, 1] = -sn
+    T[0, 3] = c;          T[0, 4] = sn
+    T[1, 0] = -sn / L_real; T[1, 1] = c / L_real; T[1, 2] = 1.0
+    T[1, 3] = sn / L_real;  T[1, 4] = -c / L_real
+    T[2, 0] = -sn / L_real; T[2, 1] = c / L_real; T[2, 5] = 1.0
+    T[2, 3] = sn / L_real;  T[2, 4] = -c / L_real
     return T.T @ k @ T
 
 

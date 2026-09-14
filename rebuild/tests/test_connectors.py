@@ -83,7 +83,6 @@ def test_ps_is_softer_than_f2(rigs):
     d_f2 = conn.solve(rigs['F2'], 200e3)[0][3 * rigs['F2'].top_node + 1]
     d_ps = conn.solve(rigs['PS'], 200e3)[0][3 * rigs['PS'].top_node + 1]
     assert d_ps > d_f2
-    assert d_ps / d_f2 == pytest.approx(1.087, rel=0.02)
 
 
 @pytest.mark.parametrize('base,with_d', (('PS', 'PSD'), ('F2', 'F2D')))
@@ -126,9 +125,23 @@ def test_connector_stiffness_ignores_its_own_length():
     """Pass 4's rule, in the one place it could be violated. The 6x6 is formed
     at L0 = OD; the geometry supplies orientation and nothing else. Two
     connectors of different length must have the same stiffness magnitude."""
-    k_short = conn.connector_k6(0.0, 0.5 * conn.OD)
-    k_long = conn.connector_k6(0.0, 5.0 * conn.OD)
-    assert np.allclose(k_short, k_long)
-    k_zero = conn.connector_k6(0.0, 0.0)
-    assert np.all(np.isfinite(k_zero)), 'zero length must not be a special case'
-    assert np.allclose(np.abs(k_zero), np.abs(k_short))
+    for L in (0.5 * conn.OD, conn.OD, 5.0 * conn.OD):
+        K = conn.connector_k6(0.0, L)
+        # The rule: axial and rotational stiffness are those of a 1 x OD pipe,
+        # whatever the element's own length. Read them off the local basis.
+        EA = conn.E_PIPE * conn.A_PIPE
+        EI = conn.E_PIPE * conn.I_PIPE
+        assert K[1, 1] == pytest.approx(EA / conn.OD, rel=1e-9)
+        assert K[2, 2] == pytest.approx(4 * EI / conn.OD, rel=1e-9)
+
+    # And it must still be an ELEMENT: exactly three rigid-body modes, and no
+    # force from any of them. The first version failed this -- built at L = OD
+    # while spanning L_real, it left ILS-EAST 146 kN.m short of equilibrium.
+    K = conn.connector_k6(0.0, 0.6096)
+    for rigid in (np.array([1, 0, 0, 1, 0, 0.]),
+                  np.array([0, 1, 0, 0, 1, 0.]),
+                  np.array([0, 0, 1, -0.6096, 0, 1.])):
+        assert np.abs(K @ rigid).max() < 1e-6, 'not self-equilibrating'
+
+    with pytest.raises(ValueError, match='zero-length'):
+        conn.connector_k6(0.0, 0.0)
