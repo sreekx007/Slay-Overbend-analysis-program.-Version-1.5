@@ -174,7 +174,7 @@ then thickened in a second pass.
 | T0 | — | package scaffold, import linter, test harness | — | ✅ 12 Sep 2026 · `docs/modules/T0_scaffold.md` |
 | T1 | L1 | `material()` accessor | — | ✅ 12 Sep 2026 · `docs/modules/T1_materials.md` |
 | T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
-| T3 | L4 | header polyline, junction merge, global numbering | — | ✅ 13 Sep 2026 — stage 1 (F/W). `slay/model/parts.py`, `slay/model/assemble.py`, 62 tests. All 7 archetypes assemble. D2 answered — no `MeshTopology` |
+| T3 | L4 | header polyline, junction merge, global numbering | — | ✅ 14 Sep 2026 — stages 1–3. `slay/model/{parts,assemble}.py`; the solve machinery in `slay/physics/connector.py` and `slay/solve/`. All 7 archetypes assemble; Group A and Group B both solve through the package, reproducing 9 measured figures. `SUPPORTED_CONN_TYPES` = {F, W, P}. Stage 4 (`S`/`D`) waits on the co-rotating frame. D2 answered — no `MeshTopology` |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | |
 | T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |

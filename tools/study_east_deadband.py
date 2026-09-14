@@ -80,7 +80,9 @@ sys.path.insert(0, str(REPO))
 sys.path.insert(0, str(REPO / 'tools'))
 
 import study_east_full as east                             # noqa: E402
-from study_connectors import ALPHA, ZERO_LEN_TOL           # noqa: E402
+from slay.physics.connector import ZERO_LEN_TOL           # noqa: E402
+from slay.solve import newton                             # noqa: E402
+from slay.solve.penalty import ALPHA                      # noqa: E402
 
 SIG_YIELD = east.SIG_YIELD
 
@@ -123,68 +125,40 @@ def d_associations(m):
     return [a for a in m.associations if a.conn_type == 'D']
 
 
-def solve_deadband(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30):
+def solve_deadband(m, ms, P, alpha=ALPHA, n_inc=10, tol=None, max_iter=30):
     """Newton with an ACTIVE SET over the D connectors.
 
-    Two decisions, and they are not the same test:
+    THIS IS NOW `slay.solve.newton.solve` -- the loop, the penalty MPCs and
+    the active set all moved into the package on 14 Sep 2026. What is left
+    here is the study's own return shape.
 
-    ENGAGE on separation. An open D is not there at all, so the only thing
-    that can close it is the two sides moving |P_gap| apart.
+    The two decisions the active set makes are NOT the same test, and that
+    asymmetry is the whole of L008:
 
-    RELEASE on FORCE. Once engaged the separation sits AT the gap edge by
-    construction -- that is what the +/-P_gap target means -- so testing
-    separation again would say "still at the gap" forever and the support
-    could never let go. What tells you it should is the sign of the force it
-    is carrying: a support pushes, and when the constraint would have to PULL
-    to hold the gap, the sides are coming back inside it and the D is open.
+      ENGAGE on separation. An open D is not there at all, so the only thing
+      that can close it is the two sides moving |P_gap| apart.
 
-        engaged at +gap  ->  the tie must act in -,  and vice versa
+      RELEASE on FORCE. Once engaged the separation sits AT the gap edge by
+      construction -- that is what the +/-P_gap target means -- so testing
+      separation again would say "still at the gap" forever and the support
+      could never let go. What tells you it should is the sign of the force
+      it is carrying: a support pushes, and when the constraint would have to
+      PULL to hold the gap, the sides are coming back inside it.
 
-    This is the correction recorded as L008. The earlier version enforced
-    u_a - u_b = 0 on an engaged D, which dragged it back to coincidence,
-    released it, let it separate, and never settled: four flips and a reported
-    state that disagreed with the displacement it returned.
+    The earlier version enforced u_a - u_b = 0 on an engaged D, which dragged
+    it back to coincidence, released it, let it separate, and never settled:
+    four flips and a reported state that disagreed with the displacement it
+    returned.
     """
-    assoc = d_associations(m)
-    idx = m._part_index
-    engaged = {a.node_a: 0 for a in assoc}
-    info = {'flips': 0, 'passes': 0, 'forces': {}}
-
-    for _p in range(MAX_PASSES):
-        info['passes'] += 1
-        U, i_load, fixed, viol = east.solve(m, ms, P, alpha=alpha,
-                                            n_inc=n_inc, tol=tol,
-                                            max_iter=max_iter,
-                                            engaged=engaged)
-        K, _Fint = east.assemble(m, ms, U)
-        new = {}
-        forces = {}
-        for a in assoc:
-            ia, ib = idx[a.node_a], idx[a.node_b]
-            da, db = east.dof(ms, ia, 1), east.dof(ms, ib, 1)
-            sep = U[da] - U[db]
-            state = engaged[a.node_a]
-            kp = alpha * max(K[da, da], K[db, db], 1.0)
-            if not state:
-                forces[a.node_a] = 0.0
-                new[a.node_a] = (int(math.copysign(1, sep))
-                                 if abs(sep) > a.gap else 0)
-                continue
-            g = sep - math.copysign(a.gap, state)
-            f_on_a = -kp * g            # what the tie does to the C-E node
-            forces[a.node_a] = f_on_a
-            # a support pushes against the direction it engaged; if it would
-            # have to pull that way instead, the gap has reopened
-            new[a.node_a] = 0 if f_on_a * state > F_TOL * abs(P) else state
-        info['forces'] = forces
-        if new == engaged:
-            break
-        info['flips'] += 1
-        engaged = new
-
-    info['engaged'] = dict(engaged)
-    info['violation'] = viol
-    return U, i_load, fixed, info
+    fixed, load = east._restraints(m, ms)
+    r = newton.solve(m, ms, {east.dof(ms, load, 1): P}, fixed,
+                     alpha=alpha, n_increments=n_inc,
+                     tol=newton.TOL if tol is None else tol,
+                     max_iter=max_iter, scale=P)
+    info = {'flips': r.flips, 'passes': r.passes, 'engaged': dict(r.engaged),
+            'violation': r.violation, 'residual': r.residual,
+            'stalled': r.stalled}
+    return r.U, load, fixed, info
 
 
 def free_separation(m, ms, P):

@@ -359,7 +359,10 @@ def test_reactions_balance_at_every_gap(swept, name):
     for (gap, P), rec in swept[name].items():
         U, _r, m, ms, _b = rec
         _K, Fint = east.assemble(m, ms, U)
-        fixed = east.solve(m, ms, 1.0, n_inc=1, max_iter=1)[2]
+        # the restraint set, not a throwaway solve. `east.solve(..., 
+        # max_iter=1)` used to be the way to get it, which worked only while
+        # a loop that ran out of iterations stayed silent about it.
+        fixed, _load = east._restraints(m, ms)
         Ry = sum(Fint[d] for d in fixed if d % 3 == 1)
         assert -Ry == pytest.approx(P, rel=1e-6), (name, gap, P)
 

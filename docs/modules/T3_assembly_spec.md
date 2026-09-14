@@ -1060,10 +1060,96 @@ position rather than inventing extent for it. Recorded as L036.
 
 ---
 
+## T3 complete — the solver landed in the package, 14 Sep 2026
+
+`slay/physics/connector.py`, `slay/solve/{constraints,penalty,kernel,newton}.py`,
+`rebuild/tests/test_solve.py` (26 tests).
+
+### What moved, and why it had to
+
+Every figure in the four sections above was produced by a study under
+`tools/`. The physics lived there and nowhere else, so a package regression
+could only show up as a changed number in a diagram nobody reruns — a G8
+exposure, and the same shape as L013 (a second copy of the joint kinematics
+is a second thing to correct, and the last one was missed for a day).
+
+| module | layer | carries |
+|---|---|---|
+| `slay/physics/connector.py` | physics | the prescribed-stiffness element, both branches |
+| `slay/solve/constraints.py` | solve | rows from associations, the deadband active set |
+| `slay/solve/penalty.py` | solve | local-diagonal MPCs, `ALPHA = 1e5` |
+| `slay/solve/kernel.py` | solve | the `nlfea_v4` boundary and the DOF permutation |
+| `slay/solve/newton.py` | solve | bounded increments, the active-set outer loop |
+
+The studies now **import** them. `study_connectors.py`'s output is
+bit-identical; the others differ only in the constraint-violation column, at
+1e-27 m, and in one figure at the 10-picometre digit.
+
+**This is not `solve(problem)`.** `Problem` is T4's artifact and does not
+exist yet, so `newton.solve` takes a `Model`, a load map and a restraint set
+directly. T5 wraps it; it does not replace it.
+
+### Verification: the package reproduces every measured figure
+
+Nine cases, both archetypes, both deadband systems, engaged and open, and the
+tie-override path as well as the declared one:
+
+| | F2 | PS | F2D open | F2D shut | F1D shut |
+|---|---|---|---|---|---|
+| ILS-EAST | 49.42884390 | 65.47250 | 49.42922334 | 38.95016 | 44.56484 |
+| ILS-EASB | 70.39454 | 83.58240 | — | 55.97199 | 59.60873 |
+
+All to within 2e-5 relative, with `violation < 1e-8`, settled, and at most
+one active-set flip.
+
+### `SUPPORTED_CONN_TYPES` widens to {F, W, P}
+
+A revolute frees rz and **rz alone**, which is frame-independent — so `P`
+needs none of the co-rotating machinery, exactly as the staging table said
+("P (rz free — no skew, could come earlier)"). `slay/solve/` now applies the
+associations, so a `P` emitted is a `P` enforced.
+
+**`S` and `D` stay out.** Both restrain one translation and not the other, so
+their rows belong in an axis that turns with the pipe slope — 0° to 32.4°
+across the stinger. Every rig solved so far is horizontal, where local *is*
+global exactly; that is a property of the rig, not of the code. G9 stands for
+them: refused, never approximated by `F`. The geometry-only grant is still
+how a study gets `D`.
+
+### A penalty formulation has its own residual floor
+
+`k_pen` is ~1e15, so round-off in `U` at ~1e-2 m leaves a fraction of a
+newton that no further iteration removes. Measured on ILS-EAST F2D with both
+deadbands engaged: quadratic convergence — 2.3e-01, 4.9e-06, 4.3e-08 — then
+**stagnation at 2.5e-09** for as many iterations as it is given.
+
+So the loop converges on `tol` **or** on stagnation below `STALL_BAND`, and
+records which (`SolveResult.stalled`). The study loops this replaces had
+neither: `for _it in range(max_iter)` with no `else`, so an engaged deadband
+silently exhausted its iteration budget on every run. The numbers were right
+— stagnation at the floor *is* the answer — but nothing said so, and nothing
+distinguished it from a genuine failure to converge. Recorded as L039.
+
+### The Group B blocker is retired, and what survives of it
+
+`test_group_b_cannot_yet_be_solved` is now
+`test_group_b_is_a_mechanism_without_its_associations`. Both blockers it
+pinned have landed. What survives is the **measurement**, because it is the
+reason the ties are needed: with both pipe ends fixed and the associations
+not applied, the smallest free |eigenvalue| is 1.7e-07 (EAST) and 2.8e-07
+(ILT) against 6.7e+02 and 5.6e+02 for Group A — nine orders of magnitude.
+ILS-EASB is exactly 0.0. The zero-length branch is likewise kept as a
+statement about the **kernel**, which still cannot form such an element and
+is still frozen (G6) — which is precisely why connectors are assembled
+outside the kernel mesh.
+
+---
+
 ## Action log
 
 | Date | Action |
 |---|---|
+| 14 Sep 2026 | **T3 stage 1-3 complete: the solve machinery landed in `slay/`.** The prescribed-stiffness connector element (both branches) to `slay/physics/connector.py`; the penalty MPCs, the deadband active set, the `nlfea_v4` boundary and a bounded Newton loop to `slay/solve/`. The studies import them, so there is ONE implementation — `study_connectors.py` is bit-identical and the rest differ only at 1e-27 m in the violation column. Verified by reproducing all nine measured figures across both archetypes and both deadband systems. `SUPPORTED_CONN_TYPES` widened to {F, W, P} (a revolute frees rz alone, which is frame-independent); S and D still refused, because their rows need the co-rotating axis. Found on the way: every study Newton loop had no `else` on its iteration budget, so an engaged deadband silently exhausted 30 iterations every run — a penalty formulation floors at 2.5e-09 and the loop now says so instead of pretending or raising. `test_group_b_cannot_yet_be_solved` retired to `test_group_b_is_a_mechanism_without_its_associations`. |
 | 14 Sep 2026 | **ILS-EASB implemented and run on every system EA-ST was taken through** — F2, PS, F1D, F2D — with the archetype as a parameter and nothing else switched. Its connectors are ALL zero length (`P_vt = 0` puts GD-SB's top chord on the pipe centreline), which is the default here and the case pass 4's length-independent rule exists for. Zero length ruled a **relative-DOF spring**, not a beam limit: `K = [[k,-k],[-k,k]]`, three rigid-body modes annihilated by construction, stiffnesses `EA/L0`, `12EI/L0^3`, `EI/L0` at `L0 = OD` — `EI/L0` and not `4EI/L0`, which is one end's rotation and not a relative mode. Axis ruled the `P_vt` direction. Seven coincident node pairs confirmed distinct (L001's own case, on the archetype that found it). The frame acts COMPOSITELY: zero vertical force in the connectors, ±112.343 kN horizontal and ±281.528 kN.m. EA-SB shields its pipe less than EA-ST (82.4% of its own bare pipe against 74.5%) because GD-ST has a 0.61 m lever and GD-SB has none, and the deadband RELIEVES EA-SB's F connectors while it LOADS EA-ST's. |
 | 14 Sep 2026 | **F1D added alongside F2D**, each swept against its own measured threshold (F1D 0.9220 / 9.1049 mm against F2D's 0.3002 / 3.0041). F1 ruled a PASSENGER: its single F sits at the layout midpoint where a symmetric fixed-fixed beam has zero rotation, so it transmits no moment and F1 leaves the pipe at its bare-beam 65.4708 mm — the same outcome as PS by a different mechanism. F1D therefore starts softer, travels 3x further before its supports touch, and gains more when they do (31.9% against 21.2%) without overtaking F2D (44.5648 against 38.9502 mm). Frame equilibrium read off the connector axials differs by system and is now a test: F2D `N_F == N_D`, F1D `N_F == 2*N_D`. Connector AXIAL reported alongside moment — every F1D connector carries zero moment at every gap, so a moment-only table cannot tell a working strut from a dead one. F1D is also the case measurably into the membrane regime: 9.876x separation for a 10x load, against F2D's 10.007x. Load-node selection corrected a second time — F1D's slot-3 connector claims the midpoint station, so there is no `PIPE-X` node and the load is found by position among pipeline element endpoints. |
 | 14 Sep 2026 | F2D measured on the complete ILS-EAST model over five deadband gaps. `emit_unenforced_conn_types` added to `build_model` as a **geometry-only** grant that leaves G9's refusal in place and warns on every connector it emits. `P_gap` confirmed as component data, carried on `Association.gap`; the "required when D" check `component_spec` attributes to `ils_builder.validate()` does not exist there. Free separation at the outer slots (0.3002 mm at 20 kN, 3.0041 mm at 200 kN) predicts every engaged/open cell at both loads. An open D is F2 exactly once F2 is given the two stations the D connectors force into the header mesh — 49.42922334 mm both. A shut D is a rigid roller, limit 38.0014 mm, approached monotonically. |

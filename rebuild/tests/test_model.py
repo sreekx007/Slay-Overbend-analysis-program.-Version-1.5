@@ -354,20 +354,47 @@ def test_a_support_only_layout_is_a_mechanism():
     assert layout_is_adequate(bad, slots, TIES_SHUT) == (False, True, True)
 
 
-def test_unsupported_connector_type_is_refused(scene, monkeypatch):
-    """G9 -- a P/S/D case is refused, never approximated by F. Refusing is the
-    whole point: approximating would silently answer a different question."""
-    ils = ils_builder.build_ils(_archetypes()['ILS-EAST']['definition'])
+def _retyped(ils, types):
+    """`connectors_of` with the connector types replaced, in slot order."""
     real = ils.connectors_of
 
-    def as_ps(component):
+    def patched(component):
         out = real(component)
-        return [(s, x, t, a, e) for (s, x, _t, a, e), t
-                in zip(out, ('P', 'S'))] if out else out
+        return [(s, x, t, a, e) for (s, x, _t, a, e), t in zip(out, types)] \
+            if out else out
+    return patched
 
-    monkeypatch.setattr(ils, 'connectors_of', as_ps)
-    with pytest.raises(AssemblyError, match='G9'):
-        build_model(scene, ils)
+
+def test_unsupported_connector_type_is_refused(scene, monkeypatch):
+    """G9 -- an S or D case is refused, never approximated by F. Refusing is
+    the whole point: approximating would silently answer a different
+    question.
+
+    `S` and `D` restrain one translation and not the other, so their rows
+    belong in an axis that turns with the pipe slope. That frame is not
+    built, so they are refused whatever else has landed.
+    """
+    ils = ils_builder.build_ils(_archetypes()['ILS-EAST']['definition'])
+    for types in (('P', 'S'), ('D', 'F'), ('S', 'S')):
+        monkeypatch.setattr(ils, 'connectors_of', _retyped(ils, types))
+        with pytest.raises(AssemblyError, match='G9'):
+            build_model(scene, ils)
+
+
+def test_p_is_supported_now_that_the_solver_applies_it(scene, monkeypatch):
+    """A revolute frees rz and rz alone, which is frame-independent -- so it
+    needs none of the co-rotating machinery S and D do. Stage 3 of the T3
+    staging table, and it could have come earlier."""
+    from slay.model.assemble import SUPPORTED_CONN_TYPES
+    assert SUPPORTED_CONN_TYPES == {'F', 'W', 'P'}
+    ils = ils_builder.build_ils(_archetypes()['ILS-EAST']['definition'])
+    monkeypatch.setattr(ils, 'connectors_of', _retyped(ils, ('P', 'P')))
+    m = build_model(scene, ils)
+    ea = [a for a in m.associations if a.conn_type == 'P']
+    assert len(ea) == 2
+    assert all(a.ties == (True, True, False) for a in ea), 'rz free'
+    assert all(not a.skewed for a in ea), 'and no frame needed'
+    assert m.warnings == []
 
 
 # ---------------------------------------------------------------------------
@@ -434,8 +461,8 @@ GROUP_B = ('ILS-EAST', 'ILS-EASB', 'ILS-ILT')
 
 
 @pytest.mark.parametrize('arch_id', GROUP_B)
-def test_group_b_cannot_yet_be_solved(scene, arch_id):
-    """Group B assembles correctly and CANNOT YET BE SOLVED, on purpose.
+def test_group_b_is_a_mechanism_without_its_associations(scene, arch_id):
+    """Group B's OWN ELEMENTS are singular, and that is why it needs ties.
 
     Pinned rather than left implicit, so the gap cannot be mistaken later for
     a passing test. There are two distinct blockers and both are real:
@@ -456,17 +483,30 @@ def test_group_b_cannot_yet_be_solved(scene, arch_id):
        common case rather than an edge one. It needs a prescribed-stiffness
        element type, not a workaround.
 
-    NOT CONTRADICTED by `test_east_full.py`, which solves ILS-EAST. That
-    study APPLIES the associations as penalty constraints; this asserts the
-    model's own elements are singular WITHOUT them, which is what says the
-    associations are declared and not yet enforced anywhere in the package.
-    The two flip together only when the penalty module moves out of tools/.
+    RETITLED 14 Sep 2026, and the change of title is the news. This was
+    `test_group_b_cannot_yet_be_solved` and it pinned two real blockers:
+    nothing applied the associations, and the kernel could not form a
+    zero-length connector. Both have landed in `slay/` -- the penalty MPC
+    assembler, the prescribed-stiffness element and the deadband active set
+    -- so Group B now solves through the package, which is what
+    `tests/test_solve.py` asserts on nine measured figures.
+
+    What survives is the MEASUREMENT, because it is the reason the ties are
+    needed at all: with both pipe ends fixed and the associations NOT applied,
+    the smallest free |eigenvalue| is 1.7e-07 (EAST) and 2.8e-07 (ILT) against
+    6.7e+02 and 5.6e+02 for Group A -- nine orders of magnitude, so it is not
+    a threshold judgement. ILS-EASB is exactly 0.0.
+
+    The zero-length branch below is likewise kept as a statement about the
+    KERNEL, which still cannot form such an element and is still frozen (G6).
+    That is precisely why `slay.physics.connector` assembles connectors
+    outside the kernel mesh.
     """
     np = pytest.importorskip('numpy')
     fe = pytest.importorskip('nlfea_v4')
 
     m = _model(scene, arch_id)
-    assert m.associations, 'the ties are declared even though nothing applies them'
+    assert m.associations, 'the ties are declared'
     assert [e for e in m.elements if e.connector is not None], 'connectors exist'
 
     mdl = fe.Model(
@@ -486,8 +526,9 @@ def test_group_b_cannot_yet_be_solved(scene, arch_id):
     if zero_len:
         # Blocker 2. The kernel cannot form this element at all.
         assert not np.isfinite(Kd).all(), (
-            f'{arch_id}: the kernel now forms a zero-length connector. If a '
-            f'prescribed-stiffness element has landed, invert this test.')
+            f'{arch_id}: the KERNEL now forms a zero-length connector. It is '
+            f'frozen (G6), so this should not change; `slay.physics.'
+            f'connector` is where that element lives instead.')
         return
 
     # Blocker 1. The matrix is finite but singular -- the frame floats.

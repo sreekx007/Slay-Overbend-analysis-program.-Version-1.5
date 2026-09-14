@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 38
+# entries: 40
 
 - id: L001
   area: kernel
@@ -279,7 +279,7 @@
     Singularity is PROVED with measured eigenvalues, never inferred from a
     solver error. Group A: 5.6e2..6.7e2. Group B: 1.7e-7, 2.8e-7; EASB
     exactly 0.0.
-  detect: test_group_a_is_not_singular, test_group_b_cannot_yet_be_solved, test_a_support_only_layout_is_a_mechanism
+  detect: test_group_a_is_not_singular, test_group_b_is_a_mechanism_without_its_associations, test_a_support_only_layout_is_a_mechanism
   refs: [rebuild/tests/test_connectors.py, rebuild/slay/model/parts.py::layout_is_adequate]
   date: 2026-09-14
 
@@ -687,4 +687,50 @@
     and the upstream sha in the same commit as any re-sync.
   detect: test_the_mirrored_files_have_not_been_edited_here, test_the_provenance_record_covers_every_mirrored_file
   refs: [rebuild/fixtures/mirror_provenance.json, rebuild/tests/test_config_ownership.py]
+  date: 2026-09-14
+
+- id: L039
+  area: solve
+  class: defect
+  symptom: >-
+    Every study's Newton loop was `for _it in range(max_iter): ... break` with
+    NO `else`. An engaged deadband silently exhausted all 30 iterations on
+    every run and nothing said so.
+  cause: >-
+    A penalty formulation has a residual FLOOR below the tolerance the F-only
+    cases reach. k_pen is ~1e15, so round-off in U at ~1e-2 m leaves a
+    fraction of a newton no iteration can remove. Measured on ILS-EAST F2D
+    with both D engaged: quadratic convergence 2.3e-01 -> 4.9e-06 -> 4.3e-08,
+    then STAGNATION at 2.5e-09 for as long as it is given.
+  rule: >-
+    Converge on tol OR on stagnation below STALL_BAND (1e-6), and RECORD
+    which (SolveResult.stalled). Bound every loop and raise otherwise --
+    L015's rule, applied to our own code rather than only to the kernel. The
+    answers were never wrong (stagnation at the floor IS the answer) but
+    nothing distinguished that from a case that failed to converge. Default
+    tol 1e-8; F/W cases reach it outright, engaged deadbands stall.
+  detect: test_the_penalty_floor_is_reported_not_hidden, test_a_non_converging_case_raises_rather_than_spinning
+  refs: [rebuild/slay/solve/newton.py, rebuild/tests/test_solve.py]
+  date: 2026-09-14
+
+- id: L040
+  area: solve
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    The solve machinery lives in slay/, not in tools/. slay/physics/connector
+    (the prescribed-stiffness element, both branches), slay/solve/constraints
+    (rows from associations + the active set), slay/solve/penalty (local-
+    diagonal MPCs, ALPHA = 1e5), slay/solve/kernel (the nlfea_v4 boundary and
+    the dof permutation), slay/solve/newton (bounded increments). The studies
+    IMPORT them -- L013's rule, that a second copy of the joint physics is a
+    second thing to correct. Verification is that the package reproduces all
+    nine measured study figures across both archetypes, both deadband
+    systems, engaged and open, and the tie-override path. NOT solve(problem):
+    Problem is T4's artifact. SUPPORTED_CONN_TYPES widened to {F, W, P} --
+    a revolute frees rz alone, which is frame-independent; S and D still
+    refused because their rows need the co-rotating axis.
+  detect: test_the_package_reproduces_the_studies, test_p_is_supported_now_that_the_solver_applies_it, test_unsupported_connector_type_is_refused
+  refs: [rebuild/slay/solve/newton.py, rebuild/slay/physics/connector.py, rebuild/tests/test_solve.py]
   date: 2026-09-14

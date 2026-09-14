@@ -56,8 +56,12 @@ from slay.scene.path import LayPath                        # noqa: E402
 from slay.scene.scene import Scene                         # noqa: E402
 import component_spec as cs                              # noqa: E402
 from slay.model.parts import TIES_OPEN, TIES_SHUT        # noqa: E402
-from study_connectors import (ALPHA, connector_k6,        # noqa: E402
-                              ZERO_LEN_TOL)               # noqa: E402
+from slay.physics.connector import (connector_k6,        # noqa: E402
+                                    ZERO_LEN_TOL)
+from slay.solve import constraints as _cons              # noqa: E402
+from slay.solve import kernel as _kern                   # noqa: E402
+from slay.solve import newton as _newton                 # noqa: E402
+from slay.solve.penalty import ALPHA                     # noqa: E402
 
 # A connector's NOMINAL direction: the component's local y, which is the
 # direction P_vt measures and the direction a connector runs from the pipe
@@ -124,216 +128,117 @@ def build(system: str = 'F2', p_gap: float = None, extra_stations=(0.0,),
     return m, s_hi - s_lo
 
 
-def dof(ms, node_index: int, comp: int) -> int:
-    """Global DOF for one of OUR node indices.
-
-    NOT 3*node_index + comp. `MeshedStructure._mesh` assigns mesh indices in
-    ELEMENT-ENCOUNTER order, so `user_node_to_mesh` is a permutation of our
-    ids rather than the identity, and any node an element reaches late lands
-    somewhere else entirely. Writing connector stiffness at 3*id put it on
-    four frame nodes' worth of the wrong rows and left theirs empty: twelve
-    zero diagonals and an exactly singular matrix.
-
-    The bijection is what `test_kernel_leaves_the_model_intact` asserts -- and
-    a bijection is all it asserts. Callers have to go through the map.
-    """
-    return 3 * ms.user_node_to_mesh[node_index] + comp
-
-
-def ea_owner(m) -> str:
-    """Which owner tag the EA structure carries in THIS model: 'ST' or 'SB'.
-
-    Read off the elements rather than assumed, because the whole point of
-    running both archetypes through one code path is that nothing downstream
-    should have to know which it got.
-    """
-    owners = {e.owner for e in m.elements} - {'pipeline', 'GD-Con'}
-    if len(owners) != 1:
-        raise ValueError(f'expected exactly one EA owner, got {owners}')
-    return owners.pop()
+# THE SOLVER LIVES IN THE PACKAGE NOW (14 Sep 2026). `dof`, `ea_owner`,
+# `kernel_mesh` and `assemble` were prototyped here and moved to
+# `slay/solve/kernel.py`; the Newton loop, the penalty MPCs and the deadband
+# active set to `slay/solve/`. They are re-exported under their old names so
+# this study and its tests read as they did, but there is ONE implementation
+# and a package regression now fails a test rather than only changing a
+# figure nobody reruns.
+dof = _kern.dof
+ea_owner = _kern.ea_owner
 
 
 def kernel_mesh(m):
     """Frame and pipeline only. Connectors are assembled separately."""
-    beams = [e for e in m.elements if e.connector is None]
-    ea = ea_owner(m)
-    mdl = fe.Model(
-        nodes=[fe.Node(n.index, n.s, n.y) for n in m.nodes],
-        elements=[fe.UserElement(k, e.n1, e.n2,
-                                 2 if e.owner == ea else 1, 1, seed=1)
-                  for k, e in enumerate(beams)],
-        sections=[fe.PipeSection(1, OD, T_WALL)],
-        materials=[fe.Material(1, E_PIPE),           # pipeline
-                   fe.Material(2, RATIO * E_PIPE)])  # frame, ratio 2.5
-    ms = fe.MeshedStructure(mdl)
-    assert ms.n_nodes == m.n_nodes, 'kernel altered the model'
-    return ms, beams
+    return _kern.mesh(m)
 
 
 def constraint_pairs(m, layout: str = None, engaged=None):
     """(node_a, node_b, component, target) to tie. Node indices, not DOFs.
 
-    `target` is the value of (u_a - u_b) the constraint enforces. It is 0.0
-    everywhere except at an ENGAGED `D`, and that exception is the whole of
-    what a deadband means: a D carries nothing until the two sides have moved
-    +/- P_gap apart, and at engagement it holds AT the gap edge --
+    A thin wrapper over `slay.solve.constraints.constraint_rows`, kept because
+    the studies and their tests read in terms of a NAMED SYSTEM while the
+    package reads in terms of a tie pattern per node.
 
-        u_a - u_b = +/- P_gap,      NOT      u_a - u_b = 0
+    With no `layout` the model's own declared associations are used. With one,
+    the EA-SIDE tie pattern is replaced by that named system's, while the
+    geometry, the mesh and the connector elements stay exactly as
+    `build_model` produced them -- so the comparison between layouts is exact
+    rather than nearly so. The pipe-side tie is always all-DOF whatever the
+    joint is.
 
-    Enforcing 0 would drag the sides back into coincidence, dropping the
-    separation below the gap, releasing the connector, letting it separate
-    again: the chatter measured in `study_connectors.py` and recorded as L008.
-
-    `engaged` maps an association's EA-side part node to its state -- 0 open,
-    +1/-1 engaged and which way. Absent, every D is open, which is what the
-    model's own declared `TIES_OPEN['D'] = (False, False, False)` already
-    says: an open D ties NOTHING, so it needs no special case here.
-
-    With no `layout` the model's own declared associations are used -- ILS-EAST
-    is F2, so every tie is all-DOF.
-
-    With one, the EA-SIDE tie pattern is replaced by that named system's, while
-    the geometry, the mesh and the connector elements stay exactly as
-    `build_model` produced them. Only which DOF are tied changes, which makes
-    the comparison between layouts exact rather than nearly so. The pipe-side
-    tie is always all-DOF whatever the joint is.
-
-    WHY THIS IS DONE HERE AND NOT IN `build_model`. The package still refuses
-    P/S/D (`SUPPORTED_CONN_TYPES`), and that refusal is right: `S` frees the
-    translation along the EA component's LOCAL x, and the co-rotating frame
-    that defines is not built. On this rig the reference configuration is
-    horizontal, so local x IS global s and the error is the size of the
-    rotations -- about 1e-3 rad. On the stinger the local axis turns up to
-    32.4 degrees and this would be wrong. G9 stands.
+    WHY A LAYOUT OVERRIDE STILL EXISTS. `build_model` supports F, W and P; S
+    and D are still refused (G9), because both restrain one translation and
+    not the other and their rows belong in an axis that turns with the pipe
+    slope. On these rigs the reference configuration is horizontal, so local
+    x IS global s and the error is the size of the rotations -- about 1e-3
+    rad. On the stinger the local axis turns up to 32.4 degrees.
     """
-    idx = m._part_index
-    slot_of = {}
-    at = {n.index: n for n in m.nodes}
-    for e in m.elements:
-        if e.connector is not None:
-            slot_of[at[e.n2].part_id] = e.connector.slot
-
-    types = cs.NAMED_CONNECTION_SYSTEMS[layout] if layout else None
-    engaged = engaged or {}
-    out = []
-    for a in m.associations:
-        ia, ib = idx[a.node_a], idx[a.node_b]
-        ctype = a.conn_type
-        if types is None or a.node_a not in slot_of:
-            ties = a.ties                       # pipe side, or no override
-        else:
-            t = types[slot_of[a.node_a] - 1]
-            if t is None:
-                continue                        # slot not populated: no tie
-            ctype, ties = t, TIES_OPEN[t]
-        state = engaged.get(a.node_a, 0)
-        if ctype == 'D' and state:
-            ties = TIES_SHUT['D']
-        for k, on in enumerate(ties):
-            if not on:
-                continue
-            target = 0.0
-            if ctype == 'D' and state and k == 1:
-                if a.gap is None:
-                    raise ValueError(
-                        f'{a.node_a}: a D engaged with no P_gap. The gap is '
-                        f'component data (GD-ST.P_gap) and has no default -- '
-                        f'a silent one would choose where the strain goes.')
-                target = math.copysign(a.gap, state)
-            out.append((ia, ib, k, target))
-    return out
+    override = None
+    if layout:
+        at = {n.index: n for n in m.nodes}
+        slot_of = {at[e.n2].part_id: e.connector.slot
+                   for e in m.elements if e.connector is not None}
+        override = _cons.layout_ties(cs.NAMED_CONNECTION_SYSTEMS[layout],
+                                     slot_of)
+    return _cons.constraint_rows(m, engaged, override)
 
 
 def assemble(m, ms, U):
-    theta0 = np.arctan2(ms.elem_coords[:, 3] - ms.elem_coords[:, 1],
-                        ms.elem_coords[:, 2] - ms.elem_coords[:, 0])
-    Kf, Fint_f, _, _, _ = fe.assemble(ms, U, theta0, {}, [], 1.0)
-    K = Kf.toarray()
-    Fint = Fint_f.copy()
-    at = {n.index: n for n in m.nodes}
-    for e in m.elements:
-        if e.connector is None:
-            continue
-        a, b = at[e.n1], at[e.n2]
-        k6 = connector_k6(b.s - a.s, b.y - a.y, axis=CONN_AXIS)
-        d = [dof(ms, e.n1, 0), dof(ms, e.n1, 1), dof(ms, e.n1, 2),
-             dof(ms, e.n2, 0), dof(ms, e.n2, 1), dof(ms, e.n2, 2)]
-        K[np.ix_(d, d)] += k6
-        Fint[d] += k6 @ U[d]
-    return K, Fint
+    """K and Fint for the beams AND the connectors."""
+    return _kern.assemble(m, ms, U)
 
 
-def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
-          layout=None, engaged=None, load_s: float = 0.0):
-    """`load_s` is WHERE the load goes, and it is not optional in spirit.
+def _restraints(m, ms, load_s=0.0):
+    """Both pipe ends fixed, and the header node the load acts on.
 
-    This used to be `next(n for n in m.nodes if n.part_id.startswith('PIPE-X'))`
-    -- the first externally-requested station in node order, which is the one
-    at the layout midpoint only while there is exactly one of them. Add a
-    second `extra_station` and the load silently moves to whichever came
-    first, off-centre, and every number in the run is for a different problem.
-    It was caught comparing an F2 model with stations added at the outer slots
-    against F2D: 48.398 mm where F2D gave 49.429, a 2% gap that looked like
-    physics and was a misplaced load. Name the position; take the node there.
+    THE LOAD POSITION IS NAMED, and it is not optional in spirit. This used to
+    be `next(n for n in m.nodes if n.part_id.startswith('PIPE-X'))` -- the
+    first externally-requested station in NODE ORDER, which is the layout
+    midpoint only while there is exactly one of them. Add a second
+    `extra_station` and the load silently moved off-centre: 48.398 mm where
+    the same structure gives 49.429, a 2% gap that looked like physics (L025).
 
-    NOR CAN IT BE FOUND BY PART ID. The first fix looked for a `PIPE-X` node
-    -- the externally-requested station -- and F1D has none at the midpoint:
-    its single `F` sits at slot 3, which IS the midpoint, so the connector
-    claimed that station and the requested one merged into it. The load still
-    has a node to act on; it just is not named the way the search expected.
-    What the load actually needs is the HEADER node at `load_s`, and the way
-    to say that is to ask the pipeline's own elements which node that is.
+    NOR CAN IT BE FOUND BY PART ID. F1D has no `PIPE-X` node at the midpoint
+    at all: its single `F` sits at slot 3, which IS the midpoint, so the
+    connector claimed that station and the requested one merged into it. What
+    the load needs is the HEADER node at `load_s`, and the way to say that is
+    to ask the pipeline's own elements which node that is (L032).
 
     The distinction matters at exactly that station. Two nodes sit at
     (s = 0, y = 0) in F1D -- the header's and the connector's `C-P` -- in
     different passes and so deliberately unmerged. Loading the connector node
-    instead would push the load through the connector into the frame and
-    bypass the pipe entirely.
+    would push the load through the connector into the frame and bypass the
+    pipe entirely.
     """
     ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
     fixed = [dof(ms, n.index, k) for n in ends for k in (0, 1, 2)]
     at = {n.index: n for n in m.nodes}
     header = {i for e in m.elements if e.owner == 'pipeline'
               for i in (e.n1, e.n2)}
-    cands = [at[i] for i in header if abs(at[i].s - load_s) <= 1e-6]
-    if not cands:
+    here = [i for i in header if abs(at[i].s - load_s) <= 1e-6]
+    if not here:
         raise ValueError(f'no header node at s={load_s} to load; the station '
                          f'has to exist before a load can act on it')
-    if len(cands) > 1:
-        raise ValueError(f'{len(cands)} header nodes at s={load_s}')
-    load = cands[0]
-    pairs = constraint_pairs(m, layout, engaged)
+    if len(here) > 1:
+        raise ValueError(f'{len(here)} header nodes at s={load_s}')
+    return fixed, here[0]
 
-    U = np.zeros(3 * m.n_nodes)
-    for inc in range(1, n_inc + 1):
-        lam = inc / n_inc
-        for _it in range(max_iter):
-            K, Fint = assemble(m, ms, U)
-            Fext = np.zeros_like(U)
-            Fext[dof(ms, load.index, 1)] = P * lam
-            R = Fext - Fint
-            for (na, nb, comp, target) in pairs:
-                a, b = dof(ms, na, comp), dof(ms, nb, comp)
-                kp = alpha * max(K[a, a], K[b, b], 1.0)
-                K[a, a] += kp; K[b, b] += kp
-                K[a, b] -= kp; K[b, a] -= kp
-                g = (U[a] - U[b]) - target
-                R[a] -= kp * g
-                R[b] += kp * g
-            kf = alpha * max(K.diagonal().max(), 1.0)
-            for dpos in fixed:
-                K[dpos, dpos] += kf
-                R[dpos] -= kf * U[dpos]
-            if np.max(np.abs(R)) / max(abs(P), 1.0) < tol:
-                break
-            dU = spsolve(csr_matrix(K), R)
-            if not np.all(np.isfinite(dU)):
-                raise RuntimeError('singular system')
-            U += dU
 
-    viol = max((abs((U[dof(ms, na, c)] - U[dof(ms, nb, c)]) - t)
-                for (na, nb, c, t) in pairs), default=0.0)
-    return U, load.index, fixed, viol
+def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=None, max_iter=30,
+          layout=None, engaged=None, load_s: float = 0.0):
+    """One solve through `slay.solve.newton`, in this study's own terms.
+
+    Returns `(U, load_node, fixed_dofs, violation)`, which is what every
+    study and test here reads. `engaged` fixes the deadband state rather than
+    letting the active set decide it -- `solve_deadband` in
+    `study_east_deadband.py` is the one that iterates.
+    """
+    fixed, load = _restraints(m, ms, load_s)
+    override = None
+    if layout:
+        at = {n.index: n for n in m.nodes}
+        slot_of = {at[e.n2].part_id: e.connector.slot
+                   for e in m.elements if e.connector is not None}
+        override = _cons.layout_ties(cs.NAMED_CONNECTION_SYSTEMS[layout],
+                                     slot_of)
+    r = _newton.solve(
+        m, ms, {dof(ms, load, 1): P}, fixed,
+        ties_override=override, alpha=alpha, n_increments=n_inc,
+        tol=_newton.TOL if tol is None else tol, max_iter=max_iter,
+        scale=P, engaged=engaged)
+    return r.U, load, fixed, r.violation
 
 
 def connector_forces(m, ms, U):

@@ -68,7 +68,18 @@ PASS_CONN_E = 5        # connector end nodes, EA side
 IW_CLASSES = {'IW-A', 'IW-P', 'IW-B'}
 EA_CLASSES = {'EA-ST', 'EA-SB'}
 
-SUPPORTED_CONN_TYPES = {'F', 'W'}      # stage 1; see G9
+# Stage 3 (14 Sep 2026): `P` joins `F`/`W`. A revolute frees rz and rz
+# alone, which is FRAME-INDEPENDENT -- so P needs none of the co-rotating
+# machinery `S` and `D` do, and the T3 staging table said so ("P (rz free --
+# no skew, could come earlier)"). `slay/solve/` now applies the associations,
+# so a P emitted here is a P enforced.
+#
+# `S` and `D` stay out. Both restrain ONE translation and not the other, so
+# their rows belong in an axis that turns with the pipe slope -- 0 deg to
+# 32.4 deg across the stinger. Every rig solved so far is horizontal, where
+# local IS global exactly; that is a property of the rig, not of the code.
+# G9 stands for them: refused, never approximated by F.
+SUPPORTED_CONN_TYPES = {'F', 'W', 'P'}
 
 
 # ---------------------------------------------------------------------------
