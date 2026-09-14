@@ -418,7 +418,10 @@
     Association.gap is not None and refuses otherwise -- P_gap has no default
     BY DESIGN, because a deadband redistributes strain and the gap decides
     where it goes. Both files are MIRRORED (G7), so the gap cannot be closed
-    here; it is an upstream item.
+    here; RAISED UPSTREAM 14 Sep 2026 as CUN-001 in Slay-ILS-Designer-V1.0
+    (docs/CRITICAL_UPDATE_NOTES.md, branch
+    critical-update/p-gap-not-enforced), with a verified patch. Still OPEN
+    upstream -- do not assume the check exists until CUN-001 says RESOLVED.
   detect: test_the_gap_is_component_data
   refs: [rebuild/component_spec.py:2582, rebuild/ils_builder.py]
   date: 2026-09-14
