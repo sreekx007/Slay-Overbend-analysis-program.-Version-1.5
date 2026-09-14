@@ -539,6 +539,72 @@ the co-rotating form the stinger needs, where the local axis turns up to
 
 ---
 
+## ILS-EAST complete — 14 Sep 2026
+
+`tools/study_east_full.py`. The first Group B case solved end to end, with
+everything from `build_model`: 45 nodes, 42 elements (22 pipeline, 18 frame,
+2 connector), 4 associations. Both ties applied as penalty constraints, so
+the load path closes:
+
+    pipe node  ~~W~~  C-P  --[ connector ]--  C-E  ~~F~~  frame slot
+
+Fixed at both pipeline ends, loaded at the layout midpoint on the header.
+
+| P | δ pipe | δ frame | ΣR | violation | σ pipe | σ frame |
+|---|---|---|---|---|---|---|
+| 20 kN | 5.04466 mm | 4.95436 mm | 20.000 kN | 3.7 × 10⁻⁷ mm | 18.1 MPa | 1.6 MPa |
+| 200 kN | 50.49254 mm | 49.54476 mm | 200.000 kN | 3.6 × 10⁻⁶ mm | 180.5 MPa | 18.0 MPa |
+
+### The comparison is the result
+
+A **bare pipe of the same span** deflects 6.63578 mm at 20 kN. With the ILS on
+it: **5.04466 mm — 24 % stiffer.** The frame is not scenery; it takes load
+back into the pipe through the connectors.
+
+And the stress diagram says where. Between the two connector stations the
+pipe's peak stress **drops from 170 MPa to 64 MPa** — the frame bridges that
+span and shields it — with the concentrations sitting just *outside* the
+connectors. A model whose connectors did nothing would show a plain
+fixed-fixed diagram peaking at midspan instead. That contrast is what
+`test_pipe_is_shielded_between_the_connectors` asserts.
+
+The frame rides down with the pipe (0.09 mm apart over a 0.61 m connector),
+which is what all-DOF ties should do.
+
+### The connector length here is 0.6096 m, not 0.5 × OD
+
+The 0.5 × OD of the standalone study was a stand-in when there was no pipe to
+span to. Now the geometry sets it: pipe centreline at `y = 0`, frame bottom
+chord at `y = −0.6096`. **The stiffness is identical either way**, which is
+pass 4's whole point.
+
+### One bug, and it is a trap worth naming
+
+`MeshedStructure._mesh` assigns mesh indices in **element-encounter order**,
+so `user_node_to_mesh` is a *permutation* of our node ids and **not the
+identity**. Writing connector stiffness at `3 * node_id` put it on the wrong
+rows and left four frame nodes with empty ones — twelve zero diagonals and an
+exactly singular matrix.
+
+`test_kernel_leaves_the_model_intact` asserts the map is a **bijection**, and
+a bijection is all it asserts. **Every caller has to go through it.**
+`test_node_map_is_not_the_identity` pins that it really is a permutation
+here, so the indirection cannot later look redundant and be removed.
+
+The earlier studies escaped it by construction — their elements referenced
+nodes in id order — which is exactly why it surfaced only on the first model
+with a frame reached late.
+
+### Group B's blocker test is not contradicted
+
+`test_group_b_cannot_yet_be_solved` still asserts ILS-EAST's own elements are
+singular. That remains true and remains the right thing to assert: it says the
+associations are **declared and not yet enforced anywhere in the package**.
+This study enforces them from `tools/`. The two flip together when the penalty
+module moves into `slay/solve/`.
+
+---
+
 ## Action log
 
 | Date | Action |

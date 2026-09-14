@@ -446,8 +446,11 @@ def test_group_b_cannot_yet_be_solved(scene, arch_id):
        common case rather than an edge one. It needs a prescribed-stiffness
        element type, not a workaround.
 
-    When both land this test flips to its opposite, and that flip is the
-    evidence they work.
+    NOT CONTRADICTED by `test_east_full.py`, which solves ILS-EAST. That
+    study APPLIES the associations as penalty constraints; this asserts the
+    model's own elements are singular WITHOUT them, which is what says the
+    associations are declared and not yet enforced anywhere in the package.
+    The two flip together only when the penalty module moves out of tools/.
     """
     np = pytest.importorskip('numpy')
     fe = pytest.importorskip('nlfea_v4')
