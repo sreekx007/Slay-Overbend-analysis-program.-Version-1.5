@@ -243,18 +243,34 @@ def solve(m, ms, P, alpha=ALPHA, n_inc=10, tol=1e-9, max_iter=30,
     first, off-centre, and every number in the run is for a different problem.
     It was caught comparing an F2 model with stations added at the outer slots
     against F2D: 48.398 mm where F2D gave 49.429, a 2% gap that looked like
-    physics and was a misplaced load. Name the position; take the nearest.
+    physics and was a misplaced load. Name the position; take the node there.
+
+    NOR CAN IT BE FOUND BY PART ID. The first fix looked for a `PIPE-X` node
+    -- the externally-requested station -- and F1D has none at the midpoint:
+    its single `F` sits at slot 3, which IS the midpoint, so the connector
+    claimed that station and the requested one merged into it. The load still
+    has a node to act on; it just is not named the way the search expected.
+    What the load actually needs is the HEADER node at `load_s`, and the way
+    to say that is to ask the pipeline's own elements which node that is.
+
+    The distinction matters at exactly that station. Two nodes sit at
+    (s = 0, y = 0) in F1D -- the header's and the connector's `C-P` -- in
+    different passes and so deliberately unmerged. Loading the connector node
+    instead would push the load through the connector into the frame and
+    bypass the pipe entirely.
     """
     ends = [min(m.nodes, key=lambda n: n.s), max(m.nodes, key=lambda n: n.s)]
     fixed = [dof(ms, n.index, k) for n in ends for k in (0, 1, 2)]
-    cands = [n for n in m.nodes
-             if n.part_id and n.part_id.startswith('PIPE-X')]
+    at = {n.index: n for n in m.nodes}
+    header = {i for e in m.elements if e.owner == 'pipeline'
+              for i in (e.n1, e.n2)}
+    cands = [at[i] for i in header if abs(at[i].s - load_s) <= 1e-6]
     if not cands:
-        raise ValueError('no externally-requested pipeline station to load')
-    load = min(cands, key=lambda n: abs(n.s - load_s))
-    if abs(load.s - load_s) > 1e-6:
-        raise ValueError(f'no PIPE-X station at s={load_s}; nearest is '
-                         f'{load.s:.6f}')
+        raise ValueError(f'no header node at s={load_s} to load; the station '
+                         f'has to exist before a load can act on it')
+    if len(cands) > 1:
+        raise ValueError(f'{len(cands)} header nodes at s={load_s}')
+    load = cands[0]
     pairs = constraint_pairs(m, layout, engaged)
 
     U = np.zeros(3 * m.n_nodes)

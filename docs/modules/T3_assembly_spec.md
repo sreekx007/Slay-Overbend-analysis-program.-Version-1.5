@@ -742,24 +742,50 @@ module moves into `slay/solve/`.
 
 ---
 
-## F2D and the deadband — measured 14 Sep 2026
+## F2D and F1D — the deadband, measured 14 Sep 2026
 
-`tools/study_east_f2d.py`, `rebuild/tests/test_east_f2d.py` (17 tests),
-`docs/diagrams/east_f2d_study.png`.
+`tools/study_east_deadband.py`, `rebuild/tests/test_east_deadband.py`
+(41 tests), `docs/diagrams/east_deadband_study.png`.
 
-### F2D is the first system whose geometry differs
+### These are the first systems whose geometry differs
 
 F2 and PS populate the same two slots, so PS was a **tie override** on an F2
 model — same nodes, same elements, only which DOF are tied, which is what made
-that comparison exact. F2D populates four:
+that comparison exact. The deadband systems populate more, so they have to be
+built:
 
-| slot | 1 | 2 | 3 | 4 | 5 |
-|---|---|---|---|---|---|
-| F2 | — | F | — | F | — |
-| F2D | **D** | F | — | F | **D** |
+| slot | 1 | 2 | 3 | 4 | 5 | connectors | nodes / elements / assoc |
+|---|---|---|---|---|---|---|---|
+| F1 | — | — | F | — | — | 1 | — |
+| F2 | — | F | — | F | — | 2 | 45 / 42 / 4 |
+| F1D | **D** | — | F | — | **D** | 3 | 49 / 45 / 6 |
+| F2D | **D** | F | — | F | **D** | 4 | 49 / 44 / 8 |
 
-so it has to be built. 49 nodes, 44 elements, 8 associations, against F2's 45 /
-42 / 4.
+### Why both, and why they are not the same experiment
+
+Their bases differ **in kind**, so the deadband has a different job in each.
+
+**F2** holds the frame at two points and carries moment across the span
+between them — it shields the pipe before any deadband closes. F2D's outer
+supports *extend* a frame that is already working.
+
+**F1** holds it at one point, and that point is the layout midpoint. At the
+midspan of a symmetric fixed-fixed beam the rotation is zero, so an `F` tied
+there transmits no moment: the frame only translates and carries nothing.
+**F1 is a passenger** — 65.4708 mm at 200 kN, the bare beam — reaching the
+same outcome as PS by a different mechanism. F1D's outer supports are the only
+thing that makes its frame work at all.
+
+Measured, at 200 kN:
+
+| | base | conns | open | tightest gap | drop | threshold |
+|---|---|---|---|---|---|---|
+| F2D | F2 | 4 | 49.4292 mm | 38.9502 mm | 21.2% | 3.0041 mm |
+| F1D | F1 | 3 | 65.4687 mm | 44.5648 mm | 31.9% | 9.1049 mm |
+
+F1D starts softer, has three times as far to travel before its supports touch,
+and gains more when they do — without overtaking F2D. Rigid-roller limits:
+38.0014 mm and 42.6787 mm.
 
 ### The geometry-only grant, and why it is not a hole in G9
 
@@ -773,8 +799,7 @@ gap and `skewed` — records every connector it lets through in
 The caller then owes the enforcement **and owes the evidence**. A `D` emitted
 this way and solved without a deadband is an `F` in all but name, which is the
 substitution G9 exists to forbid; the study carries an active-set deadband and
-prints the engaged state of every `D` at every gap, which is what makes the
-claim checkable. Recorded as L028.
+prints the engaged state of every `D` at every gap. Recorded as L028.
 
 ### The gap is component data
 
@@ -785,62 +810,102 @@ purpose: a deadband *redistributes* strain rather than removing it, and the
 gap decides where it goes.
 
 `component_spec` says the "P_gap required when D" check "lives in
-`ils_builder.validate()`". **It is not there** — ILS-EAST declared F2D with no
+`ils_builder.validate()`". **It is not there** — an F2D/F1D layout with no
 `P_gap` builds and validates, and the gap arrives as `None`. Both files are
-mirrored (G7), so this is an upstream item; every consumer of a `D` checks the
-gap itself. Recorded as L026, and **raised upstream 14 Sep 2026 as CUN-001**
-in `Slay-ILS-Designer-V1.0` (`docs/CRITICAL_UPDATE_NOTES.md`, branch
-`critical-update/p-gap-not-enforced`, PR #1) with a verified patch — all 7
-archetypes and all 39 anchors still validate clean under it. That PR is **docs
-only**: it raises the defect, it does not fix it. **Still open upstream:** do
-not assume the check exists until CUN-001 is marked RESOLVED.
+mirrored (G7), so every consumer of a `D` checks the gap itself. Recorded as
+L026, and **raised upstream as CUN-001** in `Slay-ILS-Designer-V1.0`
+(`docs/CRITICAL_UPDATE_NOTES.md`, PR #1) with a verified patch — docs only,
+**still open**, so nothing here may assume the check exists.
 
 ### The threshold is measured, and it calls every cell
 
-With every `D` open the outer slots move **0.3002 mm at 20 kN** and
-**3.0041 mm at 200 kN**. Those two numbers predict all ten engaged/open cells
-of the sweep — a gap wider than the separation cannot close, a narrower one
-must — which is what turns the sweep into a prediction rather than a curve.
+With every `D` open the outer slots move a definite distance, and a gap wider
+than it cannot close:
 
-| P_gap (mm) | 20 kN | 200 kN | d at 200 kN (mm) | D force (kN) | σ frame (MPa) |
-|---|---|---|---|---|---|
-| 5.00 | open | open | 49.4292 | 0.000 | 2.0 |
-| 3.50 | open | open | 49.4292 | 0.000 | 2.0 |
-| 2.50 | open | **shut** | 47.5135 | 64.0 | 19.4 |
-| 1.00 | open | **shut** | 41.8067 | 254.6 | 82.9 |
-| 0.25 | **shut** | **shut** | 38.9502 | 349.8 | 114.7 |
+| | 20 kN | 200 kN |
+|---|---|---|
+| F2D | 0.3002 mm | 3.0041 mm |
+| F1D | 0.9220 mm | 9.1049 mm |
 
-Engagement is a property of the gap **and** the load, never the gap alone: a
-1 mm gap is open at 20 kN and shut at 200 kN. Everything stays elastic,
-connectors included; reactions balance to 1e-6 at every cell; the active set
-settles in **one** flip everywhere, no chatter.
+Each system is swept against **its own** threshold — a shared gap set would
+land entirely on one side of one of them and measure nothing there.
 
-### An open D is not "close to" F2 — it is F2
+| F2D gap | 20 kN | 200 kN | d (200 kN) | F2D | | F1D gap | 20 kN | 200 kN | d (200 kN) |
+|---|---|---|---|---|---|---|---|---|---|
+| 5.00 mm | open | open | 49.4292 | | | 15.00 mm | open | open | 65.4687 |
+| 3.50 mm | open | open | 49.4292 | | | 10.00 mm | open | open | 65.4687 |
+| 2.50 mm | open | **shut** | 47.5135 | | | 7.50 mm | open | **shut** | 61.4748 |
+| 1.00 mm | open | **shut** | 41.8067 | | | 3.00 mm | open | **shut** | 50.2199 |
+| 0.25 mm | **shut** | **shut** | 38.9502 | | | 0.75 mm | **shut** | **shut** | 44.5648 |
 
-F2D with every gap open came out 3.79e-04 mm off plain F2 at 200 kN. That
+Engagement is a property of the gap **and** the load, never the gap alone.
+Normalised by each case's own threshold, all four curves break away from 1.00
+at the same place — which is the measurement predicting itself. Everything
+stays elastic, connectors included; reactions balance to 1e-6 at every cell;
+the active set settles in **one** flip everywhere, no chatter.
+
+### The load path has a different shape in each
+
+Frame vertical equilibrium, read straight off the connector axials:
+
+- **F2D** — 2 D + 2 F, symmetric, so `N_F == N_D` exactly (349.831 kN each at
+  the tightest gap).
+- **F1D** — 2 D + 1 F, so that single F carries both: `N_F == 2·N_D` exactly
+  (232.875 / 465.751 kN).
+
+It is the cheapest available statement that load goes where the layout says,
+and because the two ratios differ it cannot pass by accident. With every `D`
+open both are **0** — a symmetric pair summing to zero means each is zero,
+which is what "passenger" looks like numerically. Recorded as L031.
+
+Report connector **axial** as well as moment. Every F1D connector carries zero
+moment and zero shear at every gap — the two `D` are rollers by construction
+and the single `F` sits where the relative rotation is zero — so an F1D table
+of moments alone is all zeros and cannot tell a working strut from a connector
+doing nothing. Recorded as L030.
+
+### An open D is not "close to" the base — it is the base
+
+Each system with every gap open came out a few 1e-04 mm off its base. That
 residual is **the mesh, not the joint**: a connector forces a header station
-at its slot, so F2D discretises the pipeline at ±2.1675 m where F2 does not.
-Give plain F2 those two stations and the two agree to every digit printed —
-**49.42922334 mm** both. A residual that small is still a claim; it gets
-identified, not called tolerance. Recorded as L027.
+at its slot, so both D systems discretise the pipeline at ±2.1675 m where the
+base does not. Give the base those two stations and they agree to every digit
+printed — F2D/F2 at **49.42922334 mm**, F1D/F1 at **65.46868944 mm**. A
+residual that small is still a claim; it gets identified, not called
+tolerance. Recorded as L027.
 
 ### A shut D is a roller, not a fixed connection
 
 It ties the perpendicular and nothing else — measured: zero moment at the EA
-end at every gap, at 349.8 kN of axial force. The limit as the gap closes is
-**38.0014 mm** (0.001 mm gap), approached monotonically from 49.4292. It is
-not the F2D-with-F-outside case, and the zero-gap case is refused by the
-component itself: "a zero gap is a FIXED connector, which is a different
-system (F), not a D that happens to shut immediately."
+end at every gap, at hundreds of kN of axial. It is not the same system with
+`F` at the outer slots, and the zero-gap case is refused by the component
+itself: "a zero gap is a FIXED connector, which is a different system (F), not
+a D that happens to shut immediately."
 
-### Two corrections this run
+### F1D is the one that is measurably nonlinear
+
+A 10× load gives 10.007× separation on F2D and **9.876×** on F1D. That is the
+right answer, not a tolerance to widen: F1D sags a third further, the membrane
+term goes as the deflection, and separation tracks deflection in both — which
+is what says the shortfall is the pipe stiffening rather than the supports
+doing something. Pinned, because a change that quietly linearised the solve
+would make F1D read 10.000 and look like an improvement.
+
+### Three corrections this run
 
 `solve` chose its load node with `next(... startswith('PIPE-X'))` — the first
 externally-requested station in **node order**. With one `extra_station` that
 is the midpoint; with three the load silently moved to s = −2.1675 and
 reported 48.398 mm where the same structure gives 49.429, a 2% gap that looked
-like physics. The position is named now and the nearest station taken, or it
-raises (L025).
+like physics (L025).
+
+The fix was then wrong for F1D, whose single `F` sits at slot 3 = the
+midpoint: the connector claimed that station and the requested one merged into
+it, so there was no `PIPE-X` node at all. The load node is found **by position
+among the pipeline's own element endpoints** now. Two nodes sit at (s=0, y=0)
+in F1D, in different passes and deliberately unmerged — the header's and the
+connector's `C-P` — and loading the connector node would push the load
+straight into the frame and bypass the pipe (L032).
 
 `study_connectors.py` released an engaged `D` on the **separation sign**,
 while L008's recorded rule says force direction. Both studies now use the
@@ -853,6 +918,7 @@ the change left every row of that study's output bit-identical.
 
 | Date | Action |
 |---|---|
+| 14 Sep 2026 | **F1D added alongside F2D**, each swept against its own measured threshold (F1D 0.9220 / 9.1049 mm against F2D's 0.3002 / 3.0041). F1 ruled a PASSENGER: its single F sits at the layout midpoint where a symmetric fixed-fixed beam has zero rotation, so it transmits no moment and F1 leaves the pipe at its bare-beam 65.4708 mm — the same outcome as PS by a different mechanism. F1D therefore starts softer, travels 3x further before its supports touch, and gains more when they do (31.9% against 21.2%) without overtaking F2D (44.5648 against 38.9502 mm). Frame equilibrium read off the connector axials differs by system and is now a test: F2D `N_F == N_D`, F1D `N_F == 2*N_D`. Connector AXIAL reported alongside moment — every F1D connector carries zero moment at every gap, so a moment-only table cannot tell a working strut from a dead one. F1D is also the case measurably into the membrane regime: 9.876x separation for a 10x load, against F2D's 10.007x. Load-node selection corrected a second time — F1D's slot-3 connector claims the midpoint station, so there is no `PIPE-X` node and the load is found by position among pipeline element endpoints. |
 | 14 Sep 2026 | F2D measured on the complete ILS-EAST model over five deadband gaps. `emit_unenforced_conn_types` added to `build_model` as a **geometry-only** grant that leaves G9's refusal in place and warns on every connector it emits. `P_gap` confirmed as component data, carried on `Association.gap`; the "required when D" check `component_spec` attributes to `ils_builder.validate()` does not exist there. Free separation at the outer slots (0.3002 mm at 20 kN, 3.0041 mm at 200 kN) predicts every engaged/open cell at both loads. An open D is F2 exactly once F2 is given the two stations the D connectors force into the header mesh — 49.42922334 mm both. A shut D is a rigid roller, limit 38.0014 mm, approached monotonically. |
 | 13 Sep 2026 | Connector stiffness rule restated as ABSOLUTE: every connector carries the stiffness of a 1 × OD length of pipeline whatever its own length, so a zero-length one is an ordinary case and an ordinary element. Corrects an earlier claim in this spec that a zero-length connector was no element at all — the legal default was being treated as a degenerate case needing an exception, which is the opposite of what the rule is for. Implementation follows: all three Group B archetypes now carry connector elements, ILS-EASB's at length 0. Confirms L5 needs a prescribed-stiffness element type: the corotational kernel divides by the deformed length and returns inf for a zero-length element, observed at `nlfea_v4.py:1216`. |
 | 13 Sep 2026 | `D` ruled a **pure support**: local x and rz never restrained, in either state; only the perpendicular deadband. That forces a layout-adequacy rule, since a support that holds nothing while open cannot restrain a structure alone — checked against all six named systems with every gap open, and all six are adequate (`PS` exactly so: `P` gives local x, `S` gives rz). `ConnectionSystem` accepts any 5-tuple though, and `D/-/-/-/D` is legal to build and singular in both states, so the check is generic on the tuple rather than a whitelist. |

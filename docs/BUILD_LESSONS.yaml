@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 29
+# entries: 32
 
 - id: L001
   area: kernel
@@ -147,7 +147,7 @@
     release. study_connectors.py used the separation SIGN until 14 Sep; the
     force test replaced it with bit-identical output on every row.
   detect: test_deadband_engages_and_stiffens, test_open_deadbands_change_nothing, test_the_active_set_settles_without_chatter, test_constraints_are_satisfied_at_the_gap_edge
-  refs: [tools/study_connectors.py, tools/study_east_f2d.py, rebuild/tests/test_connectors.py]
+  refs: [tools/study_connectors.py, tools/study_east_deadband.py, rebuild/tests/test_connectors.py]
   date: 2026-09-14
 
 - id: L009
@@ -399,8 +399,8 @@
     Name the load position and take the nearest matching station; raise if
     none is within 1e-6. A load location selected by iteration order is a
     defect even when it happens to be right.
-  detect: test_open_f2d_is_f2_exactly
-  refs: [tools/study_east_full.py, rebuild/tests/test_east_f2d.py]
+  detect: test_open_is_the_base_system_exactly
+  refs: [tools/study_east_full.py, rebuild/tests/test_east_deadband.py]
   date: 2026-09-14
 
 - id: L026
@@ -440,8 +440,8 @@
     Compare like with like: F2 given the same two stations matches F2D-open to
     every digit printed (49.42922334 mm both). A residual that small is still
     a claim; identify it, never call it tolerance.
-  detect: test_open_f2d_is_f2_exactly
-  refs: [tools/study_east_f2d.py, rebuild/tests/test_east_f2d.py]
+  detect: test_open_is_the_base_system_exactly
+  refs: [tools/study_east_deadband.py, rebuild/tests/test_east_deadband.py]
   date: 2026-09-14
 
 - id: L028
@@ -459,7 +459,7 @@
     without a deadband is an F in all but name, which is the substitution G9
     forbids.
   detect: test_the_d_geometry_is_opt_in_and_says_so, test_unsupported_connector_type_is_refused
-  refs: [rebuild/slay/model/assemble.py, tools/study_east_f2d.py]
+  refs: [rebuild/slay/model/assemble.py, tools/study_east_deadband.py]
   date: 2026-09-14
 
 - id: L029
@@ -470,14 +470,81 @@
     calls every cell of the sweep.
   cause: '-'
   rule: >-
-    Free separation at the outer slots with all D open: 0.3002 mm at 20 kN,
-    3.0041 mm at 200 kN. A gap wider than that cannot close; narrower must.
-    So engagement is a property of the gap AND the load, never the gap alone
-    (1 mm is open at 20 kN, shut at 200 kN). 200 kN deflection against gap
-    (mm): 5.00/3.50 -> 49.4292 (= F2), 2.50 -> 47.5135, 1.00 -> 41.8067,
-    0.25 -> 38.9502; rigid-roller limit 38.0014. A shut D is a ROLLER, not an
-    F -- it ties the perpendicular and nothing else, and a zero gap is refused
-    by the component as a different system.
+    Free separation at the outer slots with all D open decides engagement.
+    F2D: 0.3002 mm at 20 kN, 3.0041 mm at 200 kN. F1D: 0.9220 / 9.1049 mm.
+    A gap wider than that cannot close; narrower must. Engagement is a
+    property of the gap AND the load, never the gap alone (F2D 1 mm and F1D
+    3 mm are each open at 20 kN, shut at 200 kN). F2D 200 kN deflection
+    against gap (mm): 5.00/3.50 -> 49.4292 (= F2), 2.50 -> 47.5135,
+    1.00 -> 41.8067, 0.25 -> 38.9502; rigid-roller limit 38.0014. F1D:
+    15.0/10.0 -> 65.4687 (= F1), 7.50 -> 61.4748, 3.00 -> 50.2199,
+    0.75 -> 44.5648; limit 42.6787. A shut D is a ROLLER, not an F -- it ties
+    the perpendicular and nothing else, and a zero gap is refused by the
+    component as a different system. Sweep each system against its OWN
+    threshold; a shared gap set measures nothing on one of them.
   detect: test_the_threshold_predicts_every_cell, test_engagement_is_load_dependent, test_engagement_stiffens_monotonically
-  refs: [tools/study_east_f2d.py, docs/diagrams/east_f2d_study.png]
+  refs: [tools/study_east_deadband.py, docs/diagrams/east_deadband_study.png]
+  date: 2026-09-14
+
+- id: L030
+  area: joint
+  class: finding
+  symptom: >-
+    F1 leaves the pipe at its bare-beam deflection (65.4708 mm at 200 kN) and
+    every F1D connector carries exactly zero moment and zero shear at every
+    gap, engaged or not.
+  cause: >-
+    F1's single F sits at slot 3 = the layout midpoint. At the midspan of a
+    symmetric fixed-fixed beam the rotation is zero, so the tie transmits no
+    moment and the frame only translates -- a PASSENGER, the same outcome as
+    PS by a different mechanism.
+  rule: >-
+    F1 is a null case like PS. Consequences that follow and must hold
+    together: F1D starts softer than F2D (65.47 vs 49.43 mm), its frame
+    travels 3x further before the D pair touches (9.105 vs 3.004 mm), and the
+    deadband buys it more (31.9% vs 21.2%) without overtaking F2D
+    (44.56 vs 38.95 mm at the tightest gap). Report connector AXIAL as well
+    as moment -- an F1D table of moments alone is all zeros and cannot tell a
+    working strut from a connector doing nothing.
+  detect: test_f1_is_a_passenger_and_every_f1d_connector_is_a_strut, test_f1d_starts_softer_and_gains_more
+  refs: [tools/study_east_deadband.py, rebuild/tests/test_east_deadband.py]
+  date: 2026-09-14
+
+- id: L031
+  area: joint
+  class: finding
+  symptom: >-
+    Frame vertical equilibrium reads straight off the connector axials, and
+    its SHAPE differs by system.
+  cause: '-'
+  rule: >-
+    F2D hangs the frame on 2 D + 2 F, symmetric, so N_F == N_D exactly.
+    F1D hangs it on 2 D + 1 F, so N_F == 2 * N_D exactly. Cheapest available
+    check that load goes where the layout says, and it cannot pass by
+    accident because the two ratios differ. With every D open both are 0 --
+    a symmetric pair summing to zero means each is zero, which is what
+    "passenger" looks like numerically.
+  detect: test_the_load_path_has_the_shape_the_layout_implies, test_open_d_carries_no_force
+  refs: [tools/study_east_deadband.py, rebuild/tests/test_east_deadband.py]
+  date: 2026-09-14
+
+- id: L032
+  area: process
+  class: defect
+  symptom: >-
+    F1D raised "no externally-requested pipeline station to load" -- the
+    model had no PIPE-X node at all.
+  cause: >-
+    F1D's single F is at slot 3, which IS the layout midpoint, so the
+    connector claimed that station and the requested one merged into it. The
+    load still had a node; it was just not named the way the search expected.
+    Two nodes then sit at (s=0, y=0) in different passes, deliberately
+    unmerged -- the header's and the connector's C-P.
+  rule: >-
+    Find the load node by POSITION among the pipeline's own element
+    endpoints, never by part-id prefix. Loading the C-P node instead would
+    push the load through the connector into the frame and bypass the pipe.
+    Second correction to the same line -- see L025.
+  detect: test_the_load_lands_on_the_header_not_the_connector
+  refs: [tools/study_east_full.py, rebuild/tests/test_east_deadband.py]
   date: 2026-09-14
