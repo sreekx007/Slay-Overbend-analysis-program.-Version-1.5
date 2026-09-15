@@ -18,7 +18,8 @@ REPO = Path(__file__).resolve().parents[2]
 REGISTER = REPO / 'docs' / 'BUILD_LESSONS.yaml'
 TESTS = Path(__file__).resolve().parent
 
-AREAS = {'kernel', 'model', 'solve', 'joint', 'plot', 'process', 'measure'}
+AREAS = {'kernel', 'model', 'physics', 'solve', 'joint', 'plot',
+         'process', 'measure'}
 CLASSES = {'defect', 'finding', 'ruling'}
 REQUIRED = {'id', 'area', 'class', 'symptom', 'cause', 'rule', 'detect',
             'refs', 'date'}

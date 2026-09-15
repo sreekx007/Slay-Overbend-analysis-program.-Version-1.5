@@ -8,7 +8,7 @@
 #
 # schema:
 #   id         L###                     stable, never reused
-#   area       kernel|model|solve|joint|plot|process|measure
+#   area       kernel|model|physics|solve|joint|plot|process|measure
 #   class      defect|finding|ruling
 #   symptom    what was OBSERVED (numbers, not adjectives)
 #   cause      the actual mechanism
@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 40
+# entries: 42
 
 - id: L001
   area: kernel
@@ -734,3 +734,47 @@
   detect: test_the_package_reproduces_the_studies, test_p_is_supported_now_that_the_solver_applies_it, test_unsupported_connector_type_is_refused
   refs: [rebuild/slay/solve/newton.py, rebuild/slay/physics/connector.py, rebuild/tests/test_solve.py]
   date: 2026-09-14
+
+- id: L041
+  area: physics
+  class: defect
+  symptom: >-
+    Contact targets came out at -1485 m, +1896 m, non-monotone, and non-zero
+    at deck stations whose target is exactly zero.
+  cause: >-
+    `arc_target(R, theta)` takes an ANGLE and was called with the station's
+    ARC LENGTH. Reading 40 m as 40 radians is off by three orders of
+    magnitude. The helper was right and verified; the call site was wrong.
+  rule: >-
+    Caught immediately ONLY because the magnitude was absurd. A
+    wrong-but-plausible number in a contact target is a wrong model that
+    converges -- which is the whole reason tracker item 16 exists. Any
+    quantity with an angle/length pair of forms gets the conversion at the
+    call site named, and the result checked against an independent
+    computation (`arc_target_by_projection`) rather than against itself.
+  detect: test_the_target_takes_an_angle_not_an_arc_length, test_targets_match_the_closed_form_at_every_station
+  refs: [rebuild/slay/physics/contact.py, rebuild/tests/test_physics.py]
+  date: 2026-09-15
+
+- id: L042
+  area: physics
+  class: ruling
+  symptom: '-'
+  cause: '-'
+  rule: >-
+    T4 artifacts. Section rules: declared | ratio (same section at ratio*E,
+    EA and EI scaling together) | section_at (per ELEMENT at its own
+    midpoint, assembly is the single source) | pipe. Frame conversion
+    x_local = s_centre - s lives in slay/physics/sections and nowhere else.
+    Contact target dn = R(1-cos t - t sin t) + lift, lift =
+    contact_at(x).y - OD/2, checked against the direct projection to 1e-15
+    at every station. Old dn = arc_y*ny errs 0.662 m at SR6 (R=85), 1.158 at
+    R=70. Weight in +y, half-half lumping, total rho*A*g*L. Tension at the
+    LOAD station along ITS OWN tangent (SR7, not SR6 -- a 3x strain error).
+    Problem carries NO shift index, NO sweep length, NO live Scene; DONE
+    WHEN is differs_only_in_contact. OPEN and deliberately not defaulted:
+    R_eff vs centreline mode, Hermite vs linear interpolation, roller
+    stations not being mesh nodes, the sweep ceiling.
+  detect: test_two_shifts_differ_only_in_contact, test_the_problem_carries_no_shift_no_sweep_and_no_scene, test_keeping_the_old_formula_would_be_metres_wrong
+  refs: [docs/modules/T4_physics_spec.md, rebuild/slay/physics/problem.py]
+  date: 2026-09-15
