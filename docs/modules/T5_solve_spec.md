@@ -328,6 +328,65 @@ Neither causes the divergence — the step-0 table above shows the
 configuration failing without any guard at all — but both belong in any
 like-for-like comparison.
 
+## 5d. D6 TAKEN — the terminal station is a contact slot, 21 Sep 2026
+
+**Decision D6, option B**: SR7 keeps its place and becomes a permanently
+active (bidirectional) contact slot while remaining the tension point. This
+matches the structure of the sliding reference, which `passage.solve` is a
+port of: `slay_sliding_v0_4.py` builds SR1..SR{n_sr+1} as slots with
+`exempt_set = {last}` and applies the joint load there.
+
+`bears_tension` is a new Station attribute, **orthogonal to `role`** — the
+station is CONTACT and carries the tension, and `load_station` selects on
+the attribute. A role test for LOAD would now match nothing and
+`lay_tension` would silently apply no load, which is the failure this
+separation exists to prevent.
+
+### The blocker is gone
+
+**120 MT converges at every radius**, first time in this project. Panel B of
+`stinger_pipe.png` now runs the benchmark case rather than a 15 MT stand-in.
+
+### It does not yet reproduce the reference, and the gap is structural
+
+Like for like at the reference's own 8 m spacing, 120 MT, plain pipe:
+
+| R | ours, 8 m | ours, 9 m | reference `run_slay`, 8 m | paper |
+|---|---|---|---|---|
+| 70 m | 0.6390% | 0.6674% | 0.5274% | 0.46% |
+| 85 m | 0.4571% | 0.4700% | 0.3882% | 0.38% |
+| 105 m | 0.3216% | 0.3287% | 0.2790% | 0.32% |
+
+**+15 to +21% above the reference at matched spacing**, and the peak has
+moved: ours is at SR6 (`s = 39.6` at 8 m, `s = 44.8` at 9 m), the
+reference's at the SR2-SR3 span (`x = -8.38`).
+
+The cause is §6's SECOND gap, not this one. **`run_slay` at `n_sr=6` builds
+six stinger stations; ours builds seven.** Its `allc` runs
+`32.0 ... -38.54` — four deck stations and SR1..SR6 — and the tension goes
+on the last of those. Ours adds SR7 beyond SR6 and now constrains it to the
+arc, which bends the pipe further round than the reference ever does and
+concentrates strain in the SR6-SR7 span.
+
+So D6 removed the divergence and exposed the count rule underneath it. The
+sliding reference (7 slots, last exempt) and `run_slay` (6 slots, tension on
+the last) are **different configurations**, and only the second has plain-pipe
+numbers to compare against. Settling which the rebuild should match is the
+next task, and it is §6's "station counts differ" item, now with measured
+consequences.
+
+**M1 IS NOT CLAIMED.** Converging is not reproducing.
+
+### For the record: the variant that did reproduce
+
+Keeping SR7 unconstrained and moving only the tension to SR6 — option C,
+not taken — gave 0.5467 / 0.3985 / 0.2845% at 9 m, within 2-4% of the
+reference at every radius with the peak in the same span. It leaves the
+free cantilever in the model, which is why it was not the chosen option,
+but it is the measurement that says the station count is what matters.
+
+---
+
 ## 5b. The pipe was not sitting on the stinger — found and FIXED, 21 Sep 2026
 
 `tools/plot_stinger.py`, `docs/diagrams/stinger_pipe.png`. The first figure
@@ -485,3 +544,4 @@ is quoted:
 | 21 Sep 2026 | **L048 found and fixed.** `tools/plot_stinger.py` drew the solved pipe for the first time; the material point that should sit at SR6 was 5.18 m off its own arc point while every contact target was met to 1e-13 m. Cause: `LayPath.normal` is a WORLD vector and `contact_targets` used it as coefficients on MODEL DOFs, so the `s` component had the wrong sign; `dn` is invariant under that error, which is why every existing check passed. Fixed with `physics.contact.to_model_frame` and guarded by `test_the_material_point_lands_on_its_own_arc_station`. Gravity-only peak strain now falls with stinger radius — 0.3365 / 0.2751 / 0.2099% at R = 70 / 85 / 105 against 0.2617 / 0.2704 / 0.2428% before — and the amplification over `D/2R` sits at +16 / +15 / +9%. The §5b diagnosis written earlier the same day (tangential indeterminacy for want of tension) was wrong and is marked as such. Tension cases still fail on the first increment; staged load steps remain the next task. |
 | 21 Sep 2026 | **L049 found and fixed**, prompted by the question "what is the direction of applied pipeline tension?". `lay_tension` used `path.tangent` — a world vector — as a model-frame `(fx, fy)`, so 10 MT of declared lay tension drove 5.27 MT of **compression** through the deck. The existing test asserted `fx == T*tx` against the same world tangent and so ratified the defect. `to_model_frame` extracted into `slay/physics/frame.py`, both crossing sites routed through it, and the test rewritten to state the physics: `fx > 0`, `fy > 0`, deck in tension. Does not unblock the 120 MT benchmark — both signs fail identically at `lam=0` — so staged load steps remain the next task. |
 | 21 Sep 2026 | **The M1 blocker found; §5's diagnosis was wrong.** `nlfea_v4.assemble` never scales `dist_loads`/`joint_loads` by `lam`, so neither solver ramps its loads and cutback cannot reduce them — 64x cutback moved the first Newton step from 3.674 m to 3.232 m against a 1.0 m threshold. The real cause is WHERE the tension is applied: our SR7 is a LOAD station with no contact constraint, 9 m of free cantilever, while the reference puts its joint load on the last SR station, which `exempt_set` makes a permanently active contact slot. Moving our tension to SR6 converges at 120 MT at every radius — 0.5467 / 0.3985 / 0.2845% at R = 70 / 85 / 105, against the reference program's 0.5274 / 0.3882 / 0.2790% and the paper's 0.46 / 0.38 / 0.32%, with the peak in the same span. Not changed in the model: raised as decision D6. Recorded as L050 and L051; the reference `run_slay` was confirmed runnable in this repo. |
+| 21 Sep 2026 | **D6 taken (option B): the terminal stinger station is a contact slot.** SR7 keeps its place, becomes bidirectional so it never releases, and still bears the tension via a new `bears_tension` attribute orthogonal to `role`. **120 MT converges at every radius for the first time** — the divergence blocker is gone. It does not reproduce: at the reference's own 8 m spacing ours reads 0.6390 / 0.4571 / 0.3216% at R = 70 / 85 / 105 against `run_slay`'s 0.5274 / 0.3882 / 0.2790%, +15 to +21%, with the peak displaced to SR6 from the reference's SR2–SR3 span. Traced to §6's station-count gap: `run_slay` at `n_sr=6` builds six stinger stations, ours builds seven. M1 not claimed. 12 tests restated. |

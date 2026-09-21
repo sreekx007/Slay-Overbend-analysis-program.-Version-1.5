@@ -321,7 +321,7 @@
   rule: >-
     Load and restraint stations are carried via extra_stations, not as a
     NodeReason. Do not invent a NodeReason member for them without a ruling.
-  detect: test_load_station_is_not_a_contact_slot, test_fixed_station_is_not_a_contact_slot
+  detect: test_the_tension_station_is_also_a_contact_slot, test_fixed_station_is_not_a_contact_slot
   refs: [rebuild/slay/model/parts.py, rebuild/slay/model/assemble.py]
   date: 2026-09-13
 
@@ -1006,4 +1006,31 @@
     difference as a thing to settle; it was not a detail, it was the blocker.
   detect: '-'
   refs: [rebuild/slay/physics/loads.py, rebuild/slay/scene/rollers.py, slay_sliding_v0_4.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L052
+  area: physics
+  class: ruling
+  symptom: >-
+    D6 taken: the terminal stinger station is a bidirectional contact slot
+    that also bears the lay tension. 120 MT converges at every radius for
+    the first time. It does NOT reproduce the reference -- 0.6390/0.4571/
+    0.3216 pct at R=70/85/105, 8 m spacing, against run_slay's 0.5274/
+    0.3882/0.2790, with the peak at SR6 instead of the SR2-SR3 span.
+  cause: >-
+    Removing the free cantilever removed the divergence and exposed the
+    station-count rule underneath. run_slay at n_sr=6 builds SIX stinger
+    stations and puts the tension on the last; ours builds SEVEN and now
+    constrains the extra one to the arc, bending the pipe further round than
+    the reference does. The sliding reference (7 slots, last exempt) and
+    run_slay (6 slots) are different configurations and only the second has
+    plain-pipe numbers.
+  rule: >-
+    bears_tension is ORTHOGONAL to role: a station may bear contact and
+    carry the load, and load_station selects on the attribute -- a role test
+    would match nothing and apply no load silently. Converging is not
+    reproducing: state the comparison at MATCHED spacing and say which
+    reference configuration is being matched before quoting a milestone.
+  detect: test_the_tension_station_is_also_a_contact_slot, test_there_is_no_unconstrained_overhang
+  refs: [rebuild/slay/scene/rollers.py, rebuild/slay/physics/loads.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21

@@ -97,12 +97,23 @@ def test_vessel_one_sided_split():
     assert not sc.by_name('VR4').one_sided
 
 
-def test_every_stinger_roller_is_one_sided():
+def test_every_stinger_roller_is_one_sided_except_the_terminal_one():
     """A roller riding the arc can push the pipe along it but never hold it
-    down against it."""
+    down against it.
+
+    The terminal station is the exception, and it is not a roller (D6): it
+    stands for the catenary continuation the model is cut from, and the pipe
+    cannot lift away from the span it hangs off. Bidirectional is how this
+    model spells "never releases", matching `exempt_set = {last}` in the
+    sliding reference.
+    """
     sc = build_scene()
-    for st in sc.contact:
-        if st.name.startswith('SR'):
+    sr = [st for st in sc.contact if st.name.startswith('SR')]
+    terminal = sc.load
+    for st in sr:
+        if st is terminal:
+            assert not st.one_sided, 'the terminal station never releases'
+        else:
             assert st.one_sided, f'{st.name} should be one-sided'
 
 
@@ -114,9 +125,11 @@ def test_every_stinger_roller_is_one_sided():
 def test_one_sided_rule_scales_with_n_sr(n_sr):
     sc = build_scene(n_sr=n_sr)
     sr_contact = [st for st in sc.contact if st.name.startswith('SR')]
-    assert len(sr_contact) == n_sr
-    assert all(st.one_sided for st in sr_contact)
+    # n_sr rollers PLUS the terminal station, which bears contact too (D6).
+    assert len(sr_contact) == n_sr + 1
+    assert all(st.one_sided for st in sr_contact if not st.bears_tension)
     assert sc.load.name == f'SR{n_sr + 1}'
+    assert sc.load.is_contact and not sc.load.one_sided
 
 
 @pytest.mark.parametrize('n_vr', [3, 5, 8])
@@ -215,13 +228,27 @@ def test_fixed_station_is_not_a_contact_slot():
     assert not sc.fixed.one_sided
 
 
-def test_load_station_is_not_a_contact_slot():
-    """SR7 carries tension only -- no roller acts there."""
+def test_the_tension_station_is_also_a_contact_slot():
+    """DECISION D6, and the reason it was taken.
+
+    SR7 used to be a LOAD station bearing no contact, which left 9 m of free
+    cantilever past SR6 carrying 120 MT on its tip. A straight, unstressed
+    pipe has no geometric stiffness to react that: the first Newton step was
+    3.2 m against a 1.0 m divergence threshold and every benchmark tension
+    case failed at `lam=0.0000`, uncuttable because `lam` does not scale
+    loads (L050).
+
+    `bears_tension` is deliberately ORTHOGONAL to `role`. A role test for
+    LOAD would now find nothing and `lay_tension` would silently apply no
+    load at all -- which is why `load_station` selects on the attribute.
+    """
     sc = build_scene()
     assert sc.load.name == 'SR7'
-    assert sc.load.role is StationRole.LOAD
-    assert not sc.load.is_contact
-    assert not sc.load.one_sided
+    assert sc.load.bears_tension
+    assert sc.load.role is StationRole.CONTACT
+    assert sc.load.is_contact
+    assert not sc.load.one_sided, 'the terminal station never releases'
+    assert [st.name for st in sc.stations if st.bears_tension] == ['SR7']
 
 
 def test_sr1_is_on_the_deck_line_and_sr2_is_on_the_curve():
@@ -246,7 +273,10 @@ def test_vr1_is_one_spacing_inboard_of_sr1():
 def test_station_counts():
     sc = build_scene()
     assert len(sc.stations) == config.N_VR + config.N_SR + 1 == 12
-    assert len(sc.contact) == (config.N_VR - 1) + config.N_SR == 10
+    # Everything but the FIXED anchor bears contact now (D6): the terminal
+    # stinger station is a slot as well as the tension point.
+    assert len(sc.contact) == (config.N_VR - 1) + config.N_SR + 1 == 11
+    assert len(sc.contact) == len(sc.stations) - 1
 
 
 # --------------------------------------------------------------------------

@@ -61,17 +61,22 @@ def arc_case():
 # -- the contact formulation ----------------------------------------------
 
 def test_every_contact_target_is_met_exactly(arc_case):
-    """The claim the whole formulation rests on. SR6 asks for 8.897 m of
-    normal displacement on a pipe that starts straight, and gets it to
-    1e-13 m."""
+    """The claim the whole formulation rests on. The terminal station asks
+    for 12.49 m of normal displacement on a pipe that starts straight, and
+    gets it to 1e-13 m.
+
+    It was 8.897 m at SR6 before D6 made the terminal station a slot; the
+    number moved because a further station is now constrained, not because
+    the formulation changed.
+    """
     _sc, p, r, _st, ms = arc_case
     assert r.converged, r.status
     slots = ctc.slots_from_targets(p.contacts, ms)
-    assert len(slots) == 8
+    assert len(slots) == 9
     for s in slots:
         assert abs(s.dn - s.u_out(r.U)) < 1e-11, s.name
     assert min(abs(s.dn) for s in slots) == 0.0, 'the deck asks for nothing'
-    assert max(abs(s.dn) for s in slots) == pytest.approx(8.89707, abs=5e-5)
+    assert max(abs(s.dn) for s in slots) == pytest.approx(12.49145, abs=5e-5)
 
 
 def test_nothing_lifts_off_when_nothing_may(arc_case):
@@ -92,13 +97,26 @@ def test_the_arc_region_bends_to_about_the_arc(arc_case):
     assert pure < np.mean(mid) < 1.6 * pure
 
 
-def test_beyond_the_last_roller_the_pipe_is_straight(arc_case):
-    """Nothing constrains or loads it there, so it must carry no strain.
-    Zero here is CORRECT -- which is exactly why a whole-model peak is not
-    the metric and `peak_strain(s_min=...)` takes a zone."""
-    sc, _p, r, _st, _ms = arc_case
-    beyond = [e for (_i, s, e) in r.strains if s > 41.0]
-    assert beyond and max(beyond) < 1e-9
+def test_there_is_no_unconstrained_overhang(arc_case):
+    """WHAT D6 REMOVED, and the test that used to assert its existence.
+
+    This was `test_beyond_the_last_roller_the_pipe_is_straight`: the model
+    ran 8 m past SR6 to a LOAD station bearing no contact, that stretch
+    carried no strain, and zero there was CORRECT. It was also the M1
+    blocker -- 120 MT on the tip of a free cantilever, first Newton step
+    3.2 m, every benchmark case failing at `lam=0.0000`.
+
+    Since D6 the terminal station is a contact slot, so the model ends ON a
+    constraint and there is no such stretch left. The zone argument survives
+    the change and is why `peak_strain(s_min=...)` still takes one: the
+    DECK end carries a restraint artefact from where the model was cut.
+    """
+    sc, p, r, _st, _ms = arc_case
+    last = max(t.s_material for t in p.contacts)
+    assert last == pytest.approx(max(sc.extent)), 'model ends on a constraint'
+    assert not [s for (_i, s, _e) in r.strains if s > last + 1e-9], \
+        'no element lies beyond the last contact station'
+    assert sc.load.s_arc == pytest.approx(last), 'and it bears the tension'
 
 
 def test_slots_constrain_the_normal_only(arc_case):
@@ -319,7 +337,7 @@ def test_state_out_carries_what_a_chained_position_needs(arc_case):
     _sc, _p, _r, state, ms = arc_case
     assert state.U is not None and len(state.U) == ms.n_dofs
     assert state.theta is not None and len(state.theta) == ms.n_elems
-    assert len(state.active) == 8
+    assert len(state.active) == 9
     assert state.plastic is None, 'RO is path-independent: nothing to carry'
 
 

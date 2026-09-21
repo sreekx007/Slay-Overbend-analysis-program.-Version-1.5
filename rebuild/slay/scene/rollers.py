@@ -7,8 +7,13 @@ downstream:
     CONTACT   a roller bears on the pipe. One-sided ones push only and let
               the pipe lift off; bidirectional ones also hold it down.
     FIXED     all DOF restrained. The model's anchor. Not a contact slot.
-    LOAD      lay tension is applied here, along this station's OWN tangent.
-              No roller acts here at all.
+    LOAD      a station that is loaded and bears no contact. NO LONGER
+              PRODUCED by the default layout -- see D6 below -- and kept
+              because the distinction it names is still real.
+
+Where the tension is applied is `bears_tension`, an attribute ORTHOGONAL to
+`role`. The terminal stinger station carries both: it is a contact slot AND
+the tension point.
 
 LAYOUT (ruled 12 Sep 2026), at the defaults n_vr=5, n_sr=6, spacing 8 m:
 
@@ -22,7 +27,22 @@ LAYOUT (ruled 12 Sep 2026), at the defaults n_vr=5, n_sr=6, spacing 8 m:
     SR2    CONTACT        +8.0   -7.988  0.376  first station on the curve
     ...
     SR6    CONTACT       +40.0  -38.540  9.239
-    SR7    LOAD          +48.0  -45.489 13.197  tension only, no contact
+    SR7    CONTACT       +48.0  -45.489 13.197  bidirectional, bears tension
+
+DECISION D6 (21 Sep 2026): SR7 IS A CONTACT STATION. It was a LOAD station
+bearing no contact, which left 9 m of free cantilever past SR6 with 120 MT
+on its tip. On a straight, unstressed pipe there is no geometric stiffness
+to react that, the first Newton step is 3.2 m against a 1.0 m divergence
+threshold, and every benchmark tension case failed at `lam=0.0000`. Cutback
+could not help, because `lam` does not scale loads (L050).
+
+The sliding reference has no such tip: `slay_sliding_v0_4.py` builds
+SR1..SR{n_sr+1} as contact slots with `exempt_set = {last}` making the
+terminal one permanently active, and applies the joint load there.
+`run_slay` ends its mesh at the last roller outright. SR7 is now
+BIDIRECTIONAL, which is how this model spells "never releases" -- the
+terminal station stands for the catenary continuation, not for a real
+roller, and the pipe cannot lift away from the span it hangs from.
 
 THE TWO COUNTS FOLLOW DIFFERENT RULES, DELIBERATELY. Each end has exactly
 one terminal station bearing no contact -- VR5 restrains, SR7 is loaded --
@@ -46,6 +66,8 @@ GLOSSARY
                 this is what stands between that locus and the pipe.
     one_sided   True where the roller may push but not hold down. Meaningful
                 only for CONTACT stations; `role` is what decides behaviour.
+    bears_tension  True at the single station lay tension is applied to,
+                along that station's own tangent. Independent of `role`.
 """
 
 from __future__ import annotations
@@ -80,6 +102,7 @@ class Station:
     normal: tuple
     role: StationRole
     one_sided: bool = False
+    bears_tension: bool = False
 
     @property
     def is_contact(self) -> bool:
@@ -150,7 +173,8 @@ def roller_stations(path: LayPath,
             role=StationRole.FIXED if j == n_vr else StationRole.CONTACT,
             one_sided=(j != n_vr and name in one_sided)))
 
-    # Stinger side. The last name is the tension station, not a roller.
+    # Stinger side. The last station bears the tension AND bears contact
+    # (D6). It is bidirectional, so it never releases.
     names = _stinger_names(n_sr)
     for i, name in enumerate(names):
         s = i * spacing
@@ -159,8 +183,9 @@ def roller_stations(path: LayPath,
         out.append(Station(
             name=name, s_arc=s, x=x, y=y,
             radius=radius_of(name), normal=path.normal(s),
-            role=StationRole.LOAD if is_tension else StationRole.CONTACT,
-            one_sided=(not is_tension and name in one_sided)))
+            role=StationRole.CONTACT,
+            one_sided=(not is_tension and name in one_sided),
+            bears_tension=is_tension))
 
     return out
 
@@ -174,10 +199,16 @@ def fixed_station(stations: list) -> Station:
 
 
 def load_station(stations: list) -> Station:
-    """The single tension-application station."""
-    found = [s for s in stations if s.role is StationRole.LOAD]
+    """The single tension-application station.
+
+    Selected on `bears_tension`, not on `role`: since D6 the station that
+    bears the tension is also a contact slot, so a role test would find
+    nothing and `lay_tension` would silently apply no load.
+    """
+    found = [s for s in stations if s.bears_tension]
     if len(found) != 1:
-        raise ValueError(f'expected exactly one LOAD station, got {len(found)}')
+        raise ValueError(
+            f'expected exactly one tension station, got {len(found)}')
     return found[0]
 
 

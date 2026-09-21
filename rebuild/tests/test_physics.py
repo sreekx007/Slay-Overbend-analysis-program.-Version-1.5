@@ -162,7 +162,8 @@ def test_targets_match_the_closed_form_at_every_station(scene, plain):
     """The card's VERIFY clause, at R = 85."""
     targets = ct.contact_targets(plain, scene)
     assert [c.station for c in targets] == \
-        ['VR4', 'VR3', 'VR2', 'VR1', 'SR1', 'SR2', 'SR3', 'SR4', 'SR5', 'SR6']
+        ['VR4', 'VR3', 'VR2', 'VR1', 'SR1', 'SR2', 'SR3', 'SR4', 'SR5',
+         'SR6', 'SR7']
     for c in targets:
         assert c.dn == pytest.approx(
             ct.arc_target(scene.path.R, c.theta), abs=1e-12)
@@ -214,13 +215,19 @@ def test_keeping_the_old_formula_would_be_metres_wrong(scene):
 
 
 def test_only_contact_stations_get_targets(scene, plain):
-    """The FIXED anchor and the LOAD station are not contact slots. `role` is
-    what says so -- a list read through `one_sided` alone cannot tell a
-    bidirectional roller from a station that touches nothing."""
+    """The FIXED anchor is not a contact slot. `role` is what says so -- a
+    list read through `one_sided` alone cannot tell a bidirectional roller
+    from a station that touches nothing.
+
+    SR7 IS one since D6, and it is bidirectional, so it is exactly the case
+    `one_sided` cannot see: absent from that set for the opposite reason to
+    VR5.
+    """
     names = {c.station for c in ct.contact_targets(plain, scene)}
     for st in scene.stations:
         assert (st.name in names) == (st.role is StationRole.CONTACT)
-    assert 'VR5' not in names and 'SR7' not in names
+    assert 'VR5' not in names, 'the anchor bears no contact'
+    assert 'SR7' in names and not scene.by_name('SR7').one_sided
 
 
 def test_weights_interpolate_the_station_position(scene, plain):
@@ -405,7 +412,7 @@ def test_the_problem_is_complete(scene):
     assert len(p.sections) == p.n_elems
     assert len(p.connectors) == 2
     assert len(p.associations) == 4
-    assert len(p.contacts) == 10
+    assert len(p.contacts) == 11
     assert p.restraints and p.loads
     assert p.elastic_zones == scene.elastic_zones
     assert p.R == pytest.approx(85.0)

@@ -49,16 +49,12 @@ from slay.solve.passage import solve                       # noqa: E402
 TON = 9806.65                       # 1 MT of force, N
 UPLIFT_ARROW = 1.6                  # m, the 'may lift off' arrow's length
 
-# THE CEILING, measured rather than chosen: 15 MT converges and 16 MT fails
-# outright (`CUTBACK EXHAUSTED at lam=0.0000`), so panel B runs at 15. That
-# is 13% of the benchmark's 120 MT, and the gap is the staged load path --
-# the benchmark builds the deformed shape first and loads it second, while
-# `passage.solve` ramps contact targets, gravity and tension on one `lam`.
-# See section 5 of `docs/modules/T5_solve_spec.md`. Do not quietly raise this
-# to 120 to make the figure look like the benchmark: it does not converge,
-# and a plot of a non-converged state is the silent-failure signature G8
-# exists to prevent.
-TENSION_MT = 15.0
+# THE BENCHMARK'S OWN TENSION, reachable since decision D6 made the terminal
+# stinger station a contact slot. Before that it was 15 MT -- 16 gave
+# `CUTBACK EXHAUSTED at lam=0.0000` -- because 120 MT sat on the tip of a 9 m
+# free cantilever and the first Newton step was 3.2 m against a 1.0 m
+# threshold. See section 5 of `docs/modules/T5_solve_spec.md`.
+TENSION_MT = 120.0
 
 
 def world(s, y, us, uy):
@@ -221,6 +217,10 @@ def plot(cases, out):
             # goes, and a one-sided one that happens to stay loaded still
             # allows uplift. The arrow points the way the pipe may leave --
             # up the screen, which is -y.
+            if st.bears_tension:
+                ax.add_patch(Circle((st.x, st.y), st.radius * 3.2,
+                                    facecolor='none', edgecolor='#6b4ea8',
+                                    lw=1.3, ls=(0, (2, 1.6)), zorder=4))
             if st.role is StationRole.CONTACT and st.one_sided:
                 ax.annotate('', xy=(st.x, st.y - UPLIFT_ARROW),
                             xytext=(st.x, st.y - 0.35),
@@ -240,12 +240,15 @@ def plot(cases, out):
         name, off = nearest_station(sc, s_pk)
         ax.plot([kx], [ky], marker='D', ms=6.5, mfc='#c1121f',
                 mec='white', mew=1.2, zorder=7)
+        x0, x1 = ax.get_xlim()
+        left = (kx - min(x0, x1)) / abs(x1 - x0) < 0.35
+        dx, ha = (22, 'left') if left else (-18, 'right')
         where = (f'at {name}' if abs(off) < 0.05
                  else f'{abs(off):.1f} m {"past" if off > 0 else "short of"} '
                       f'{name}')
         ax.annotate(f'peak {100 * eps:.3f}%\ns = {s_pk:.1f} m, {where}',
-                    (kx, ky), textcoords='offset points', xytext=(-18, 20),
-                    ha='right', va='center', fontsize=8.5, color='#8d0801',
+                    (kx, ky), textcoords='offset points', xytext=(dx, 20),
+                    ha=ha, va='center', fontsize=8.5, color='#8d0801',
                     zorder=7,
                     bbox=dict(boxstyle='round,pad=0.32', fc='white',
                               ec='#c1121f', lw=0.9, alpha=0.93),
@@ -282,7 +285,7 @@ def plot(cases, out):
                     ('unmarked: bidirectional, held down',
                      '#6b737b', 0.0, 'none'),
                     ('FIXED station', '#111111', 1.6, '-'),
-                    ('LOAD station', '#6b4ea8', 1.6, '-'))]
+                    ('ring: bears the lay tension', '#6b4ea8', 1.3, '--'))]
     axes[0].legend(handles=handles, fontsize=8, ncol=2, loc='lower right',
                    framealpha=0.93)
     axes[-1].set_xlabel('x (m)   --   +x toward the vessel, so the stinger '
@@ -312,8 +315,8 @@ def main() -> int:
              f'(R = {R:.0f} m) -- the pipe is DRIVEN onto the arc',
              dict(one_sided=frozenset(), gravity=False)),
             (f'B. the ruled one-sided set, gravity, {TENSION_MT:.0f} MT lay '
-             f'tension (R = {R:.0f} m) -- the most tension this solver '
-             f'reaches; the benchmark is 120 MT',
+             f'tension (R = {R:.0f} m) -- the benchmark case, reachable '
+             f'since D6',
              dict(gravity=True, tension_mt=TENSION_MT)),
     ):
         print(f'\n=== {title} ===')
