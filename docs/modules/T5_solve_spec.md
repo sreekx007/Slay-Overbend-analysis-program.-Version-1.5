@@ -581,6 +581,69 @@ two signs is 12% of peak strain, and it was pointing the wrong way.
 
 ---
 
+## 5f. Plain-pipe sequential sliding — first passage run, 21 Sep 2026
+
+`tools/slide_plain.py`. Step 6 of the physics sequence
+(`docs/modules/T9_physics_sequence.md`) exercised on plain pipe before any
+component case. 406.4 × 21, 120 MT, 8 m spacing, travel **4 × OD =
+1.6256 m** in **1 × OD = 0.4064 m** steps — five positions, each continuing
+from the last.
+
+Run through the reference `run_passage_sliding`, since the rebuild has the
+per-position solver but not the sweep driver. That entry point refuses a
+plain-pipe case, so a **neutral component** — OD and wall equal to the
+pipe's — is used to pass its guard; `SEC2` is then identical to `SEC1` and
+the contact lift is exactly zero.
+
+### Result
+
+| R | pos 0 | pos 1 | pos 2 | pos 3 | pos 4 | passage peak | at |
+|---|---|---|---|---|---|---|---|
+| 70 m | **0.5269%** | 0.5192 | 0.5088 | 0.5003 | 0.4923 | **0.5269%** | SR2 |
+| 85 m | **0.3962%** | 0.3900 | 0.3815 | 0.3740 | 0.3678 | **0.3962%** | SR2 |
+| 105 m | **0.2920%** | 0.2871 | 0.2831 | 0.2793 | 0.2827 | **0.2920%** | SR2 |
+
+Peak sits at SR2 throughout, and the passage peak is at the starting
+position in all three.
+
+### The two entry points agree — a real cross-check
+
+Position 0 against `run_slay` (J2, same pipe, tension and spacing) despite
+`n_vr = 10` here against 3 there:
+
+| R | sliding, pos 0 | `run_slay` | delta |
+|---|---|---|---|
+| 70 m | 0.5269% | 0.5271% | **−0.04%** |
+| 85 m | 0.3962% | 0.3937% | **+0.6%** |
+| 105 m | 0.2920% | 0.2903% | **+0.6%** |
+
+Within 0.6% through two different entry points with different vessel-roller
+counts. That validates the neutral-component device and says the sliding
+path's starting position is the same physical case `run_slay` solves.
+
+Against the paper: +14.5 / +4.3 / −8.8%, the R-trend divergence §4 records.
+
+### Two things to carry with these numbers
+
+**The reach is 20% of a span.** 1.6256 m of a 7.99 m roller spacing. The
+pipe advances a fifth of the way from one roller toward the next, so this is
+not a full bend-unload cycle and a monotonic fall across it is not a
+minimum, let alone a maximum. The same truncation misled the first reading
+of the component sweep (L057).
+
+**R = 105 turns at the last position** — 0.2793 → 0.2827% — the only
+non-monotonic point in the set, with the peak moving one node along
+(−7.99 → −6.99). Nothing is concluded from one point, but it is the
+signature of a trend that may reverse with more travel, and it is the
+argument for extending the reach rather than for reading these as settled.
+
+**The whole-model peak is elsewhere.** At R = 85 positions 1–3 and at
+R = 105 throughout, the largest strain in the model sits at x ≈ −38, between
+SR5 and SR6 — inside the excluded tip. Both columns are reported so the
+exclusion cannot hide it.
+
+---
+
 ## 6. Known case-construction gaps
 
 Separate from the baseline question, and to be settled before any M1 number

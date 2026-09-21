@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 14
+# entries: 15
 
 - id: T001
   date: 2026-09-21
@@ -322,3 +322,33 @@
     documented offset.
   lesson: L056, L057
   refs: [slay_sliding_v0_4.py, docs/modules/T9_components_spec.md]
+
+- id: T015
+  date: 2026-09-21
+  goal: >-
+    Execute sequential sliding on PLAIN pipeline -- Step 6 of the physics
+    sequence -- before any component case.
+  action: >-
+    Built tools/slide_plain.py. Travel 4 x OD = 1.6256 m in 1 x OD =
+    0.4064 m steps, five positions each continuing from the last, through
+    the reference run_passage_sliding. Plain pipe passed its guard with a
+    NEUTRAL component (OD and wall equal to the pipe's), so SEC2 equals SEC1
+    and the contact lift is exactly zero.
+  case: 'R=70,85,105; spacing 8; T=120 MT; 406.4x21; J2'
+  outcome: success
+  evidence: >-
+    All five positions converge at all three radii. Peak at SR2 throughout;
+    passage peak at the START position in every case: 0.5269/0.3962/0.2920
+    pct at R=70/85/105, falling to 0.4923/0.3678/0.2827 by position 4.
+    Cross-check: position 0 against run_slay (J2, same case, n_vr 3 vs 10)
+    gives -0.04/+0.6/+0.6 pct -- two entry points agreeing within 0.6 pct.
+    Against the paper +14.5/+4.3/-8.8 pct, the documented R-trend
+    divergence. R=105 turns UP at the last position (0.2793 -> 0.2827) with
+    the peak moving one node along, the only non-monotonic point.
+  verdict: >-
+    Sliding works on plain pipe and its start position reproduces run_slay.
+    Reach is only 20 pct of a roller spacing, so the monotonic fall is not a
+    minimum; the R=105 turn is the argument for extending travel before
+    reading any passage trend as settled.
+  lesson: '-'
+  refs: [tools/slide_plain.py, docs/modules/T5_solve_spec.md]
