@@ -116,7 +116,36 @@ def solve(problem, state_in: SolveState = None, *,
           reg_mult: float = 0.0, n_points_polar: int = 8,
           n_fibres: int = 20, polar: bool = True,
           verbose: bool = False):
-    """Solve one lay position. Returns `(Result, state_out)`."""
+    """Solve one lay position. Returns `(Result, state_out)`.
+
+    THE LOAD SEQUENCE, written down because it has been misread once and the
+    misreading produced a wrong diagnosis (L050).
+
+        tension and gravity      FULL VALUE, from Newton iteration 1
+        contact targets          ramped by `lam`, 0 -> 1
+
+    `lam` is passed to `fe.assemble` and the kernel never applies it to
+    `dist_loads` or `joint_loads` (`nlfea_v4.py:1419-1429`); only the
+    `assemble_at` wrapper scales them and nothing here calls it. So the loads
+    are NOT ramped, and this matches the reference exactly -- both
+    `_solve_state_sliding` and `run_slay` pass their raw `dist` and `jl`
+    through in the same way. `test_assemble_does_not_scale_loads_by_lam`
+    pins that contract.
+
+    TWO CONSEQUENCES worth holding on to:
+
+      * Cutback cannot reduce a load. `dlam` shrinks the contact targets and
+        nothing else, so a divergence whose first-iteration `dU` is
+        insensitive to `dlam` is a load or a model problem. That is what
+        `CUTBACK EXHAUSTED at lam=0.0000` means here.
+      * A separate load-settling step -- converge tension and gravity with
+        the targets held at their anchors, THEN ramp -- was tried and is
+        WORSE, not better: it diverges above about 15 MT and, with the
+        divergence guard removed, runs to 1e215 and a singular kernel
+        matrix. The straight unstressed start has no geometric stiffness to
+        react a tip load, and no amount of sequencing creates one. See
+        section 5 of `docs/modules/T5_solve_spec.md`.
+    """
     chained = state_in is not None
     pen_mult = (PEN_CHAINED if chained else PEN_FIRST) \
         if pen_mult is None else pen_mult

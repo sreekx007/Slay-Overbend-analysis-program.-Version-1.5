@@ -279,6 +279,55 @@ quoting an M1 number. It was in fact the M1 blocker.
 model should end at SR6, or the tension should simply move, is a modelling
 decision that moves every number in the project. Raised as decision D6.
 
+### The staged load step was tried, and it is worse
+
+Asked to stage the sequence explicitly — tension and gravity settled first,
+then `lam` ramping the contact targets — 21 Sep 2026. Two results:
+
+**1. It is already the sequence.** `passage.solve` matches the reference
+exactly. Neither ramps loads; both ramp targets alone. Nothing to change.
+
+**2. An explicit load-settling step 0 diverges.** Holding every contact
+target at its anchor and converging tension + gravity alone, R = 85:
+
+| T | with the divergence guard | guard removed |
+|---|---|---|
+| 15 MT | converges, max\|U\| = 0.403 m | same |
+| 30 MT | trips at iteration 3 | **NaN**, kernel matrix exactly singular |
+| 60 MT | trips at iteration 1 | max\|U\| = **2e215** |
+| 120 MT | trips at iteration 1 | **NaN** |
+
+So the guard is not being over-cautious: without it the configuration runs
+away. A straight, unstressed pipe has no geometric stiffness to react a load
+at a free tip, and no amount of sequencing creates one. The sequence was
+never the problem.
+
+### The reference mesh has no tip to load — measured
+
+`run_slay` at R = 85, 120 MT: station x values run `32.0 ... -38.54`, and
+the mesh node range is `32.0 -> -38.54`. **The mesh ends exactly at the last
+stinger roller.** The tension goes on `nn`, that same last node
+(`slay_overbend_v1_50.py`, `run_slay`), which is a `radial` contact slot.
+
+Ours runs `s = -45 -> +54` (world `x = +45 -> -54`) with the last contact
+roller SR6 at `x = -42.93` and **9 m of free pipe beyond it** to SR7.
+
+That is D6, and it is now measured from both reference entry points rather
+than inferred.
+
+### Two smaller differences from `run_slay`, for the record
+
+  * **No divergence guard and no cutback.** Its Newton loop is
+    `for it in range(30)` with `U += dU` and a residual break — no
+    `|dU| > 1.0` trip, no failure path. `_solve_state_sliding` *does* carry
+    the same guard we do, so this is a difference from the plain-pipe
+    runner only.
+  * **Newton tolerance `1e-3`**, against our `1e-8`.
+
+Neither causes the divergence — the step-0 table above shows the
+configuration failing without any guard at all — but both belong in any
+like-for-like comparison.
+
 ## 5b. The pipe was not sitting on the stinger — found and FIXED, 21 Sep 2026
 
 `tools/plot_stinger.py`, `docs/diagrams/stinger_pipe.png`. The first figure
