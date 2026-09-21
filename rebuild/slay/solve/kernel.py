@@ -120,3 +120,84 @@ def assemble(model, ms, U, axis=NOMINAL_AXIS, OD=None, t_wall=None, E=None):
         K[np.ix_(d, d)] += k6
         Fint[d] += k6 @ U[d]
     return K, Fint
+
+
+# ---------------------------------------------------------------------------
+# a Problem, turned into a kernel mesh
+# ---------------------------------------------------------------------------
+#
+# T4's `Problem` is flat and serialisable on purpose -- no Model object, no
+# Scene, nothing live. That makes it the solver's real input rather than a
+# side artifact, and this is where it becomes a mesh. Sections are per
+# ELEMENT (a taper changes along its length), so distinct (OD, t) pairs are
+# pooled into kernel sections and distinct E values into kernel materials.
+
+
+def _kernel_material(mid: int, material, E: float):
+    """A slay material at modulus `E`, as the kernel wants it.
+
+    `E` comes from the SECTION, not the material: a `stiffness_ratio` scales
+    the modulus on the same section, so two elements can share a material
+    model and differ in E. The kernel's elastic `Material` carries E
+    directly; the inelastic ones carry their own and are scaled by rebuilding
+    them at the scaled modulus rather than by scaling their stress table,
+    which would change the yield point instead of the stiffness.
+    """
+    from slay.data.materials import J2Material, RambergOsgoodMaterial
+    if material is None:
+        return fe.Material(mid, E)
+    if isinstance(material, RambergOsgoodMaterial):
+        return fe.RambergOsgood(
+            id=mid, E=E, sig_y=material.sig_ys,
+            alpha=material.alpha_dnv, n=material.n_ro)
+    if isinstance(material, J2Material):
+        return fe.IncrementalIsotropic(
+            id=mid, E=E, sigma_y0=material.sigma_y0, H=0.0,
+            eps_p_table=np.asarray(material.plastic_strain, float),
+            sigma_y_table=np.asarray(material.yield_stress, float))
+    raise TypeError(f'unknown material type {type(material).__name__}')
+
+
+def mesh_of_problem(problem, n_points_polar: int = 8, n_fibres: int = 20,
+                    polar: bool = True):
+    """(MeshedStructure, beams, element-index -> kernel element id).
+
+    `polar` selects the B31-equivalent angular integration the reference runs
+    use by default; `fibre` is the converged Cartesian scheme. They are not
+    interchangeable and the choice changes the answer in deep plasticity, so
+    it is an argument rather than a constant.
+    """
+    secs = {s.index: s for s in problem.sections}
+    sec_key, mat_key = {}, {}
+    sections, materials = [], []
+    for s in problem.sections:
+        k = (round(s.OD, 12), round(s.t, 12))
+        if k not in sec_key:
+            sec_key[k] = len(sections) + 1
+            sections.append(
+                fe.PipeSectionPolar(sec_key[k], s.OD, s.t, n_points_polar)
+                if polar else fe.PipeSection(sec_key[k], s.OD, s.t, n_fibres))
+        e = round(s.E, 6)
+        if e not in mat_key:
+            mat_key[e] = len(materials) + 1
+            materials.append(_kernel_material(mat_key[e], problem.material,
+                                              s.E))
+
+    elems, index_of = [], {}
+    for (idx, n1, n2, _owner, _line) in problem.elements:
+        s = secs[idx]
+        eid = len(elems)
+        index_of[idx] = eid
+        elems.append(fe.UserElement(eid, n1, n2,
+                                    mat_key[round(s.E, 6)],
+                                    sec_key[(round(s.OD, 12),
+                                             round(s.t, 12))], seed=1))
+    mdl = fe.Model(
+        nodes=[fe.Node(i, s, y) for (i, s, y) in problem.nodes],
+        elements=elems, sections=sections, materials=materials)
+    ms = fe.MeshedStructure(mdl)
+    if ms.n_nodes != problem.n_nodes:
+        raise AssertionError(
+            f'the kernel altered the model: {problem.n_nodes} nodes in, '
+            f'{ms.n_nodes} out (G6, L001)')
+    return ms, mdl, index_of

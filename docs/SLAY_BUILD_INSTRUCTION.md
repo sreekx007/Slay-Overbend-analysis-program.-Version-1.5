@@ -176,7 +176,7 @@ then thickened in a second pass.
 | T2 | L3 | stinger arc, roller stations, deck | — | ✅ 12 Sep 2026 · `docs/modules/T2_scene_spec.md` |
 | T3 | L4 | header polyline, junction merge, global numbering | — | ✅ 14 Sep 2026 — stages 1–3. `slay/model/{parts,assemble}.py`; the solve machinery in `slay/physics/connector.py` and `slay/solve/`. All 7 archetypes assemble; Group A and Group B both solve through the package, reproducing 9 measured figures. `SUPPORTED_CONN_TYPES` = {F, W, P}. Stage 4 (`S`/`D`) waits on the co-rotating frame. D2 answered — no `MeshTopology` |
 | T4 | L5 | sections, contact targets, loads, BCs, `Problem` | — | ✅ 15 Sep 2026 — `slay/physics/{sections,contact,loads,problem}.py`, 31 tests. `docs/modules/T4_physics_spec.md`. DONE WHEN (`differs_only_in_contact`) passing on plain pipe and 5 archetypes. 4 open items recorded, none defaulted |
-| T5 | L6 | `solve()` — Newton + active set + increments | **M1** | |
+| T5 | L6 | `solve()` — Newton + active set + increments | **M1** | ⚠️ 21 Sep 2026 — solver BUILT (`slay/solve/{contact,passage}.py`, 14 tests); **M1 BLOCKED**, its baseline does not reproduce from the reference code. `docs/modules/T5_solve_spec.md` §4, decision D5 |
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
 | T7 | L8 | strains, peaks, DNV check, plots, IO | — | |
 | T8 | Entry | `spec.py`, `run()`, CLI | — | |

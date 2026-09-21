@@ -75,3 +75,63 @@ def condition_number(K, rows, dof_of, fixed=(), alpha=ALPHA):
     apply_constraints(Kp, R, np.zeros(Kp.shape[0]), rows, dof_of, alpha)
     apply_fixed(Kp, R, np.zeros(Kp.shape[0]), list(fixed), alpha)
     return np.linalg.cond(Kp)
+
+
+# ---------------------------------------------------------------------------
+# general linear constraints -- what a contact slot needs
+# ---------------------------------------------------------------------------
+#
+# A connector tie is one DOF against another, same component. A CONTACT slot
+# is not: it constrains the NORMAL component of a displacement interpolated
+# between two nodes, so it spans four DOF with mixed components and mixed
+# signs,
+#
+#     sum_k c_k U[d_k] = target,    c = (w_lo*nx, w_lo*ny, w_hi*nx, w_hi*ny)
+#
+# and only that combination. The tangential direction is left free, which is
+# the whole point: a material point slides 2.07 m over the rollers by SR6
+# (R = 85), and a uy-only constraint fights that slide -- measured at ~2.4%
+# spurious strain concentration against ~0.29% pure-arc bending.
+#
+# THE PENALTY SCALE IS GLOBAL HERE, not local-diagonal. "The local diagonal"
+# has no single meaning for a constraint spanning four DOF of two different
+# components; the validated formulation scales one `pen` off K's global
+# maximum and the release threshold below is calibrated against it. Connector
+# ties keep the local scaling measured in this module's docstring -- the two
+# are different constraints, not an inconsistency.
+
+
+def global_penalty(K, mult: float) -> float:
+    """`max(diag(K)) * mult` -- the validated contact scaling."""
+    return float(K.diagonal().max() if hasattr(K, 'diagonal')
+                 else np.max(np.diag(K))) * mult
+
+
+def apply_linear(K, R, U, dofs, coeffs, target, pen) -> float:
+    """Add `pen` * (c.U - target)^2 / 2 as a rank-1 outer product.
+
+    Returns the scalar residual `r = target - c.U`, which is what the active
+    set reads: `pen * r` is the constraint force, and its SIGN is push versus
+    pull. At convergence `r` itself is ~1e-10 m -- far too small for a gap
+    threshold to mean anything, and the reason release is reaction-based.
+    """
+    r = target - float(sum(c * U[d] for c, d in zip(coeffs, dofs)))
+    for j, (dj, cj) in enumerate(zip(dofs, coeffs)):
+        if cj == 0.0:
+            continue
+        R[dj] += pen * cj * r
+        for dk, ck in zip(dofs, coeffs):
+            if ck != 0.0:
+                K[dj, dk] += pen * cj * ck
+    return r
+
+
+def regularise(K, mult: float, scale: float) -> None:
+    """Add `mult * scale` to every diagonal. The validated stabiliser --
+    retained, off by default, and applied to the WHOLE diagonal rather than
+    to the constrained rows, which is what makes it a regulariser rather than
+    a second penalty."""
+    if mult <= 0.0:
+        return
+    n = K.shape[0]
+    K[range(n), range(n)] += mult * scale
