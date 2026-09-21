@@ -49,6 +49,17 @@ from slay.solve.passage import solve                       # noqa: E402
 TON = 9806.65                       # 1 MT of force, N
 UPLIFT_ARROW = 1.6                  # m, the 'may lift off' arrow's length
 
+# THE CEILING, measured rather than chosen: 15 MT converges and 16 MT fails
+# outright (`CUTBACK EXHAUSTED at lam=0.0000`), so panel B runs at 15. That
+# is 13% of the benchmark's 120 MT, and the gap is the staged load path --
+# the benchmark builds the deformed shape first and loads it second, while
+# `passage.solve` ramps contact targets, gravity and tension on one `lam`.
+# See section 5 of `docs/modules/T5_solve_spec.md`. Do not quietly raise this
+# to 120 to make the figure look like the benchmark: it does not converge,
+# and a plot of a non-converged state is the silent-failure signature G8
+# exists to prevent.
+TENSION_MT = 15.0
+
 
 def world(s, y, us, uy):
     """Model (s, y) + displacement -> world (x, y). See the module docstring."""
@@ -96,6 +107,34 @@ def undeformed_xy(m):
             np.array([at[i].y for i in ids]))
 
 
+def peak_on_pipe(m, ms, U, r, s_min=None):
+    """(x, y, s, eps) of the worst element, placed on the SOLVED pipe.
+
+    `Result.strains` carries `s_mid` -- a MATERIAL coordinate -- so the mark
+    has to be interpolated onto the deformed shape rather than dropped at the
+    undeformed station. The pipe slides metres over the rollers; a mark
+    placed by undeformed `s` would sit next to the pipe, not on it.
+    """
+    s_pk, eps = r.peak_strain(s_min=s_min)
+    at = {n.index: n for n in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    k = max(0, min(len(ids) - 2,
+                   next((j for j in range(len(ids) - 1)
+                         if at[ids[j + 1]].s >= s_pk), len(ids) - 2)))
+    a, b = ids[k], ids[k + 1]
+    span = at[b].s - at[a].s
+    w = 0.0 if span <= 0 else (s_pk - at[a].s) / span
+    xa, ya = world(at[a].s, at[a].y, U[dof(ms, a, 0)], U[dof(ms, a, 1)])
+    xb, yb = world(at[b].s, at[b].y, U[dof(ms, b, 0)], U[dof(ms, b, 1)])
+    return (xa + w * (xb - xa), ya + w * (yb - ya), s_pk, eps)
+
+
+def nearest_station(sc, s_pk):
+    st = min(sc.stations, key=lambda t: abs(t.s_arc - s_pk))
+    return st.name, s_pk - st.s_arc
+
+
 def report(sc, p, r, slots, ms):
     """The numbers behind the picture -- printed, because a plot cannot be
     checked by eye and the question being asked is whether it is right."""
@@ -114,6 +153,10 @@ def report(sc, p, r, slots, ms):
             print(f'  {st.name:>8}{st.role.value:>9}'
                   f'{"":>9}{"":>11}{"":>11}{"":>11}{"":>8}')
     arc_table(sc, p, r, ms)
+    s_pk, eps = r.peak_strain()
+    name, off = nearest_station(sc, s_pk)
+    print(f'\n  peak strain {100 * eps:.4f}% at s = {s_pk:.2f} m '
+          f'({name}{off:+.2f} m)')
 
 
 def arc_table(sc, p, r, ms):
@@ -189,6 +232,26 @@ def plot(cases, out):
         ax.plot(px, py, color='#1f7a8c', lw=2.4, zorder=5,
                 label='pipe, SOLVED')
 
+        # THE PEAK, placed on the deformed pipe and labelled with the
+        # station it falls nearest. The offset is printed because the peak
+        # is an ELEMENT midpoint and rarely lands on a station exactly;
+        # rounding it to the station name alone would invent a coincidence.
+        kx, ky, s_pk, eps = peak_on_pipe(m, ms, r.U, r)
+        name, off = nearest_station(sc, s_pk)
+        ax.plot([kx], [ky], marker='D', ms=6.5, mfc='#c1121f',
+                mec='white', mew=1.2, zorder=7)
+        where = (f'at {name}' if abs(off) < 0.05
+                 else f'{abs(off):.1f} m {"past" if off > 0 else "short of"} '
+                      f'{name}')
+        ax.annotate(f'peak {100 * eps:.3f}%\ns = {s_pk:.1f} m, {where}',
+                    (kx, ky), textcoords='offset points', xytext=(-18, 20),
+                    ha='right', va='center', fontsize=8.5, color='#8d0801',
+                    zorder=7,
+                    bbox=dict(boxstyle='round,pad=0.32', fc='white',
+                              ec='#c1121f', lw=0.9, alpha=0.93),
+                    arrowprops=dict(arrowstyle='-', color='#c1121f',
+                                    lw=0.9, shrinkA=0, shrinkB=3))
+
         ax.set_aspect('equal')
         ax.invert_yaxis()
         # HEADROOM FOR THE UPLIFT ARROWS. The deck rollers sit at y = 0, so
@@ -203,19 +266,25 @@ def plot(cases, out):
         ax.set_ylabel('y (m), down')
         ax.set_title(title, fontsize=10, loc='left')
 
-    axes[0].legend(handles=[
-        plt.Line2D([], [], color=c, lw=lw, ls=ls, label=lb)
-        for lb, c, lw, ls in (
-            ('pipe, SOLVED', '#1f7a8c', 2.4, '-'),
-            ('pipe, undeformed', '#d7dde3', 2.0, '-'),
-            ('roller-centreline locus', '#b9c2cb', 1.0, '--'),
-            ('roller, in contact', '#2f6f3e', 1.6, '-'),
-            ('roller, lifted off', '#b44d12', 1.6, '-'),
-            ('arrow: one-sided, may lift off', '#6b737b', 1.1, '-'),
-            ('unmarked: bidirectional, held down', '#6b737b', 0.0, 'none'),
-            ('FIXED station', '#111111', 1.6, '-'),
-            ('LOAD station', '#6b4ea8', 1.6, '-'))],
-        fontsize=8, ncol=2, loc='lower right', framealpha=0.93)
+    handles = [plt.Line2D([], [], color=c, lw=lw, ls=ls, label=lb)
+               for lb, c, lw, ls in (
+                   ('pipe, SOLVED', '#1f7a8c', 2.4, '-'),
+                   ('pipe, undeformed', '#d7dde3', 2.0, '-'),
+                   ('roller-centreline locus', '#b9c2cb', 1.0, '--'),
+                   ('roller, in contact', '#2f6f3e', 1.6, '-'),
+                   ('roller, lifted off', '#b44d12', 1.6, '-'))]
+    handles.append(plt.Line2D([], [], ls='none', marker='D', ms=6.5,
+                              mfc='#c1121f', mec='white', mew=1.2,
+                              label='peak strain'))
+    handles += [plt.Line2D([], [], color=c, lw=lw, ls=ls, label=lb)
+                for lb, c, lw, ls in (
+                    ('arrow: one-sided, may lift off', '#6b737b', 1.1, '-'),
+                    ('unmarked: bidirectional, held down',
+                     '#6b737b', 0.0, 'none'),
+                    ('FIXED station', '#111111', 1.6, '-'),
+                    ('LOAD station', '#6b4ea8', 1.6, '-'))]
+    axes[0].legend(handles=handles, fontsize=8, ncol=2, loc='lower right',
+                   framealpha=0.93)
     axes[-1].set_xlabel('x (m)   --   +x toward the vessel, so the stinger '
                         'is on the LEFT (starboard view, no flip)')
 
@@ -242,9 +311,10 @@ def main() -> int:
             (f'A. every roller bidirectional, no gravity, no tension '
              f'(R = {R:.0f} m) -- the pipe is DRIVEN onto the arc',
              dict(one_sided=frozenset(), gravity=False)),
-            (f'B. the ruled one-sided set, gravity, no tension '
-             f'(R = {R:.0f} m) -- nothing holds the pipe down',
-             dict(gravity=True)),
+            (f'B. the ruled one-sided set, gravity, {TENSION_MT:.0f} MT lay '
+             f'tension (R = {R:.0f} m) -- the most tension this solver '
+             f'reaches; the benchmark is 120 MT',
+             dict(gravity=True, tension_mt=TENSION_MT)),
     ):
         print(f'\n=== {title} ===')
         c = case(R=R, **kw)

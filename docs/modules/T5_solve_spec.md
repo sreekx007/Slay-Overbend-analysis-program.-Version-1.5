@@ -177,11 +177,24 @@ tracker. It was evidence about the config.
 | 85 m | 0.38% | — | **CUTBACK EXHAUSTED**, 0 increments |
 | 105 m | 0.32% | — | **CUTBACK EXHAUSTED**, 0 increments |
 
-It fails on the **first increment**, at **30 MT** as readily as at 120. It
-reports the failure rather than returning 0.0 silently, which is the one
-thing the documented failure signature demands.
+It fails on the **first increment**, and it reports the failure rather than
+returning 0.0 silently, which is the one thing the documented failure
+signature demands.
 
-What does converge, at R = 85: no gravity and no tension (the pure-arc case),
+**The ceiling is between 15 and 16 MT** (R = 85, gravity, bisected
+21 Sep 2026): 15 MT converges, 16 MT gives `CUTBACK EXHAUSTED at
+lam=0.0000`. That is **13% of the benchmark's 120 MT**, and the cliff is
+sharp rather than a gradual loss of robustness — consistent with the load
+path being wrong rather than the solver being fragile.
+
+What the 15 MT case buys is worth recording, because it points the same way:
+SR5 re-engages (6 of 10 rollers carry, against 5 at zero tension) and every
+engaged station's arc miss collapses to **millimetres** — SR2 through SR5
+land within 1.2 mm of their own arc point, against 0.39 m at SR5 with no
+tension. Tension is doing exactly what the benchmark applies it for; there is
+simply not enough of it.
+
+What else converges at R = 85: no gravity and no tension (the pure-arc case),
 and gravity alone.
 
 | R | rebuild, gravity only | analytical `D/2R` | over | rollers active |
