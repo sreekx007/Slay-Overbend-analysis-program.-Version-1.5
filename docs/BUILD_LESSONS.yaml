@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 55
+# entries: 57
 
 - id: L001
   area: kernel
@@ -1110,4 +1110,49 @@
     combination.
   detect: '-'
   refs: [docs/modules/T9_components_spec.md, docs/SLAY_BUILD_INSTRUCTION.md]
+  date: 2026-09-21
+
+- id: L056
+  area: solve
+  class: finding
+  symptom: >-
+    Sweeping the sliding passage BACKWARDS (negative shift) returns status
+    'ok' with a 6.3-6.8 pct peak at x=-42.01, beyond SR6 in the free-tip
+    region. The same shift=0 reads 0.5715 pct from a cold start and 6.3032
+    pct after one backward step.
+  cause: >-
+    p = bn - shift, so a negative shift moves the roller's target toward the
+    stinger and the model into a configuration it cannot reach. The sweep
+    carries state forward and only breaks on status != 'ok', which never
+    trips, so one bad step contaminates every later one. Step 0 also gets
+    n_increments_step0=40 and pen_step0=1e8 against 20 and 1e4 later, so a
+    backward first step is solved with the loose settings too.
+  rule: >-
+    The sliding sweep is FORWARD ONLY and must start from a cold state. A
+    peak reported outside the roller span is the signature to check: the
+    free tip is where a corrupted state shows first. Status 'ok' is not
+    evidence -- G8 -- and a stateful sweep needs a per-step sanity bound on
+    WHERE the peak is, not just whether it converged.
+  detect: '-'
+  refs: [slay_sliding_v0_4.py, docs/modules/T9_components_spec.md]
+  date: 2026-09-21
+
+- id: L057
+  area: measure
+  class: finding
+  symptom: >-
+    Series 3 thick-pipe cases peak at SR2 (x=-7.98) at EVERY shift, and the
+    peak falls monotonically with shift: 0.5715/0.5530/0.5273/0.5168/0.5074
+    pct over shifts 0-4 (A3, R=85, 100 MT).
+  cause: >-
+    The default placement puts the component's stinger-side edge exactly on
+    SR2 (ref_centre_x = x_sr2 + L_comp/2), and SR2 is where the Phase 1 peak
+    lives. Advancing the pipe moves the component away from it.
+  rule: >-
+    For Series 3 the governing case is the START position, shift 0, so these
+    cases need no sweep and are reachable before T6 exists. Do not assume a
+    sweep is required because the reference program offers one; run the
+    schedule once and look at where the peak moves.
+  detect: '-'
+  refs: [docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
   date: 2026-09-21

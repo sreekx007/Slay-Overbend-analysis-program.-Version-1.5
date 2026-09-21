@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 13
+# entries: 14
 
 - id: T001
   date: 2026-09-21
@@ -289,3 +289,33 @@
     the combination are gated on T6's sweep.
   lesson: L054, L055
   refs: [docs/modules/T9_components_spec.md, rebuild/component_spec.py]
+
+- id: T014
+  date: 2026-09-21
+  goal: >-
+    Get the sliding-contact method from the original program: where a
+    component starts and how far it sweeps.
+  action: >-
+    Read run_passage_sliding's placement and shift rules, then ran it
+    directly -- forward sweep, backward sweep, and the paper's nine Series 3
+    cases at shift 0.
+  case: 'R=70,85,100; spacing 8; T=100 MT; thick component 32/42/53 mm x 1.000 m'
+  outcome: measurement
+  evidence: >-
+    Placement ref_centre_x = x_sr2 + L_comp/2, so the stinger-side edge
+    starts on SR2 (measured -7.4882 against x_sr2 -7.99). Shifts are in
+    ELEMENT units; elem_len_sr2 = |x_sr2-x_sr1|/epe with epe = round(spacing
+    / 2OD) = 10, giving 0.7988 m per unit; default 5 steps to 3.195 m.
+    Ceiling p >= 2.0, ~one roller spacing regardless of n_vr. Peak sits at
+    SR2 at every shift and FALLS monotonically 0.5715 -> 0.5074 pct, so
+    shift 0 governs. Negative shifts return status 'ok' with 6.3-6.8 pct at
+    x=-42.01 and contaminate later steps. Nine-case reference matrix
+    recorded: within 6 pct of the paper at R=85 and R=100, +19 to +26 pct
+    at R=70 -- the same R-trend divergence T5 section 4 documents for plain
+    pipe.
+  verdict: >-
+    Series 3 needs no sweep; the start position governs. The rebuild's
+    target is the original's column, with the paper as a secondary
+    comparison carrying a documented offset.
+  lesson: L056, L057
+  refs: [slay_sliding_v0_4.py, docs/modules/T9_components_spec.md]
