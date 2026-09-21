@@ -47,6 +47,7 @@ from slay.solve.kernel import dof, mesh_of_problem         # noqa: E402
 from slay.solve.passage import solve                       # noqa: E402
 
 TON = 9806.65                       # 1 MT of force, N
+UPLIFT_ARROW = 1.6                  # m, the 'may lift off' arrow's length
 
 
 def world(s, y, us, uy):
@@ -170,6 +171,19 @@ def plot(cases, out):
                                 edgecolor=col, lw=1.6, zorder=4))
             ax.annotate(st.name, (st.x, st.y), textcoords='offset points',
                         xytext=(0, -14), ha='center', fontsize=7, color=col)
+            # ONE-SIDED = the roller may only PUSH, so the pipe is free to
+            # lift off it. That is a property of the ROLLER, fixed before the
+            # solve; the colour above is the solved STATE. Keep them apart:
+            # a bidirectional roller never lifts however tensile its reaction
+            # goes, and a one-sided one that happens to stay loaded still
+            # allows uplift. The arrow points the way the pipe may leave --
+            # up the screen, which is -y.
+            if st.role is StationRole.CONTACT and st.one_sided:
+                ax.annotate('', xy=(st.x, st.y - UPLIFT_ARROW),
+                            xytext=(st.x, st.y - 0.35),
+                            arrowprops=dict(arrowstyle='-|>', lw=1.1,
+                                            color=col, shrinkA=0, shrinkB=0),
+                            zorder=4)
 
         px, py, _ids = pipe_xy(m, ms, r.U)
         ax.plot(px, py, color='#1f7a8c', lw=2.4, zorder=5,
@@ -177,6 +191,14 @@ def plot(cases, out):
 
         ax.set_aspect('equal')
         ax.invert_yaxis()
+        # HEADROOM FOR THE UPLIFT ARROWS. The deck rollers sit at y = 0, so
+        # on the default limits their arrows fall off the top of the axes --
+        # and those are exactly the ones the reader needs, because SR1, VR1
+        # and VR2 are where panel B lifts off. An annotation that is clipped
+        # is an annotation that is not there.
+        lo = min(list(ly) + list(py) + [s_.y for s_ in sc.stations])
+        hi = max(list(ly) + list(py) + [s_.y for s_ in sc.stations])
+        ax.set_ylim(hi + 1.5, lo - (UPLIFT_ARROW + 1.2))
         ax.grid(alpha=0.2)
         ax.set_ylabel('y (m), down')
         ax.set_title(title, fontsize=10, loc='left')
@@ -189,6 +211,8 @@ def plot(cases, out):
             ('roller-centreline locus', '#b9c2cb', 1.0, '--'),
             ('roller, in contact', '#2f6f3e', 1.6, '-'),
             ('roller, lifted off', '#b44d12', 1.6, '-'),
+            ('arrow: one-sided, may lift off', '#6b737b', 1.1, '-'),
+            ('unmarked: bidirectional, held down', '#6b737b', 0.0, 'none'),
             ('FIXED station', '#111111', 1.6, '-'),
             ('LOAD station', '#6b4ea8', 1.6, '-'))],
         fontsize=8, ncol=2, loc='lower right', framealpha=0.93)
@@ -196,8 +220,10 @@ def plot(cases, out):
                         'is on the LEFT (starboard view, no flip)')
 
     fig.suptitle('Pipeline on the stinger. Every pipe coordinate is a SOLVED '
-                 'displacement, never interpolated onto the arc '
-                 '(tracker item 27).', fontsize=11)
+                 'displacement, never interpolated onto the arc (tracker '
+                 'item 27).\nColour is the SOLVED state (in contact / lifted '
+                 'off); the arrow is the ROLLER, marking the ones that allow '
+                 'uplift.', fontsize=11)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
     print(f'\nwrote {Path(out).relative_to(REPO)}')
