@@ -1,0 +1,263 @@
+# SLAY Overbend -- trial log
+# MACHINE REFERENCE. Terse by design. Not prose; do not expand.
+#
+# Purpose: BUILD_LESSONS.yaml records what was LEARNED. This records what was
+# TRIED, in order, including the attempts that failed -- so a later session
+# does not re-run a dead end, and so every number that ended up in a spec can
+# be traced to the trial that produced it.
+#
+# A FAILED trial is as valuable as a successful one and is never deleted.
+#
+# schema:
+#   id         T###                     stable, never reused
+#   date       when run
+#   goal       what the trial was trying to settle
+#   action     what was actually done (the change or the measurement)
+#   case       the configuration, where one applies ('-' if not a solve)
+#   outcome    success|failure|partial|measurement
+#   evidence   numbers observed. NUMBERS, not adjectives
+#   verdict    what it settled, one line
+#   lesson     BUILD_LESSONS id(s) it produced ('-' = none)
+#   refs       files carrying the change or the evidence
+#
+# version: 1
+# entries: 12
+
+- id: T001
+  date: 2026-09-21
+  goal: Settle whether config.ROLLER_SPACING 8.0 m matches the benchmark.
+  action: >-
+    Read the source paper. Benchmark is Abaqus, 406x21, 300 mm rollers,
+    2xOD mesh, 120 MT, 9 m roller spacing. Changed spacing_m 8.0 -> 9.0 and
+    re-measured tracker item 16's published node-offset figures.
+  case: 'R=85; spacing 8.0 -> 9.0'
+  outcome: success
+  evidence: >-
+    Item 16 quotes 2.07 m and 3.04 m; at 9 m these reproduce as 2.0728 and
+    3.0361. At 8 m they read 1.460 and 2.142. A prior session had recorded
+    the mismatch and explained it away as a tracker quirk.
+  verdict: Config was wrong, not the tracker. Benchmark spacing is 9 m.
+  lesson: '-'
+  refs: [rebuild/slay_config.yaml, docs/modules/T5_solve_spec.md]
+
+- id: T002
+  date: 2026-09-21
+  goal: Explain the repo 6 plain-pipe row, which matches neither paper nor code.
+  action: >-
+    Hypothesised the benchmark was a 22 in pipe. Ratio evidence
+    1.371/1.362/1.346 vs 22/16 = 1.375; a 22 in run reproduced R=70 to 0.3 pct.
+  case: 'R=70,85,105; OD 0.5588 vs 0.4064'
+  outcome: failure
+  evidence: >-
+    Hypothesis is WRONG. The paper states 406 mm explicitly. A near-constant
+    ratio across three radii was suggestive and proved nothing.
+  verdict: Dead end. Do not re-open on ratio evidence alone.
+  lesson: L043
+  refs: [docs/modules/T5_solve_spec.md]
+
+- id: T003
+  date: 2026-09-21
+  goal: >-
+    Draw the SOLVED pipe on the stinger for the first time and check it sits
+    where arc-length node positioning says it must.
+  action: >-
+    Built tools/plot_stinger.py. Every coordinate a solved displacement,
+    none interpolated onto the arc (tracker item 27). Measured, per station,
+    the distance from the material point at arc s to path.position(s).
+  case: 'R=85; spacing 9; all rollers bidirectional; no gravity; no tension'
+  outcome: measurement
+  evidence: >-
+    Every contact target met to 1e-13 m, and the material point that should
+    sit at SR6 was 5.1797 m from its own arc point. Misses grew monotonically
+    down the stinger: SR3 0.0599, SR4 0.3364, SR5 1.3230, SR6 5.1797.
+  verdict: >-
+    A converged residual on a partial constraint is evidence about the
+    constrained direction only. The arc position is the independent check.
+  lesson: L047
+  refs: [tools/plot_stinger.py, docs/diagrams/stinger_pipe.png]
+
+- id: T004
+  date: 2026-09-21
+  goal: Find the cause of T003's miss.
+  action: >-
+    Traced the contact normal. path.normal returns a WORLD vector;
+    contact_targets handed it to the solver as coefficients on MODEL DOFs
+    (u_s, u_y), so the s component had the wrong sign. Added
+    physics.frame.to_model_frame as the single conversion point.
+  case: 'as T003'
+  outcome: success
+  evidence: >-
+    Arc miss at SR6 5.1797 -> 0.0023 m (9 m); 2.212 -> 0.0027 m (8 m fixture).
+    Gravity-only peak strain at R=70/85/105 went 0.2617/0.2704/0.2428 ->
+    0.3365/0.2751/0.2099 pct, i.e. it now FALLS with stinger radius as D/2R
+    requires. dn is invariant under the error, which is why every prior check
+    passed.
+  verdict: Defect fixed. A formula ported across a frame change did not survive the port.
+  lesson: L048
+  refs: [rebuild/slay/physics/frame.py, rebuild/slay/physics/contact.py]
+
+- id: T005
+  date: 2026-09-21
+  goal: Check whether any other world vector crosses into model DOFs.
+  action: >-
+    Grepped path.tangent and path.normal below the scene layer. Two sites;
+    only one had been converted. lay_tension used the world tangent as a
+    model-frame (fx, fy). Routed it through to_model_frame.
+  case: 'R=85; spacing 9; gravity; T=10 MT'
+  outcome: success
+  evidence: >-
+    As built, deck axial strain -9.683e-06 = 5.27 MT COMPRESSION. Converted,
+    +1.698e-05 = 9.25 MT tension. Peak strain at 10 MT 0.2595 -> 0.2904 pct.
+    The existing test asserted fx == T*tx against the same world tangent, so
+    it restated the implementation and ratified the defect.
+  verdict: >-
+    Second site of the same defect. A test that restates the implementation
+    cannot fail with it.
+  lesson: L049
+  refs: [rebuild/slay/physics/loads.py, rebuild/tests/test_physics.py]
+
+- id: T006
+  date: 2026-09-21
+  goal: Explain CUTBACK EXHAUSTED at lam=0.0000 on every tension case.
+  action: >-
+    Read nlfea_v4.assemble. It accepts lam and never applies it to
+    dist_loads or joint_loads; only the assemble_at wrapper scales them and
+    no solver calls it. Measured first-iteration max|dU| against dlam.
+  case: 'R=85; spacing 9; gravity; T=120 MT'
+  outcome: measurement
+  evidence: >-
+    max|dU| 3.674 m at lam=1/40 and 3.232 m at lam=1/2560, threshold 1.0 m.
+    A 64x cutback moved it 12 pct. Both passage.solve and the reference
+    _solve_state_sliding and run_slay pass raw loads through: gravity and
+    tension are at FULL value on Newton iteration 1 in all three.
+  verdict: >-
+    Cutback cannot reduce a load lam does not scale. The earlier
+    staged-load-path diagnosis in spec 5 was WRONG and is marked so.
+  lesson: L050
+  refs: [nlfea_v4.py, rebuild/tests/test_passage.py]
+
+- id: T007
+  date: 2026-09-21
+  goal: Find what the reference does differently, given the sequence matches.
+  action: >-
+    Measured the reference's mesh extent and tension node from both entry
+    points. Then moved our tension from SR7 to SR6 with nothing else changed.
+  case: 'R=70,85,105; spacing 9; gravity; T=120 MT'
+  outcome: success
+  evidence: >-
+    run_slay stations run 32.0 ... -38.54 and mesh nodes 32.0 -> -38.54: the
+    mesh ENDS at the last stinger roller and the tension goes on that node,
+    which is a contact slot. Ours ran 9 m past SR6 to a free SR7. Tension at
+    SR6 converged at 120 MT: 0.5467/0.3985/0.2845 pct vs run_slay 0.5274/
+    0.3882/0.2790.
+  verdict: >-
+    The M1 blocker is the free tip, not the load sequence. Raised as D6
+    rather than changed unilaterally.
+  lesson: L051
+  refs: [slay_sliding_v0_4.py, slay_overbend_v1_50.py]
+
+- id: T008
+  date: 2026-09-21
+  goal: Confirm the reference programs are runnable in this repo.
+  action: Imported and ran both reference entry points.
+  case: 'R=70,85,105; spacing 8 (SO.SPACING); T=120 MT'
+  outcome: measurement
+  evidence: >-
+    slay_overbend_v1_50.run_slay runs plain pipe. RO 0.5274/0.3882/0.2790,
+    J2 0.5271/0.3937/0.2903, peak at x=-8.38, span SR2-SR3.
+    slay_sliding_v0_4.run_passage_sliding REFUSES plain pipe -- it raises
+    'need shroud_component and/or thick_component'. run_slay has no
+    divergence guard and no cutback; Newton tolerance 1e-3 vs our 1e-8.
+  verdict: >-
+    All files present. Plain-pipe reference is run_slay only; the sliding
+    reference has no plain-pipe numbers to compare against.
+  lesson: '-'
+  refs: [slay_overbend_v1_50.py, slay_sliding_v0_4.py]
+
+- id: T009
+  date: 2026-09-21
+  goal: Test an explicit load-settling step 0 before ramping contact targets.
+  action: >-
+    Held every contact target at its anchor and converged tension + gravity
+    alone, with and without the divergence guard.
+  case: 'R=85; spacing 9; gravity; T=15,30,60,120 MT'
+  outcome: failure
+  evidence: >-
+    15 MT converges, max|U| 0.403 m. 30 MT trips at iteration 3; with the
+    guard removed, NaN and an exactly singular kernel matrix. 60 MT trips at
+    iteration 1; guard removed, max|U| 2e215. 120 MT NaN.
+  verdict: >-
+    Sequencing alone does not help. The guard is not over-cautious; the
+    configuration runs away without it. A straight unstressed pipe has no
+    geometric stiffness to react a tip load.
+  lesson: '-'
+  refs: [docs/modules/T5_solve_spec.md]
+
+- id: T010
+  date: 2026-09-21
+  goal: 'D6 option B: make the terminal station a permanently active contact slot.'
+  action: >-
+    SR7 role CONTACT, one_sided False, new Station.bears_tension attribute
+    orthogonal to role; load_station selects on the attribute. 12 tests
+    restated.
+  case: 'R=70,85,105; spacing 8 and 9; gravity; T=120 MT'
+  outcome: partial
+  evidence: >-
+    120 MT converges at every radius, first time in the project. Does NOT
+    reproduce: at 8 m ours 0.6390/0.4571/0.3216 vs run_slay 0.5274/0.3882/
+    0.2790, +15 to +21 pct, and the peak displaced to SR6 from the
+    reference's SR2-SR3 span. Cause: run_slay at n_sr=6 builds SIX stinger
+    stations, ours builds SEVEN, and the extra one bends the pipe further
+    round than the reference does.
+  verdict: Divergence removed; station-count difference exposed underneath.
+  lesson: L052
+  refs: [rebuild/slay/scene/rollers.py, docs/modules/T5_solve_spec.md]
+
+- id: T011
+  date: 2026-09-21
+  goal: >-
+    Staged four-step sequence with SR7's contact REMOVED in step 3
+    (first specification).
+  action: >-
+    Steps: displacements elastic; gravity elastic; tension at SR7 with SR7's
+    contact dropped; J2. Then isolated the release from the tension, and
+    tried sub-stepping the tension.
+  case: 'R=70,85; spacing 8 and 9; gravity; T=120 MT'
+  outcome: partial
+  evidence: >-
+    R=85/9 m and R=70/8 m converge; R=70/9 m fails at step 3. Releasing SR7
+    at T=0 fails at EVERY radius and spacing tried. Sub-stepping the tension
+    with SR7 already released fails at the first sub-step at 15 MT as
+    readily as at 120. Applying the tension with SR7 still held and
+    releasing afterwards converges everywhere.
+  verdict: >-
+    The release, not the tension magnitude, is what destabilises. Order
+    within the step is not free.
+  lesson: '-'
+  refs: [docs/modules/T5_solve_spec.md]
+
+- id: T012
+  date: 2026-09-21
+  goal: >-
+    Staged four-step sequence, revised: all rollers bidirectional in step 1,
+    lift-off activated in step 2, SR7's contact KEPT throughout.
+  action: >-
+    Steps: 1 displacements, elastic, every roller bidirectional, no loads;
+    2 gravity, elastic, ruled one-sided set active; 3 tension 120 MT at SR7,
+    elastic; 4 J2. Each a separate solve carrying SolveState. Results
+    exclude SR5, SR6, SR7.
+  case: 'R=70,85,105; spacing 8 and 9; gravity; T=120 MT; final material J2'
+  outcome: success
+  evidence: >-
+    All four steps converge at every radius. At 8 m, J2 against J2: ours
+    0.5179/0.3884/0.2879 vs run_slay 0.5271/0.3937/0.2903 -- within 1.7 pct
+    at every radius, peak in the same SR2-SR3 span. At 9 m: 0.5423/0.4014/
+    0.2942 vs the paper's 0.46/0.38/0.32, reproducing the documented
+    Python-vs-Abaqus R-trend divergence rather than removing it. SR6 carries
+    0.4727 pct at R=85/9 m, ABOVE the reported peak, so the excluded zone is
+    load-bearing.
+  verdict: >-
+    The rebuild behaves like the reference program. Build the geometry
+    before applying the load the geometry must carry.
+  lesson: L053
+  refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py]
