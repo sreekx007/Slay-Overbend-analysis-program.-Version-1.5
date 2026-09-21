@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 57
+# entries: 58
 
 - id: L001
   area: kernel
@@ -1155,4 +1155,30 @@
     schedule once and look at where the peak moves.
   detect: '-'
   refs: [docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
+  date: 2026-09-21
+
+- id: L058
+  area: measure
+  class: finding
+  symptom: >-
+    The paper's 1000 mm thick component meshes as ONE element at the
+    standard 2xOD element length. Refining raises the peak monotonically and
+    it has not converged: 1 elem 0.5715, 2 elems 0.6118, 3 elems 0.6458,
+    5 elems 0.6640, 7 elems 0.6739 pct (A3, R=85, 100 MT, shift 0).
+  cause: >-
+    A single element cannot represent bending WITHIN the component, and the
+    component exists to create a bending-stiffness discontinuity. The repo's
+    own M3 note already required at least 3 elements across a component; the
+    reference program's default mesh does not meet it, and neither does the
+    paper's, which states its mesh is for relative comparison only.
+  rule: >-
+    Count the elements INSIDE a component before quoting its number. Two
+    claims must be kept apart: reproducing the reference (run at the
+    reference's own 2xOD mesh) and predicting the strain (needs refinement
+    and a convergence check). Agreement at a coarse mesh can owe something
+    to both sides being under-resolved. RULED 21 Sep 2026: 2 elements across
+    the component, element length not below 1xOD -- 0.4993 m at 1.23xOD --
+    accepted as roughly 10 pct below the converging trend, deliberately.
+  detect: '-'
+  refs: [docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
   date: 2026-09-21

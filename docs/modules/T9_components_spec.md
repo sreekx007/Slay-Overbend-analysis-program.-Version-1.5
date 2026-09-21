@@ -238,6 +238,37 @@ of the plain-pipe configuration.
 paper as the secondary comparison carrying a known and documented offset —
 exactly the M1 arrangement.
 
+## 6c. Mesh ruling — 2 elements across the component
+
+The paper's 1000 mm body meshes as **ONE element** at the standard 2×OD
+element length, and the answer is strongly mesh-dependent (A3, R = 85,
+100 MT, shift 0):
+
+| elements across the component | element length | peak |
+|---|---|---|
+| 1 | 0.799 m (2×OD) | 0.5715% |
+| **2** | **0.499 m (1.23×OD)** | **0.6118%** |
+| 3 | 0.296 m | 0.6458% |
+| 5 | 0.200 m | 0.6640% |
+| 7 | 0.151 m | 0.6739% |
+
+Monotonic and still creeping up at 7. **RULED 21 Sep 2026: two elements
+across the component, element length not below 1×OD.** That is
+`elem_len = 0.5` → 0.4993 m, 1.23×OD, 2 thick elements — and it reads
+roughly 10% below where the trend is heading. Accepted deliberately.
+
+Keep two claims apart from here on (L058):
+
+  * **Reproducing the reference** — run at the reference's own 2×OD mesh
+    and compare against §6b's matrix. Agreement there partly reflects both
+    sides being under-resolved, which is fine for a rebuild check and is
+    not a strain prediction.
+  * **Predicting the strain** — needs refinement and a convergence check,
+    and lands ~16% higher than either the paper or the original.
+
+The physics sequence these cases will be run under is written out in plain
+English, before any run, in `docs/modules/T9_physics_sequence.md`.
+
 ## 7. What is already in place
 
   * `ThickPipeBody` and `OffsetShroud` exist, parameterised, in the mirror.
