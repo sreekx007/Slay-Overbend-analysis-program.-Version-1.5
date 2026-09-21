@@ -180,7 +180,7 @@ then thickened in a second pass.
 | T6 | L7 | Mode A, Mode B, landing, coverage | **M5** | |
 | T7 | L8 | strains, peaks, DNV check, plots, IO | — | |
 | T8 | Entry | `spec.py`, `run()`, CLI | — | |
-| T9 | L3/L5 | thicken: ILS placement, component contact ownership | **M2–M4** | |
+| T9 | L3/L5 | thicken: ILS placement, component contact ownership | **M2–M4** | 🎯 21 Sep 2026 — target set: GD-TP, GD-SH, GD-TP+GD-SH (paper Series 3, 4, 5). Target register in `docs/modules/T9_components_spec.md`. GD-TP is Phase 1 and reachable now; GD-SH and the combination are **Phase 2 in every row** and gated on T6's sweep (L055). One blocker found before any run: the paper thickens inward at fixed OD, `ThickPipeBody` thickens outward at fixed bore — 19–64% stiffer at the same nominal wall (L054) |
 
 ---
 

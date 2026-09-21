@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 12
+# entries: 13
 
 - id: T001
   date: 2026-09-21
@@ -261,3 +261,28 @@
     before applying the load the geometry must carry.
   lesson: L053
   refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py]
+
+- id: T013
+  date: 2026-09-21
+  goal: >-
+    Scope the next target -- GD-TP, GD-SH and GD-TP+GD-SH -- against the
+    research paper's cases.
+  action: >-
+    Mapped the paper's analysis series to repo component codes by mechanism
+    (the paper never uses GD- codes). Probed whether the three archetypes
+    build and solve. Compared the paper's thick-section geometry convention
+    against ThickPipeBody's. Read the phase label on every target row.
+  case: 'R=85; spacing 9; ILS-TP, ILS-SH, ILS-SHTP; step 1 only'
+  outcome: measurement
+  evidence: >-
+    All three archetypes build, mesh and solve step 1 (124/123/124 nodes,
+    11 contacts each, status ok). Series 3 = GD-TP, Phase 1, reachable with
+    T5 as built. Series 4 and 5 are Phase 2 in EVERY row and need the sweep
+    (T6/L7/M5, not built). The paper holds OD at 406.4 mm and thickens
+    inward; ThickPipeBody holds bore constant and thickens outward, giving
+    I ratios ours/paper of 1.186/1.384/1.637 at 32/42/53 mm.
+  verdict: >-
+    GD-TP first; GD-SH and the combination are gated on T6. The geometry
+    convention must be settled before any Series 3 number is quoted.
+  lesson: L054, L055
+  refs: [docs/modules/T9_components_spec.md, rebuild/component_spec.py]

@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 47
+# entries: 55
 
 - id: L001
   area: kernel
@@ -1062,4 +1062,49 @@
     without the zone beside it.
   detect: test_it_reproduces_the_reference_program, test_the_excluded_zone_is_load_bearing
   refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L054
+  area: physics
+  class: finding
+  symptom: >-
+    The paper's Series 3 thick-pipe cases hold OD at 406.4 mm and thicken
+    INWARD; component_spec.ThickPipeBody holds bore constant and thickens
+    OUTWARD. Second moment of area, ours/paper, at the same nominal wall:
+    1.186 (32 mm), 1.384 (42 mm), 1.637 (53 mm).
+  cause: >-
+    Sec.1.3 of the component spec makes constant bore the governing rule,
+    t_comp the free variable and OD_comp a read-only consequence. The paper
+    varies WT at fixed OD. Both are defensible; they are different
+    components, and Series 3 is a study of exactly that stiffness.
+  rule: >-
+    Check the geometry convention before comparing against a benchmark, not
+    after the numbers disagree. A 19-64 pct stiffness difference would read
+    as a solver error. A larger OD also lifts the centreline off the roller,
+    leaking the GD-SH mechanism into a GD-TP case the study exists to
+    isolate. Routes: declared section (cheap, reproduces the paper, no
+    mirror edit); upstream PR for a constant-OD mode (correct, slow);
+    or compare trends and say so on every number.
+  detect: '-'
+  refs: [rebuild/component_spec.py, rebuild/slay/physics/sections.py, docs/modules/T9_components_spec.md]
+  date: 2026-09-21
+
+- id: L055
+  area: process
+  class: finding
+  symptom: >-
+    Paper Series 4 (GD-SH) and Series 5 (GD-TP + GD-SH) report Phase 2
+    results in EVERY row; Series 3 (GD-TP) reports Phase 1.
+  cause: >-
+    Phase 1 is plastic bending at the first two roller boxes -- a single lay
+    position, which T5 already solves. Phase 2 is elastic bend-unload as the
+    pipe SLIDES over the mid-stinger rollers, which needs the sweep: T6, the
+    L7 study layer, M5. Not built.
+  rule: >-
+    Read the PHASE label on a benchmark row before targeting it. A
+    single-position solve compared against a Phase 2 target produces a wrong
+    answer that converges. Order: GD-TP now, then T6, then GD-SH and the
+    combination.
+  detect: '-'
+  refs: [docs/modules/T9_components_spec.md, docs/SLAY_BUILD_INSTRUCTION.md]
   date: 2026-09-21
