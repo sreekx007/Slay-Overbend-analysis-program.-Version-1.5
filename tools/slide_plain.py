@@ -40,34 +40,35 @@ sys.path.insert(0, str(REPO))
 
 import slay_sliding_v0_4 as SL                       # noqa: E402
 
-OD = 0.4064
-WT = 0.021
+OD_DEF = 0.4064
+WT_DEF = 0.021
 DROP_AT_TIP = 3          # SR5, SR6, SR7 excluded, per the physics sequence
 
+# TABLE XI of the paper: three diameters, ALL at 21 mm wall, R = 70 m.
+# Travel and step are each pipeline's OWN diameter, so the passage is the
+# same in pipe-diameters for every pipe and different in metres.
+PAPER_PIPES = ((0.168, 0.021, '6 in'),
+               (0.4064, 0.021, '16 in'),
+               (0.508, 0.021, '20 in'))
 
-def neutral_component():
+
+def neutral_component(od, wt):
     """Identical to the pipe: same OD, same wall. See the module docstring."""
-    return {'OD': OD, 't': WT, 'length': 1.000}
+    return {'OD': od, 't': wt, 'length': 1.000}
 
 
-def slide(R, tension_mt=120.0, spacing=8.0, od_travel=4.0, od_step=1.0,
-          n_sr=6, n_vr=10, elem_len=None):
+def slide(R, od=OD_DEF, wt=WT_DEF, tension_mt=120.0, spacing=8.0,
+          od_travel=4.0, od_step=1.0, n_sr=6, n_vr=10, elem_len=None):
     """One sliding passage. Returns (result dict, shifts, step_m)."""
-    probe = SL.run_passage_sliding(
-        R=R, thick_component=neutral_component(), tension_mt=tension_mt,
-        n_sr=n_sr, n_vr=n_vr, spacing=spacing, shifts=[0.0],
-        elem_len=elem_len, verbose=False)
-    elem = probe['elem_len_sr2']
+    kw = dict(R=R, D_o=od, t=wt, thick_component=neutral_component(od, wt),
+              tension_mt=tension_mt, n_sr=n_sr, n_vr=n_vr, spacing=spacing,
+              elem_len=elem_len, verbose=False)
+    elem = SL.run_passage_sliding(shifts=[0.0], **kw)['elem_len_sr2']
 
-    step_m = od_step * OD
+    step_m = od_step * od
     n_steps = int(round(od_travel / od_step))
     shifts = [i * step_m / elem for i in range(n_steps + 1)]
-
-    res = SL.run_passage_sliding(
-        R=R, thick_component=neutral_component(), tension_mt=tension_mt,
-        n_sr=n_sr, n_vr=n_vr, spacing=spacing, shifts=shifts,
-        elem_len=elem_len, verbose=False)
-    return res, shifts, step_m
+    return SL.run_passage_sliding(shifts=shifts, **kw), shifts, step_m
 
 
 def zone(res):
@@ -105,20 +106,30 @@ def main() -> int:
     spacing = arg('--spacing', 8.0)
     od_travel = arg('--od-travel', 4.0)
     od_step = arg('--od-step', 1.0)
+    # --pipes runs the paper's three diameters instead of one; --od/--wt
+    # runs a single named pipe.
+    if '--pipes' in sys.argv:
+        pipes = list(PAPER_PIPES)
+    else:
+        pipes = [(arg('--od', OD_DEF), arg('--wt', WT_DEF), 'pipe')]
 
-    print(f'PLAIN PIPELINE, sequential sliding.  OD {OD * 1000:.1f} mm x '
-          f'{WT * 1000:.0f} mm WT,  T = {T:.0f} MT,  spacing {spacing:.0f} m')
-    print(f'travel {od_travel:g} x OD = {od_travel * OD:.4f} m   '
-          f'step {od_step:g} x OD = {od_step * OD:.4f} m   '
-          f'({int(round(od_travel / od_step))} steps after the start)\n')
+    print(f'PLAIN PIPELINE, sequential sliding.  T = {T:.0f} MT,  '
+          f'spacing {spacing:.0f} m')
+    print(f'travel {od_travel:g} x OD   step {od_step:g} x OD   '
+          f'({int(round(od_travel / od_step))} steps after the start) '
+          f'-- both scale with EACH pipe\'s own diameter\n')
 
-    for R in radii:
-        res, shifts, step_m = slide(R, tension_mt=T, spacing=spacing,
-                                    od_travel=od_travel, od_step=od_step)
+    for od, wt, label in pipes:
+      for R in radii:
+        res, shifts, step_m = slide(R, od=od, wt=wt, tension_mt=T,
+                                    spacing=spacing, od_travel=od_travel,
+                                    od_step=od_step)
         cut, x_vr1 = zone(res)
-        print(f'--- R = {R:.0f} m   (1 shift unit = '
-              f'{res["elem_len_sr2"]:.4f} m,  band {cut:.2f} < x < '
-              f'{x_vr1:.2f})')
+        print(f'--- {label}  OD {od * 1000:.1f} x {wt * 1000:.0f} mm   '
+              f'R = {R:.0f} m   travel {od_travel * od:.4f} m in '
+              f'{step_m:.4f} m steps')
+        print(f'    (1 shift unit = {res["elem_len_sr2"]:.4f} m,  band '
+              f'{cut:.2f} < x < {x_vr1:.2f})')
         print(f'  {"pos":>4}{"shift":>9}{"travel":>10}'
               f'{"peak in band":>14}{"at x":>9}'
               f'{"whole-model":>13}{"at x":>9}  status')
