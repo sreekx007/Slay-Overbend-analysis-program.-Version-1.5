@@ -215,32 +215,69 @@ rollers cannot pull the pipe onto the arc — they only push — so the pipe sag
 between whatever it touches and the stinger radius stops governing. That is
 *why* the benchmark applies 120 MT.
 
-### The diagnosis: the load path is staged, and ours is proportional
+### The diagnosis — WRONG, and corrected 21 Sep 2026
 
-The paper's §V.D runs five steps:
+The first diagnosis written here was that the paper's §V.D runs five staged
+steps while `passage.solve` "ramps everything together — contact targets,
+gravity and tension all scale with one `lam`", so the first increment applies
+a fraction of 1.18 MN to a straight pipe.
 
-1. pretension at the catenary end, **vessel end fixed**
-2. **rotation** at the catenary end to bend the pipe along the stinger
-3. gravity
-4. lay tension at the catenary end
-5. translation at the vessel end
+**`passage.solve` does not ramp the loads, and neither does the reference.**
+`nlfea_v4.assemble` accepts `lam` and never applies it to `dist_loads` or
+`joint_loads` (`nlfea_v4.py:1419-1429`); only the wrapper `assemble_at` at
+line 1693 scales them, and neither solver calls it. Both `passage.solve` and
+`_solve_state_sliding` pass raw `dist` and `jl` straight through. **Gravity
+and tension are at FULL value on the first Newton iteration of the first
+increment in both programs**; `lam` ramps the contact targets and nothing
+else.
 
-`passage.solve` ramps **everything together** — contact targets, gravity and
-tension all scale with one `lam`. So at the first increment it applies a
-fraction of 1.18 MN at the tip of a 9 m overhang hanging past SR6 on a pipe
-that is still straight and anchored 99 m away. There is nothing to react it,
-and Newton diverges before the geometry exists that would carry the load.
+That also explains the failure signature, which the old diagnosis did not.
+`CUTBACK EXHAUSTED at lam=0.0000` means the first increment failed at the
+smallest step — and cutback cannot help, because the thing diverging is not
+scaled by `lam`. Measured, R = 85, 120 MT, first-iteration `max|dU|`:
 
-Step 2 is also **displacement**-controlled — a rotation imposed at the end —
-where ours is contact-target-driven throughout. Both differences point the
-same way: the benchmark builds the deformed shape first and loads it second.
+| tension applied at | lam = 1/40 | lam = 1/2560 (64x cutback) |
+|---|---|---|
+| SR7, the free tip | **3.674 m** | **3.232 m** |
+| SR6, the last contact roller | 0.525 m | 0.082 m |
 
-**Next task: staged load steps.** `solve` needs to take a sequence of steps,
-each ramping its own subset (geometry, then gravity, then tension), carrying
-state between them — which is what `SolveState` already exists to do. This is
-a well-defined piece of work, not a search.
+Threshold is 1.0 m. Sixty-four-fold cutback moves the free-tip step by 12%.
 
----
+### The real cause: WHERE the tension is applied
+
+Our SR7 is a **LOAD station with no contact constraint** — the model runs
+9 m past the last roller and the tension goes on that free cantilever tip,
+on a pipe that is still straight and unstressed. The first Newton step is
+3.2 m and trips `DIVERGENCE_DU`.
+
+The reference has no such tip. `slay_sliding_v0_4.py:541-544` applies the
+joint load at the LAST MESH NODE, at angle `(n_sr_total - 1) * dtheta` —
+the last SR station — and that station is a contact slot which
+`exempt_set = {len(slot_names) - 1}` makes **permanently active**. The
+tension lands on a node whose normal DOF is held.
+
+Moving our tension to SR6, the last contact roller, changes nothing else and
+the benchmark converges at every radius:
+
+| R | ours, tension at SR6, 9 m | reference `run_slay`, 8 m | paper (Abaqus) |
+|---|---|---|---|
+| 70 m | 0.5467% | 0.5274% | 0.46% |
+| 85 m | **0.3985%** | 0.3882% | 0.38% |
+| 105 m | 0.2845% | 0.2790% | 0.32% |
+
+Within 2-4% of the reference program at every radius, with the peak in the
+same span (ours s = 8.99, SR2; the reference x = -8.38, SR2-SR3). Note the
+two columns are at different spacings, so this is agreement in behaviour,
+not a like-for-like reproduction yet.
+
+**§6's "known case-construction gaps" already listed this**: *"The scene's
+extent runs to the LOAD station (SR7), 8 m past the last contact roller...
+The reference mesh ends at SR6."* It was recorded as a gap to settle before
+quoting an M1 number. It was in fact the M1 blocker.
+
+**NOT CHANGED HERE.** Whether SR7 should become a contact station, or the
+model should end at SR6, or the tension should simply move, is a modelling
+decision that moves every number in the project. Raised as decision D6.
 
 ## 5b. The pipe was not sitting on the stinger — found and FIXED, 21 Sep 2026
 
@@ -377,10 +414,11 @@ two signs is 12% of peak strain, and it was pointing the wrong way.
 Separate from the baseline question, and to be settled before any M1 number
 is quoted:
 
-- **The scene's extent runs to the LOAD station (SR7, s = +48)**, 8 m past
+- **The scene's extent runs to the LOAD station (SR7, s = +54)**, 9 m past
   the last contact roller. With `tension = 0` that leaves an unsupported
   cantilever the reference model does not have. The reference mesh ends at
-  SR6.
+  its last SR station, which is itself a permanently-active contact slot.
+  **THIS WAS THE M1 BLOCKER** — see §5. Open as decision D6.
 - **Station counts differ.** Our `n_vr` includes its terminal (VR*n* is the
   fixed anchor); the reference's `n_vr=3` means VR0..VR3 with a separate
   `std_ux` anchor. Comparable cases have to be built deliberately.
@@ -397,3 +435,4 @@ is quoted:
 | 21 Sep 2026 | T5 solver built and its machinery verified — contact targets met to 1e-13 m including 8.897 m at SR6, active set unit-tested, loops bounded, J2 state carried. M1 **blocked**: the §6 plain-pipe baseline does not reproduce from the reference code under any of 12 configurations, and no plain-pipe sliding reference exists at all. Raised as decision D5 with three options and a recommendation. Three case-construction gaps recorded. |
 | 21 Sep 2026 | **L048 found and fixed.** `tools/plot_stinger.py` drew the solved pipe for the first time; the material point that should sit at SR6 was 5.18 m off its own arc point while every contact target was met to 1e-13 m. Cause: `LayPath.normal` is a WORLD vector and `contact_targets` used it as coefficients on MODEL DOFs, so the `s` component had the wrong sign; `dn` is invariant under that error, which is why every existing check passed. Fixed with `physics.contact.to_model_frame` and guarded by `test_the_material_point_lands_on_its_own_arc_station`. Gravity-only peak strain now falls with stinger radius — 0.3365 / 0.2751 / 0.2099% at R = 70 / 85 / 105 against 0.2617 / 0.2704 / 0.2428% before — and the amplification over `D/2R` sits at +16 / +15 / +9%. The §5b diagnosis written earlier the same day (tangential indeterminacy for want of tension) was wrong and is marked as such. Tension cases still fail on the first increment; staged load steps remain the next task. |
 | 21 Sep 2026 | **L049 found and fixed**, prompted by the question "what is the direction of applied pipeline tension?". `lay_tension` used `path.tangent` — a world vector — as a model-frame `(fx, fy)`, so 10 MT of declared lay tension drove 5.27 MT of **compression** through the deck. The existing test asserted `fx == T*tx` against the same world tangent and so ratified the defect. `to_model_frame` extracted into `slay/physics/frame.py`, both crossing sites routed through it, and the test rewritten to state the physics: `fx > 0`, `fy > 0`, deck in tension. Does not unblock the 120 MT benchmark — both signs fail identically at `lam=0` — so staged load steps remain the next task. |
+| 21 Sep 2026 | **The M1 blocker found; §5's diagnosis was wrong.** `nlfea_v4.assemble` never scales `dist_loads`/`joint_loads` by `lam`, so neither solver ramps its loads and cutback cannot reduce them — 64x cutback moved the first Newton step from 3.674 m to 3.232 m against a 1.0 m threshold. The real cause is WHERE the tension is applied: our SR7 is a LOAD station with no contact constraint, 9 m of free cantilever, while the reference puts its joint load on the last SR station, which `exempt_set` makes a permanently active contact slot. Moving our tension to SR6 converges at 120 MT at every radius — 0.5467 / 0.3985 / 0.2845% at R = 70 / 85 / 105, against the reference program's 0.5274 / 0.3882 / 0.2790% and the paper's 0.46 / 0.38 / 0.32%, with the peak in the same span. Not changed in the model: raised as decision D6. Recorded as L050 and L051; the reference `run_slay` was confirmed runnable in this repo. |

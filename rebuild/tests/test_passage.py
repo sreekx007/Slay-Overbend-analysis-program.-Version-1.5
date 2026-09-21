@@ -180,6 +180,45 @@ def test_lay_tension_puts_the_deck_in_tension():
     assert 0.7 * T < N < 1.1 * T, f'{N / 1e3:.0f} kN against {T / 1e3:.0f} kN'
 
 
+def test_assemble_does_not_scale_loads_by_lam():
+    """A CHARACTERISATION TEST OF THE FROZEN KERNEL (L050, guardrail G6).
+
+    `nlfea_v4.assemble` takes `lam` and never applies it to `dist_loads` or
+    `joint_loads`. Only the `assemble_at` wrapper scales them, and no solver
+    in this project calls it, so gravity and tension are at FULL value on the
+    first Newton iteration of the first increment -- in `passage.solve` and
+    in the reference `_solve_state_sliding` alike.
+
+    This is not a complaint about the kernel; it is the kernel's contract,
+    and the solver's cutback is built on top of it. It is written down
+    because assuming the opposite produced a load-path diagnosis that was
+    wrong, and because it is what makes `CUTBACK EXHAUSTED at lam=0.0000`
+    mean "the load diverges", not "the step was too big".
+    """
+    import nlfea_v4 as fe
+    sc = _scene()
+    p = build_problem(build_model(sc), sc, material=material('ro'),
+                      tension=120e3, gravity=True)
+    ms, _mdl, index_of = mesh_of_problem(p)
+    dist, joint = passage._loads(p, ms, index_of)
+    # `dist` is empty by design: this project lumps self weight half-half to
+    # NODES (`loads.self_weight`), where the reference hands the kernel
+    # distributed element loads. Both arrive as `Fext`, and neither is
+    # scaled by `lam` -- which is the point here.
+    assert joint, 'the case has nodal loads to check'
+
+    U = np.zeros(ms.n_dofs)
+    th = np.full(ms.n_elems, np.nan)
+    f = {}
+    for lam in (1.0, 0.5, 1.0 / 2560):
+        _K, _Fint, Fext, _th, _ps = fe.assemble(ms, U, th, dist, joint, lam)
+        f[lam] = Fext.copy()
+    assert np.max(np.abs(f[1.0])) > 0.0
+    for lam in (0.5, 1.0 / 2560):
+        assert np.array_equal(f[lam], f[1.0]), \
+            f'Fext changed with lam={lam}; the ramp assumption would hold'
+
+
 # -- the active set --------------------------------------------------------
 
 def test_release_is_on_reaction_and_re_contact_is_on_gap():

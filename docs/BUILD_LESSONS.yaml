@@ -958,3 +958,52 @@
   detect: test_tension_pulls_the_tip_away_from_the_vessel, test_lay_tension_puts_the_deck_in_tension
   refs: [rebuild/slay/physics/frame.py, rebuild/slay/physics/loads.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21
+
+- id: L050
+  area: solve
+  class: finding
+  symptom: >-
+    CUTBACK EXHAUSTED at lam=0.0000 on every tension case, and a 64x cutback
+    barely moved the first Newton step -- 3.674 m at lam=1/40 against 3.232 m
+    at lam=1/2560, threshold 1.0 m.
+  cause: >-
+    nlfea_v4.assemble takes lam and never applies it to dist_loads or
+    joint_loads (nlfea_v4.py:1419-1429); only the assemble_at wrapper at line
+    1693 scales them, and no solver in this project calls it. Both
+    passage.solve and the reference _solve_state_sliding pass raw dist and jl
+    through, so gravity and tension are at FULL value on the first Newton
+    iteration of the first increment. lam ramps the contact targets alone.
+  rule: >-
+    Cutback cannot reduce a load that lam does not scale. A divergence whose
+    first-iteration dU is insensitive to dlam is a LOAD or a model problem,
+    never a step-size problem, and cutting further is wasted work. Read what
+    the kernel does with lam before writing a load-path diagnosis: the first
+    one written here assumed a proportional ramp that does not exist.
+  detect: test_assemble_does_not_scale_loads_by_lam
+  refs: [nlfea_v4.py, rebuild/slay/solve/passage.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L051
+  area: physics
+  class: finding
+  symptom: >-
+    120 MT lay tension diverged on the first Newton iteration at every
+    stinger radius. Applied at SR6 instead of SR7, with nothing else changed,
+    it converges: 0.5467/0.3985/0.2845 pct at R=70/85/105 against the
+    reference program's 0.5274/0.3882/0.2790 and the paper's 0.46/0.38/0.32.
+  cause: >-
+    Our SR7 is a LOAD station with NO contact constraint, so the tension is
+    applied to a free cantilever tip 9 m past the last roller on a straight
+    unstressed pipe -- first Newton step 3.2 m. The reference applies its
+    joint load at the last mesh node, at the last SR station's angle
+    (slay_sliding_v0_4.py:541-544), and exempt_set makes that station a
+    permanently active contact slot, so the tension lands on a held node.
+  rule: >-
+    A load applied at a free end of an initially straight geometrically
+    nonlinear model has no stiffness to react it on iteration one. Check
+    where the reference APPLIES a load, not just its magnitude and direction.
+    The case-construction gap list had already recorded this end-condition
+    difference as a thing to settle; it was not a detail, it was the blocker.
+  detect: '-'
+  refs: [rebuild/slay/physics/loads.py, rebuild/slay/scene/rollers.py, slay_sliding_v0_4.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
