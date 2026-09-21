@@ -314,8 +314,11 @@
     at R=70 -- the same R-trend divergence T5 section 4 documents for plain
     pipe.
   verdict: >-
-    Series 3 needs no sweep; the start position governs. The rebuild's
-    target is the original's column, with the paper as a secondary
-    comparison carrying a documented offset.
+    CORRECTED same day: "no sweep needed" is withdrawn. The schedule covers
+    only 40 pct of a spacing and cannot reach SR3, so the monotonic fall is
+    not a maximum. Sequential sliding is Step 6 of the physics sequence and
+    the peak is taken across the whole passage. The rebuild's target is the
+    original's column, with the paper as a secondary comparison carrying a
+    documented offset.
   lesson: L056, L057
   refs: [slay_sliding_v0_4.py, docs/modules/T9_components_spec.md]

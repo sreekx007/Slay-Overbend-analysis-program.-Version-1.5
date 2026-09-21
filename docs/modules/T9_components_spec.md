@@ -209,11 +209,18 @@ A3 (53 mm), R = 85, T = 100 MT, forward sweep:
 | 3 | 2.396 m | 0.5168% | −7.99 |
 | 4 | 3.195 m | 0.5074% | −7.99 |
 
-Monotonically decreasing: the component is moving away from SR2, and SR2 is
-where the peak lives in every step — which is the paper's own statement
-(*"Phase 1, 2nd stinger roller"*). **So Series 3 needs no sweep at all: the
-governing case is the default placement at shift 0**, and that is why these
-cases are reachable before T6 exists.
+Monotonically decreasing over the stretch covered: the component is moving
+away from SR2, and SR2 is where the peak lives in every step — the paper's
+own statement (*"Phase 1, 2nd stinger roller"*).
+
+**CORRECTED 21 Sep 2026.** An earlier reading of this table concluded that
+Series 3 needs no sweep and that shift 0 is the governing case. That is
+withdrawn (L057). The schedule covers 3.195 m — **40% of one 7.988 m
+spacing** — and the program refuses a shift large enough to reach SR3, so a
+monotonic fall over that stretch is not a maximum. **Sequential sliding is
+Step 6 of the physics sequence** and the reported peak is taken across the
+whole passage. Consequence: Series 3 needs the sweep driver, which is not
+ported — see `docs/modules/T9_physics_sequence.md`.
 
 ### Reference matrix — the original program at shift 0, 100 MT, 8 m spacing
 

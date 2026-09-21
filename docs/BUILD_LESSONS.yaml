@@ -1141,20 +1141,27 @@
   area: measure
   class: finding
   symptom: >-
-    Series 3 thick-pipe cases peak at SR2 (x=-7.98) at EVERY shift, and the
-    peak falls monotonically with shift: 0.5715/0.5530/0.5273/0.5168/0.5074
-    pct over shifts 0-4 (A3, R=85, 100 MT).
+    Series 3 thick-pipe cases peak at SR2 (x=-7.98) at every shift, and the
+    peak falls monotonically over the reference program's default schedule:
+    0.5715/0.5530/0.5273/0.5168/0.5074 pct over shifts 0-4 (A3, R=85,
+    100 MT).
   cause: >-
     The default placement puts the component's stinger-side edge exactly on
-    SR2 (ref_centre_x = x_sr2 + L_comp/2), and SR2 is where the Phase 1 peak
-    lives. Advancing the pipe moves the component away from it.
+    SR2 and SR2 is where the Phase 1 peak lives, so advancing the pipe moves
+    the component away from it. BUT the schedule covers 3.195 m, only 40 pct
+    of one 7.988 m roller spacing, and the program refuses a shift large
+    enough to reach the next roller. Whether the peak rises again as the
+    component approaches SR3 was never observed because the run cannot get
+    there.
   rule: >-
-    For Series 3 the governing case is the START position, shift 0, so these
-    cases need no sweep and are reachable before T6 exists. Do not assume a
-    sweep is required because the reference program offers one; run the
-    schedule once and look at where the peak moves.
+    A monotonic trend over 40 pct of a span is not a maximum. RULED 21 Sep
+    2026: sequential sliding IS part of the physics sequence (Step 6), and
+    the reported peak is taken across the whole passage, not at the start
+    position. An earlier version of this lesson concluded no sweep was
+    needed; that conclusion was drawn from the truncated schedule and is
+    withdrawn. State the sweep's reach beside any passage result.
   detect: '-'
-  refs: [docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
+  refs: [docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
   date: 2026-09-21
 
 - id: L058
