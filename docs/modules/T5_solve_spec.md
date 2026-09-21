@@ -224,6 +224,64 @@ a well-defined piece of work, not a search.
 
 ---
 
+## 5b. The pipe is not sitting on the stinger — shown, 21 Sep 2026
+
+`tools/plot_stinger.py`, `docs/diagrams/stinger_pipe.png`. The first figure
+in this project that draws the SOLVED pipe. `draw_layout.py` renders the
+Scene and deliberately draws no pipe, because tracker item 27 forbids a
+drawing that derives the pipe's shape from the arc formula. Every coordinate
+here is a solved displacement, so the rule is satisfied and the figure is
+allowed — and the first thing it shows is a defect.
+
+### Two facts that cannot both be comfortable
+
+Every contact target is met to **1e-13 m** — and the material point that
+should sit at SR6 ends up **5.2 m away from the arc**.
+
+Pure-arc case, R = 85 m, all rollers bidirectional, no gravity, no tension.
+"Slide" is the miss resolved along the path tangent:
+
+| station | arc (x, y) | solved (x, y) | miss dx | miss dy | slide |
+|---|---|---|---|---|---|
+| VR5 (fixed) | 45.000, 0.000 | 45.000, −0.000 | 0.000 | 0.000 | 0.000 |
+| VR1 | 9.000, 0.000 | 9.389, 0.002 | +0.389 | +0.002 | +0.389 |
+| SR1 | −0.000, 0.000 | 0.401, −0.007 | +0.401 | −0.007 | +0.401 |
+| SR3 | −17.866, 1.899 | −18.238, 2.047 | −0.372 | +0.148 | −0.333 |
+| SR4 | −26.548, 4.252 | −26.816, 4.711 | −0.268 | +0.459 | −0.111 |
+| SR5 | −34.933, 7.510 | −34.644, 8.980 | +0.289 | **+1.470** | +0.868 |
+| SR6 | −42.927, 11.636 | −40.014, 15.997 | **+2.913** | **+4.361** | **+4.717** |
+| SR7 (load) | −50.440, 16.584 | −45.226, 23.087 | +5.214 | +6.504 | +8.056 |
+
+Under arc-length node positioning the material point at arc `s` is supposed
+to land at `path.position(s)` — bending is inextensible to first order, which
+is item 16's whole argument. Every row here should be zero. They are not, and
+the error grows monotonically down the stinger.
+
+### What that means
+
+The constraint being satisfied is **not the constraint that puts the pipe on
+the stinger**. Each slot fixes the NORMAL component of an interpolated
+displacement and leaves the tangent free — by design, because a material
+point genuinely slides ~2 m over the rollers by SR6. But with one restraint
+in the whole model (VR5, all DOF) and no tension, nothing makes the
+tangential position determinate. The free direction absorbs metres of motion
+and the residual stays at 1e-13 throughout, because it is measuring the one
+direction that is held.
+
+**The boundary conditions are the problem, and the benchmark's tension is
+part of them.** Lay tension at the catenary end is not decoration on this
+case: it is what pulls the pipe taut along the path and makes the tangential
+position determinate. Panel B of the figure shows the other half of the same
+story — with the ruled one-sided set and gravity but no tension, six of ten
+rollers lift off and the pipe bridges from SR3 straight past the stinger tip.
+
+This is the same conclusion as §5's load-path finding, reached independently
+and now visible rather than argued. It does not change the next task; it
+raises its priority and says what to check when the staged steps land: every
+row of the table above should go to zero.
+
+---
+
 ## 5. Known case-construction gaps
 
 Separate from the baseline question, and to be settled before any M1 number

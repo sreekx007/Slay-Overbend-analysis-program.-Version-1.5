@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 46
+# entries: 47
 
 - id: L001
   area: kernel
@@ -875,4 +875,32 @@
     the benchmark case, it is what makes it the benchmark case.
   detect: '-'
   refs: [rebuild/slay/solve/passage.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L047
+  area: solve
+  class: defect
+  symptom: >-
+    Every contact target met to 1e-13 m, and the material point that should
+    sit at SR6 ends up 5.2 m from the arc. Miss grows monotonically down the
+    stinger: 0.4 m at SR1, 1.5 m at SR5, 5.2 m at SR6, 8.1 m at the tip.
+  cause: >-
+    A contact slot fixes the NORMAL component of an interpolated displacement
+    and leaves the tangent free -- correct, because a material point really
+    does slide ~2 m over the rollers by SR6. But with one restraint in the
+    whole model (VR5, all DOF) and no tension, nothing makes the tangential
+    position determinate. The free direction absorbs metres of motion while
+    the residual stays at 1e-13, because the residual measures the one
+    direction that IS held.
+  rule: >-
+    A converged residual on a partial constraint is not evidence the model is
+    right -- it is evidence about the constrained direction only. Under
+    arc-length positioning the material point at arc s must land at
+    path.position(s); that is the check, and it is independent of any
+    residual. Lay tension is part of the BOUNDARY CONDITIONS on this case,
+    not a load on top of it: it is what pulls the pipe taut and makes the
+    tangential position determinate. When staged load steps land, every row
+    of the arc-position table must go to zero.
+  detect: '-'
+  refs: [tools/plot_stinger.py, docs/modules/T5_solve_spec.md, docs/diagrams/stinger_pipe.png]
   date: 2026-09-21
