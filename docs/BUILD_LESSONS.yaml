@@ -1034,3 +1034,32 @@
   detect: test_the_tension_station_is_also_a_contact_slot, test_there_is_no_unconstrained_overhang
   refs: [rebuild/slay/scene/rollers.py, rebuild/slay/physics/loads.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21
+
+- id: L053
+  area: solve
+  class: finding
+  symptom: >-
+    A four-step staged solve -- displacements with all rollers bidirectional,
+    then gravity with lift-off active, then tension, then J2 -- reproduces
+    run_slay to within 1.7 pct at R=70/85/105 (0.5179/0.3884/0.2879 against
+    0.5271/0.3937/0.2903, 8 m, 120 MT, J2) with the peak in the same span.
+    The single proportional solve of the same case runs +15 to +21 pct high
+    with the peak displaced to SR6.
+  cause: >-
+    The blocker was never the ramp sequence: assemble does not scale loads by
+    lam in either program (L050), so there is no ramp to change. It was that
+    the geometric stiffness reacting 120 MT did not exist yet on a straight
+    unstressed pipe (L051). Bending the pipe onto the arc FIRST creates it.
+    Step 1 must hold every roller bidirectionally -- a one-sided roller
+    cannot pull, so with no tension the stinger rollers release and the pipe
+    never reaches the arc at all.
+  rule: >-
+    Build the geometry before applying the load that the geometry has to
+    carry. Where a load needs stiffness that only deformation provides,
+    staging is a modelling decision, not a solver tuning knob. And the
+    reported zone travels with the number: this result excludes SR5/SR6/SR7,
+    SR6 carries MORE strain than the reported peak, so the headline is wrong
+    without the zone beside it.
+  detect: test_it_reproduces_the_reference_program, test_the_excluded_zone_is_load_bearing
+  refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21

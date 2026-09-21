@@ -387,6 +387,70 @@ but it is the measurement that says the station count is what matters.
 
 ---
 
+## 5e. The staged sequence — IT REPRODUCES THE REFERENCE, 21 Sep 2026
+
+`tools/stage_run.py`. Four steps, specified this session, each a separate
+`solve` carrying `SolveState` forward:
+
+| | step | material | contacts | loads |
+|---|---|---|---|---|
+| 1 | displacements | elastic | **all bidirectional** | none |
+| 2 | gravity | elastic | ruled one-sided set, **lift-off active** | gravity |
+| 3 | tension | elastic | as step 2 | + 120 MT at SR7 |
+| 4 | plasticity | **J2** | as step 2 | as step 3 |
+
+Results exclude the last three stinger rollers — SR5, SR6, SR7.
+
+### Like for like against the reference program
+
+`run_slay`, J2, `one_sided=True`, self weight, 120 MT, both at 8 m spacing:
+
+| R | ours, staged | `run_slay` | delta | peak location |
+|---|---|---|---|---|
+| 70 m | 0.5179% | 0.5271% | **−1.7%** | ours s = 8.06, ref x = −8.38 |
+| 85 m | **0.3884%** | **0.3937%** | **−1.3%** | same span (SR2–SR3) |
+| 105 m | 0.2879% | 0.2903% | **−0.8%** | same span |
+
+**Within 1.7% at every radius, with the peak in the same span.** The single
+proportional solve of the same case runs +15 to +21% high with the peak at
+SR6 (§5d). This is M1's actual question — does the rebuild behave like the
+old program — and the answer is yes.
+
+At the paper's 9 m spacing: 0.5423 / 0.4014 / 0.2942% against the paper's
+0.46 / 0.38 / 0.32. That is +18 / +6 / −8%, the R-trend divergence §4
+already documents between the Python toolchain and Abaqus, reproduced rather
+than removed. Agreeing with the old program and disagreeing with Abaqus in
+the old program's own direction is the correct outcome for a rebuild.
+
+### Why the order is what it is
+
+  * **Step 1 holds every roller.** A one-sided roller cannot pull, so with
+    no tension yet the stinger rollers release and the pipe never reaches
+    the arc — panel B of `stinger_pipe.png` at zero tension is that
+    picture. Holding them builds the geometry.
+  * **Step 2 hands the active set its real rule** and lets whatever wants
+    to lift off, lift off, with gravity there to be resisted.
+  * **Step 3 applies the tension to a pipe that is already bent and already
+    loaded.** The geometric stiffness that reacts 120 MT exists by then.
+    That is the whole answer to L050/L051: the blocker was never the
+    sequence of *ramping*, it was that the stiffness did not exist yet.
+  * **Step 4 activates plasticity** on the deformed state. J2 is
+    incremental and path-dependent, so it must come last.
+
+### What the result depends on
+
+**The excluded zone is load-bearing, and the number must never be quoted
+without it.** SR6 carries 0.4727% at R = 85 / 9 m — above the reported
+0.4014% — because D6's terminal contact slot over-constrains the tip
+(§5d). Excluding the last three rollers is what makes that artefact
+harmless. `test_the_excluded_zone_is_load_bearing` asserts the dependence
+rather than leaving it to a footnote.
+
+`rebuild/tests/test_stage_run.py` pins our side of the comparison; the
+reference's numbers are quoted here, not recomputed in the suite.
+
+---
+
 ## 5b. The pipe was not sitting on the stinger — found and FIXED, 21 Sep 2026
 
 `tools/plot_stinger.py`, `docs/diagrams/stinger_pipe.png`. The first figure
@@ -545,3 +609,4 @@ is quoted:
 | 21 Sep 2026 | **L049 found and fixed**, prompted by the question "what is the direction of applied pipeline tension?". `lay_tension` used `path.tangent` — a world vector — as a model-frame `(fx, fy)`, so 10 MT of declared lay tension drove 5.27 MT of **compression** through the deck. The existing test asserted `fx == T*tx` against the same world tangent and so ratified the defect. `to_model_frame` extracted into `slay/physics/frame.py`, both crossing sites routed through it, and the test rewritten to state the physics: `fx > 0`, `fy > 0`, deck in tension. Does not unblock the 120 MT benchmark — both signs fail identically at `lam=0` — so staged load steps remain the next task. |
 | 21 Sep 2026 | **The M1 blocker found; §5's diagnosis was wrong.** `nlfea_v4.assemble` never scales `dist_loads`/`joint_loads` by `lam`, so neither solver ramps its loads and cutback cannot reduce them — 64x cutback moved the first Newton step from 3.674 m to 3.232 m against a 1.0 m threshold. The real cause is WHERE the tension is applied: our SR7 is a LOAD station with no contact constraint, 9 m of free cantilever, while the reference puts its joint load on the last SR station, which `exempt_set` makes a permanently active contact slot. Moving our tension to SR6 converges at 120 MT at every radius — 0.5467 / 0.3985 / 0.2845% at R = 70 / 85 / 105, against the reference program's 0.5274 / 0.3882 / 0.2790% and the paper's 0.46 / 0.38 / 0.32%, with the peak in the same span. Not changed in the model: raised as decision D6. Recorded as L050 and L051; the reference `run_slay` was confirmed runnable in this repo. |
 | 21 Sep 2026 | **D6 taken (option B): the terminal stinger station is a contact slot.** SR7 keeps its place, becomes bidirectional so it never releases, and still bears the tension via a new `bears_tension` attribute orthogonal to `role`. **120 MT converges at every radius for the first time** — the divergence blocker is gone. It does not reproduce: at the reference's own 8 m spacing ours reads 0.6390 / 0.4571 / 0.3216% at R = 70 / 85 / 105 against `run_slay`'s 0.5274 / 0.3882 / 0.2790%, +15 to +21%, with the peak displaced to SR6 from the reference's SR2–SR3 span. Traced to §6's station-count gap: `run_slay` at `n_sr=6` builds six stinger stations, ours builds seven. M1 not claimed. 12 tests restated. |
+| 21 Sep 2026 | **The staged sequence reproduces the reference program.** Four steps — displacements (all rollers bidirectional, elastic), gravity (lift-off active), 120 MT tension, then J2 — each a separate `solve` carrying `SolveState`. At the reference's own 8 m spacing, J2 against J2: 0.5179 / 0.3884 / 0.2879% at R = 70 / 85 / 105 against `run_slay`'s 0.5271 / 0.3937 / 0.2903%, **within 1.7% at every radius**, peak in the same SR2–SR3 span. The single proportional solve of the same case is +15 to +21% with the peak at SR6. Results exclude SR5/SR6/SR7 and the exclusion is load-bearing — SR6 carries more than the reported peak — so the zone travels with the number. `tools/stage_run.py`, `rebuild/tests/test_stage_run.py`, lesson L053. |
