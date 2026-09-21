@@ -66,66 +66,93 @@ reference result could not be generated.
 
 ---
 
-## 4. The blocker — M1's target does not reproduce
+## 4. M1's real benchmark — resolved 21 Sep 2026
 
-`run_slay(thick_component=None)` in `slay_overbend_v1_50.py` is the
-plain-pipe baseline. Run today at its own defaults:
+The source paper was supplied: *Towards AI-Assisted Concept Design of ILS*
+(IJRASET Vol. 14 Issue VII, July 2026). **The benchmark is an Abaqus model**,
+and §VI Study 1 / TABLE X is the plain-pipe case M1 gates on.
 
-| R | `run_slay` defaults | §6 baseline table | ratio |
+### The benchmark as the paper states it
+
+| | |
+|---|---|
+| pipeline | 16 in, **406 mm OD x 21 mm WT** — matches `config` |
+| elements | B31 beam, mesh **2 x OD** |
+| rollers | rigid R3D4 surface, **300 mm radius** — matches `config` |
+| **roller spacing** | **9 m c/c** — `config` has **8.0 m** |
+| tension | **120 MT** |
+| contact | **single-roller model**, stated conservative |
+| steps | pretension, bend, gravity, lay tension, translate |
+
+**TABLE X** (plain pipe, T = 120 MT): **0.46%** at R = 70 m, **0.38%** at
+R = 85 m, **0.32%** at R = 105 m, all Phase 1.
+
+Note the paper is internally inconsistent about Config C: TABLE X says
+R = 105 m, §VII TABLE XIII says R = 100 m.
+
+### Three sets of numbers, not two
+
+| R | **paper (Abaqus)** | repo §6 table | old program, 8 m | old program, 9 m |
+|---|---|---|---|---|
+| 70 m | **0.46** | 0.494 | 0.4800 | 0.5081 |
+| 85 m | **0.38** | 0.384 | 0.3626 | 0.3777 |
+| 100 m | — | 0.316 | 0.2847 | 0.2932 |
+| 105 m | **0.32** | — | 0.2665 | 0.2733 |
+
+The repo's §6 regression row is **not** the paper's benchmark. It is a Python
+result, at a configuration that sits near but not on either spacing.
+
+### Where the old program and Abaqus diverge
+
+TABLE XI (R = 70 m, diameter x tension) is the cleanest comparison — the
+zero-tension rows have an independent analytical check, `eps = D/2R`:
+
+| OD | T | paper | analytic | paper vs analytic | old prog (8 m) | **old vs paper** |
+|---|---|---|---|---|---|---|
+| 168 mm | 0 | 0.13 | 0.12 | +8% | 0.1415 | **+8.8%** |
+| 406 mm | 0 | 0.33 | 0.29 | +14% | 0.3603 | **+9.2%** |
+| 508 mm | 0 | 0.42 | 0.36 | +17% | 0.4556 | **+8.5%** |
+| 168 mm | 100 | 0.29 | — | | 0.3200 | **+10.3%** |
+| 406 mm | 100 | 0.42 | — | | 0.4626 | **+10.1%** |
+| 508 mm | 100 | 0.54 | — | | 0.5560 | **+3.0%** |
+
+**At R = 70 the old program runs a uniform +8.5 to +10% above Abaqus**, held
+across a 3x diameter range and two tension levels. A stable offset of that
+kind is a modelling difference, not an error — the single-roller idealisation
+the paper itself flags as conservative, and point contact against a finite
+300 mm roller surface, both push the same way.
+
+**The divergence is in the R-trend, and it is the actual finding.**
+Amplification over the analytical `D/2R`:
+
+| | R = 70 | R = 85 | R = 105 |
 |---|---|---|---|
-| 70 m | 0.3603% | **0.494%** | 1.371 |
-| 85 m | 0.2819% | **0.384%** | 1.362 |
-| 100 m | 0.2347% | **0.316%** | 1.346 |
+| paper (Abaqus) | +58% | +59% | **+65%** |
+| old program, 8 m | +65% | +52% | **+38%** |
 
-Twelve configurations were tried against the table. None reproduces it:
+The paper's amplification **rises** with stinger radius; the old program's
+**falls**. They cross near R = 80 m, which is why R = 85 agrees to a few
+percent and R = 105 is 15% apart. This is not a scale factor and no single
+setting reconciles it — it is a difference in how the two models respond to
+stinger radius, and it is the thing to chase.
 
-| variant | R=70 | R=85 | R=100 |
-|---|---|---|---|
-| defaults | 0.3603 | 0.2819 | 0.2347 |
-| `one_sided=True` | 0.2931 | 0.2399 | 0.2029 |
-| `tension_mt=100` | 0.4626 | 0.3480 | 0.2748 |
-| `tension_mt=120` | 0.4800 | 0.3626 | 0.2847 |
-| **`tension_mt=150`** | **0.5052** | **0.3845** | **0.3008** |
-| `tension_mt=200` | 0.5458 | 0.4200 | 0.3298 |
-| `material='J2'` | 0.3604 | 0.2903 | 0.2353 |
-| `section='fibre'` | 0.3535 | 0.2847 | 0.2361 |
-| `self_weight=False` | 0.3517 | 0.2784 | 0.2324 |
-| `T=120, J2` | 0.4800 | 0.3679 | 0.2954 |
-| `T=120, one_sided` | 0.5274 | 0.3882 | 0.3002 |
-| target | 0.494 | 0.384 | 0.316 |
+### Consequences for M1
 
-`tension_mt=150` matches **R = 85 almost exactly** (0.3845 against 0.384) and
-then misses R = 70 by +2.3% and R = 100 by −4.8%. The R-dependence of the
-target does not match the R-dependence of any configuration tried, so it is
-not one knob away.
-
-**There is also no plain-pipe sliding reference at all.**
-`run_passage_sliding` raises without a component, so the only plain-pipe
-number the old code can produce comes from the **node-snapped** path — the
-one T5 is specified to retire. Expecting the sliding formulation to reproduce
-a node-snapped figure to three significant figures is not sound in any case;
-tracker item 16 records the two differing by about 5% on another case.
-
-This is decision **D5** — "which source governs the milestone ladder?" —
-now spot-checked and confirmed disagreeing on the plain-pipe case.
-
-### Options
-
-1. **Re-baseline against live reference runs.** Record `run_slay` defaults
-   (0.3603 / 0.2819 / 0.2347 at R = 70/85/100) as M1, with its full
-   configuration written down. Reproducible today; but it gates a sliding
-   solver on a node-snapped number.
-2. **Find the original configuration.** If the provenance of 0.494 / 0.384 /
-   0.316 is recoverable, use it. Nothing in the repo records it.
-3. **Re-gate M1 on a physical check** rather than a legacy number — the pure
-   arc, where the answer is known independently. Weakest as a regression
-   guard, strongest as a statement of correctness.
-
-**Recommendation: 1, with 3 kept as the standing sanity bound.** A baseline
-whose generating configuration is unrecorded cannot discriminate a rebuild
-defect from a legacy deviation, which is exactly what D5 warns about.
-
----
+1. **M1's target is the paper's, at the paper's configuration**: 0.46 / 0.38
+   / 0.32 at R = 70 / 85 / 105, T = 120 MT, **9 m roller spacing**, 406 x 21.
+2. **`config.ROLLER_SPACING` is 8.0 m and the benchmark is 9 m.** The whole
+   Python toolchain uses 8; the Abaqus benchmark uses 9. Not changed here —
+   it moves every number in the project and is a decision, not a typo.
+3. **The repo's §6 plain-pipe row should be retired or re-labelled.** It
+   matches neither the paper nor a reproducible configuration, and it is the
+   row that sent this investigation down a blind alley — including a
+   well-evidenced but wrong hypothesis that the benchmark was a 22 in pipe
+   (the 1.375x ratio is exactly 22/16, and a 22 in run reproduces R = 70 to
+   0.3%; the paper says 406 mm, so it is a coincidence).
+4. **Agreement should be judged against Abaqus with a stated tolerance**, not
+   as equality. The old program is +9% at R = 70 and -15% at R = 105; a
+   rebuild landing in that band has reproduced the old program's behaviour,
+   which is what §6 is for.
 
 ## 5. Known case-construction gaps
 

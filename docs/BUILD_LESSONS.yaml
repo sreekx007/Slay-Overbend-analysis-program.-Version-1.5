@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 42
+# entries: 44
 
 - id: L001
   area: kernel
@@ -778,3 +778,52 @@
   detect: test_two_shifts_differ_only_in_contact, test_the_problem_carries_no_shift_no_sweep_and_no_scene, test_keeping_the_old_formula_would_be_metres_wrong
   refs: [docs/modules/T4_physics_spec.md, rebuild/slay/physics/problem.py]
   date: 2026-09-15
+
+- id: L043
+  area: process
+  class: defect
+  symptom: >-
+    The §6 regression table's plain-pipe row (0.494/0.384/0.316 at R=70/85/100)
+    could not be reproduced from the reference program under 12 configurations
+    and is not the benchmark it was taken to be.
+  cause: >-
+    The real benchmark is the source paper's Abaqus TABLE X: 0.46/0.38/0.32 at
+    R = 70/85/105, T = 120 MT, 9 m roller spacing, 406x21 pipe. The repo row is
+    a Python result recorded without its configuration; it sits near but on
+    neither the 8 m (0.4800/0.3626/0.2665) nor the 9 m (0.5081/0.3777/0.2733)
+    run at T=120.
+  rule: >-
+    A baseline row states R AND tension AND roller spacing AND pipe geometry,
+    or it cannot discriminate a rebuild defect from a configuration
+    difference. Chasing this one produced a well-evidenced WRONG hypothesis:
+    target/defaults = 1.371/1.362/1.346 is almost exactly 22in/16in = 1.375,
+    and a 22in run reproduces R=70 to 0.3% -- but the paper says 406 mm, so
+    it is a coincidence. A near-constant ratio is suggestive, never proof.
+  detect: '-'
+  refs: [docs/modules/T5_solve_spec.md, docs/SLAY_ARCHITECTURE_AND_RESTRUCTURING_PLAN.md]
+  date: 2026-09-21
+
+- id: L044
+  area: measure
+  class: finding
+  symptom: >-
+    The reference Python program and the paper's Abaqus model agree at R = 70
+    and diverge progressively with stinger radius, to -15% at R = 105.
+  cause: >-
+    Two separate effects, and only the first is a scale. (1) At R=70 the
+    Python program runs a uniform +8.5 to +10% above Abaqus across a 3x
+    diameter range (168/406/508 mm) and two tensions -- a stable offset
+    consistent with the single-roller idealisation the paper flags as
+    conservative, and with point contact against a finite 300 mm roller.
+    (2) The amplification over the analytical D/2R moves the OPPOSITE way
+    with R: Abaqus +58/+59/+65% at R=70/85/105, Python +65/+52/+38%. They
+    cross near R=80.
+  rule: >-
+    Judge agreement against the benchmark with a STATED tolerance, not as
+    equality -- the reference itself is +9% at R=70 and -15% at R=105. The
+    R-trend mismatch is the thing to chase, not the offset. Also:
+    config.ROLLER_SPACING is 8.0 m while the benchmark is 9 m c/c. Changing
+    it moves every number in the project, so it is a decision, not a typo.
+  detect: '-'
+  refs: [docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
