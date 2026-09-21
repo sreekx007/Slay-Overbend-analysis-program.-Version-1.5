@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 import config
 
+from slay.physics.frame import to_model_frame
 from slay.scene.rollers import StationRole
 
 
@@ -112,11 +113,20 @@ def lay_tension(model, scene, tension: float) -> list:
     Applied at the header node nearest the station's arc position: the
     station is the end of the model, so there is nothing to interpolate
     between and a bracketing pair would be one-sided anyway.
+
+    THE DIRECTION IS AWAY FROM THE VESSEL, down the catenary -- the tangent
+    of INCREASING s. The model is cut at the stinger tip and the suspended
+    span below pulls on that cut; the tensioner's hold is the reaction at the
+    FIXED station at the vessel end. Pull the tip the other way and the
+    overbend carries COMPRESSION, which is lesson L049: `path.tangent` is a
+    WORLD vector and this is a model-frame `(fx, fy)`, so it crosses
+    `physics.frame`. Measured as built: 10 MT of "lay tension" put 5.27 MT of
+    COMPRESSION through the deck. Converted, it puts 9.25 MT of tension.
     """
     if tension == 0.0:
         return []
     st = scene.load
-    tx, ty = scene.path.tangent(st.s_arc)
+    tx, ty = to_model_frame(scene.path.tangent(st.s_arc))
     at = {n.index: n for n in model.nodes}
     ids = {i for e in model.elements if e.owner == 'pipeline'
            for i in (e.n1, e.n2)}

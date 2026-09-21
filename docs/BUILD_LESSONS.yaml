@@ -930,5 +930,31 @@
     flips a sign. A quantity that is invariant under the error -- here dn,
     because both factors flip -- cannot be used to check the error.
   detect: test_the_material_point_lands_on_its_own_arc_station
-  refs: [rebuild/slay/physics/contact.py, rebuild/slay/scene/path.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
+  refs: [rebuild/slay/physics/frame.py, rebuild/slay/physics/contact.py, rebuild/slay/scene/path.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L049
+  area: physics
+  class: defect
+  symptom: >-
+    Lay tension pointed the wrong way along the pipe. Measured through the
+    solve at R=85: 10 MT of declared lay tension put 5.27 MT of COMPRESSION
+    through the straight deck run instead of ~10 MT of tension. Peak strain
+    at 10 MT read 0.2595 pct against 0.2904 pct with the direction corrected.
+  cause: >-
+    Same defect as L048 at a second site. path.tangent returns a WORLD vector
+    and lay_tension used it as a model-frame (fx, fy), so the s component had
+    the wrong sign and the tip was pulled back toward the vessel instead of
+    down the catenary. The existing test asserted fx == T*tx against the same
+    world tangent, so it restated the implementation and ratified the defect
+    rather than catching it.
+  rule: >-
+    A test that restates the implementation cannot fail with it. Name the
+    physics instead: tension pulls the cut end away from the vessel and down,
+    so fx > 0 and fy > 0 in model components, and the deck carries tension,
+    not compression. Every world vector entering model/physics/solve goes
+    through physics.frame.to_model_frame; grep path.tangent and path.normal
+    outside scene to find the sites -- there were exactly two.
+  detect: test_tension_pulls_the_tip_away_from_the_vessel, test_lay_tension_puts_the_deck_in_tension
+  refs: [rebuild/slay/physics/frame.py, rebuild/slay/physics/loads.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21

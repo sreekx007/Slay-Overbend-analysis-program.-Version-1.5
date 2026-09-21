@@ -29,7 +29,8 @@ import config                                      # noqa: E402
 import ils_builder                                 # noqa: E402
 from slay.model.assemble import build_model        # noqa: E402
 from slay.physics import contact as ct             # noqa: E402
-from slay.physics import loads as ld               # noqa: E402
+from slay.physics import loads as ld
+from slay.physics.frame import to_model_frame               # noqa: E402
 from slay.physics.problem import (                 # noqa: E402
     build_problem, differs_only_in_contact)
 from slay.physics.sections import bind_sections    # noqa: E402
@@ -306,14 +307,33 @@ def test_tension_acts_at_the_load_station_along_its_own_tangent(scene, plain):
     assert len(out) == 1
     st = scene.load
     assert st.name == 'SR7'
-    tx, ty = scene.path.tangent(st.s_arc)
+    tx, ty = to_model_frame(scene.path.tangent(st.s_arc))
     assert out[0].fx == pytest.approx(T * tx)
     assert out[0].fy == pytest.approx(T * ty)
     assert math.hypot(out[0].fx, out[0].fy) == pytest.approx(T)
 
     tx6, ty6 = scene.path.tangent(scene.by_name('SR6').s_arc)
-    assert (tx, ty) != (tx6, ty6), 'the two tangents genuinely differ'
+    assert (tx, ty) != to_model_frame((tx6, ty6)), \
+        'the two tangents genuinely differ'
     assert ld.lay_tension(plain, scene, 0.0) == []
+
+
+def test_tension_pulls_the_tip_away_from_the_vessel(scene, plain):
+    """THE SIGN, stated as physics rather than as a formula (L049).
+
+    The model is cut at the stinger tip and the suspended span below pulls on
+    that cut, away from the vessel and downward; the tensioner's hold is the
+    reaction at the FIXED station. In model components that is `fx > 0` --
+    `s` increases toward the stinger -- and `fy > 0`, because `y` is down.
+
+    The earlier version of this test asserted `fx == T * tx` against the
+    WORLD tangent, so it ratified the defect instead of catching it. A test
+    that restates the implementation cannot fail with it; this one names the
+    direction the pipe is pulled.
+    """
+    out = ld.lay_tension(plain, scene, 120e3)
+    assert out[0].fx > 0.0, 'tension must pull the tip toward the stinger'
+    assert out[0].fy > 0.0, 'and downward, along the catenary'
 
 
 def test_restraints_are_the_fixed_station_and_nothing_else(scene, plain):

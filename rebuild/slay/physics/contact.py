@@ -21,8 +21,8 @@ BOTH VECTORS ARE IN THE MODEL FRAME, and that is the whole of lesson L048.
 `scene` speaks WORLD (`x` toward the vessel); `model`, `physics` and `solve`
 speak MODEL (`s` toward the stinger, `x_world = -(s + u_s)`). A normal read
 off the Scene is a world vector, and these coefficients multiply MODEL DOFs,
-so the `s` component flips sign and `y` does not -- `to_model_frame` below,
-the single place it happens. The reference program had no such boundary: its
+so the `s` component flips sign and `y` does not -- `physics.frame`, the
+single place it happens. The reference program had no such boundary: its
 nodal coordinate IS world `x` (`slay_sliding_v0_4.py:235`, "decreasing with
 node id"), so its `nx = -sin(theta)` was right there and is wrong here. `dn`
 is unchanged either way -- flipping both `u_s` and `n_s` leaves the product
@@ -79,6 +79,7 @@ from dataclasses import dataclass
 
 import config
 
+from slay.physics.frame import to_model_frame
 from slay.scene.rollers import StationRole
 
 
@@ -130,17 +131,6 @@ def arc_target_by_projection(path, s: float) -> float:
     ux, uy = -(x - (-s)), y - 0.0       # straight reference along the deck
     nx, ny = to_model_frame(path.normal(s))
     return ux * nx + uy * ny
-
-
-def to_model_frame(n) -> tuple:
-    """A world normal from `scene` -> coefficients on MODEL DOFs.
-
-    `x_world = -(s + u_s)`, so a world `x` component is an `s` component
-    with the sign flipped; `y` is shared by both frames and is untouched.
-    Every contact coefficient crosses this boundary and crosses it here.
-    """
-    nx, ny = n
-    return (-nx, ny)
 
 
 def _bracket(nodes_s, s: float):

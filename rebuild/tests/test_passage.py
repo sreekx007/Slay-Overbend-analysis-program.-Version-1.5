@@ -18,6 +18,8 @@ import math
 
 import pytest
 
+import config                                    # noqa: E402
+
 np = pytest.importorskip('numpy')
 pytest.importorskip('nlfea_v4')
 
@@ -140,6 +142,42 @@ def test_the_material_point_lands_on_its_own_arc_station(arc_case):
         assert miss < 5e-3, f'{t.station}: {miss:.4f} m off its own arc point'
         worst = max(worst, miss)
     assert worst > 1e-5, 'sag between supports is real; zero means no solve'
+
+
+def test_lay_tension_puts_the_deck_in_tension():
+    """L049, proven through the solve rather than on the load vector.
+
+    Frictionless rollers apply normal forces only, so the axial force is
+    carried the length of the pipe: pull the tip down the catenary and the
+    straight deck run must stretch. As built it SHORTENED -- 10 MT of "lay
+    tension" driving 5.27 MT of compression through the deck -- because
+    `path.tangent` is a world vector and `fx` is a model component.
+
+    10 MT, not 120: the benchmark tension still fails on the first increment
+    (the load path is staged and ours is proportional, section 5 of the T5
+    spec), and this test is about the sign, not the magnitude.
+    """
+    T = 10.0 * 9806.65
+    sc = _scene()
+    m = build_model(sc)
+    p = build_problem(m, sc, material=material('ro'), tension=T, gravity=True)
+    r, _state = passage.solve(p)
+    assert r.converged, r.status
+    ms, _mdl, _ix = mesh_of_problem(p)
+
+    at = {n.index: n for n in m.nodes}
+    deck = sorted((i for i in
+                   {i for e in m.elements if e.owner == 'pipeline'
+                    for i in (e.n1, e.n2)}
+                   if -40.0 <= at[i].s <= -20.0), key=lambda i: at[i].s)
+    a, b = deck[0], deck[-1]
+    eps = ((r.U[dof(ms, b, 0)] - r.U[dof(ms, a, 0)])
+           / (at[b].s - at[a].s))
+    area = math.pi / 4.0 * (config.OD_PIPE_DEF ** 2
+                            - (config.OD_PIPE_DEF - 2 * config.T_WALL_DEF) ** 2)
+    N = eps * config.STEEL_E * area
+    assert N > 0.0, f'the deck is in {-N / 1e3:.0f} kN of COMPRESSION'
+    assert 0.7 * T < N < 1.1 * T, f'{N / 1e3:.0f} kN against {T / 1e3:.0f} kN'
 
 
 # -- the active set --------------------------------------------------------

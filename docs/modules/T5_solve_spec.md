@@ -323,6 +323,42 @@ stands untouched and is still the next task.
 
 ---
 
+## 5c. The same defect at the tension load — L049, 21 Sep 2026
+
+Asked directly which way the tension points, and the answer was: the wrong
+way. `physics.frame` existing is what made the question cheap — `grep` for
+`path.tangent` and `path.normal` outside `scene` returns exactly two sites,
+and only one of them had been converted.
+
+`lay_tension` took `path.tangent(s)` — a **world** vector — and used it as a
+model-frame `(fx, fy)`. Measured through the solve at R = 85, 10 MT:
+
+| | deck axial strain | deck axial force |
+|---|---|---|
+| as built | −9.683e−06 | **−5.27 MT (compression)** |
+| converted | +1.698e−05 | **+9.25 MT (tension)** |
+
+Frictionless rollers apply normal forces only, so the axial force is carried
+the length of the pipe and the straight deck run is the clean place to read
+it. As built, 10 MT of declared *lay tension* compressed the overbend against
+its own anchor. Peak strain at 10 MT: 0.2595% as built, 0.2904% corrected.
+
+**The test that should have caught it ratified it.** It asserted
+`fx == T * tx` against the same world tangent the implementation used — a
+restatement of the code, which cannot fail with the code. Replaced by a
+statement of the physics: tension pulls the cut end away from the vessel and
+downward, so `fx > 0` and `fy > 0` in model components, and the deck carries
+tension.
+
+**This does NOT unblock the 120 MT benchmark.** Both signs fail identically —
+`CUTBACK EXHAUSTED at lam=0.0000` at R = 70, 85 and 105 — so §5's load-path
+finding stands unchanged and staged load steps are still the next task. What
+the correction buys is that the tension cases which *do* converge are now
+solving the intended problem: below about 10 MT the difference between the
+two signs is 12% of peak strain, and it was pointing the wrong way.
+
+---
+
 ## 6. Known case-construction gaps
 
 Separate from the baseline question, and to be settled before any M1 number
@@ -347,3 +383,4 @@ is quoted:
 |---|---|
 | 21 Sep 2026 | T5 solver built and its machinery verified — contact targets met to 1e-13 m including 8.897 m at SR6, active set unit-tested, loops bounded, J2 state carried. M1 **blocked**: the §6 plain-pipe baseline does not reproduce from the reference code under any of 12 configurations, and no plain-pipe sliding reference exists at all. Raised as decision D5 with three options and a recommendation. Three case-construction gaps recorded. |
 | 21 Sep 2026 | **L048 found and fixed.** `tools/plot_stinger.py` drew the solved pipe for the first time; the material point that should sit at SR6 was 5.18 m off its own arc point while every contact target was met to 1e-13 m. Cause: `LayPath.normal` is a WORLD vector and `contact_targets` used it as coefficients on MODEL DOFs, so the `s` component had the wrong sign; `dn` is invariant under that error, which is why every existing check passed. Fixed with `physics.contact.to_model_frame` and guarded by `test_the_material_point_lands_on_its_own_arc_station`. Gravity-only peak strain now falls with stinger radius — 0.3365 / 0.2751 / 0.2099% at R = 70 / 85 / 105 against 0.2617 / 0.2704 / 0.2428% before — and the amplification over `D/2R` sits at +16 / +15 / +9%. The §5b diagnosis written earlier the same day (tangential indeterminacy for want of tension) was wrong and is marked as such. Tension cases still fail on the first increment; staged load steps remain the next task. |
+| 21 Sep 2026 | **L049 found and fixed**, prompted by the question "what is the direction of applied pipeline tension?". `lay_tension` used `path.tangent` — a world vector — as a model-frame `(fx, fy)`, so 10 MT of declared lay tension drove 5.27 MT of **compression** through the deck. The existing test asserted `fx == T*tx` against the same world tangent and so ratified the defect. `to_model_frame` extracted into `slay/physics/frame.py`, both crossing sites routed through it, and the test rewritten to state the physics: `fx > 0`, `fy > 0`, deck in tension. Does not unblock the 120 MT benchmark — both signs fail identically at `lam=0` — so staged load steps remain the next task. |
