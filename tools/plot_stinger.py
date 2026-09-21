@@ -95,7 +95,7 @@ def undeformed_xy(m):
             np.array([at[i].y for i in ids]))
 
 
-def report(sc, p, r, slots):
+def report(sc, p, r, slots, ms):
     """The numbers behind the picture -- printed, because a plot cannot be
     checked by eye and the question being asked is whether it is right."""
     print(f'  status {r.status}   increments {r.increments}   '
@@ -112,6 +112,26 @@ def report(sc, p, r, slots):
         if st.role is not StationRole.CONTACT:
             print(f'  {st.name:>8}{st.role.value:>9}'
                   f'{"":>9}{"":>11}{"":>11}{"":>11}{"":>8}')
+    arc_table(sc, p, r, ms)
+
+
+def arc_table(sc, p, r, ms):
+    """THE INDEPENDENT CHECK (L047). Node reference positions are set by arc
+    length, so the material point at arc `s` must land at `path.position(s)`.
+    That statement owes nothing to the contact residual, which reports on the
+    normal direction alone -- which is exactly how a mirrored normal (L048)
+    hid behind targets met to 1e-13 m."""
+    print(f'\n  {"station":>8}{"s_mat":>9}{"arc_x":>10}{"arc_y":>10}'
+          f'{"pipe_x":>10}{"pipe_y":>10}{"miss":>9}')
+    for t in p.contacts:
+        us = sum(w * r.U[dof(ms, i, 0)]
+                 for i, w in ((t.n_lo, t.w_lo), (t.n_hi, t.w_hi)))
+        uy = sum(w * r.U[dof(ms, i, 1)]
+                 for i, w in ((t.n_lo, t.w_lo), (t.n_hi, t.w_hi)))
+        x, y = world(t.s_material, 0.0, us, uy)
+        ax, ay = sc.path.position(t.s_material)
+        print(f'  {t.station:>8}{t.s_material:9.2f}{ax:10.3f}{ay:10.3f}'
+              f'{x:10.3f}{y:10.3f}{math.hypot(x - ax, y - ay):9.4f}')
 
 
 def plot(cases, out):
@@ -171,7 +191,7 @@ def plot(cases, out):
             ('roller, lifted off', '#b44d12', 1.6, '-'),
             ('FIXED station', '#111111', 1.6, '-'),
             ('LOAD station', '#6b4ea8', 1.6, '-'))],
-        fontsize=8, ncol=4, loc='lower left', framealpha=0.93)
+        fontsize=8, ncol=2, loc='lower right', framealpha=0.93)
     axes[-1].set_xlabel('x (m)   --   +x toward the vessel, so the stinger '
                         'is on the LEFT (starboard view, no flip)')
 
@@ -202,7 +222,7 @@ def main() -> int:
     ):
         print(f'\n=== {title} ===')
         c = case(R=R, **kw)
-        report(c[0], c[2], c[3], c[5])
+        report(c[0], c[2], c[3], c[5], c[4])
         built.append((title, c))
     plot(built, out)
     return 0

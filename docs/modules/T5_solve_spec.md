@@ -190,6 +190,11 @@ and gravity alone.
 | 85 m | 0.2704% | 0.2391% | +13.1% | 4/10 |
 | 105 m | 0.2428% | 0.1935% | +25.5% | 5/10 |
 
+> **SUPERSEDED by §5b.** Those figures carried defect L048. The corrected
+> run is 0.3365 / 0.2751 / 0.2099, which does fall with R. The paragraph
+> below was right that they were "a different problem" and wrong about which
+> one.
+
 **Those are not a near-miss of the benchmark; they are a different problem.**
 Absolute strain barely moves with R (0.24–0.27%) when it should fall, and
 only four or five of ten rollers carry. With no tension the one-sided stinger
@@ -224,65 +229,101 @@ a well-defined piece of work, not a search.
 
 ---
 
-## 5b. The pipe is not sitting on the stinger — shown, 21 Sep 2026
+## 5b. The pipe was not sitting on the stinger — found and FIXED, 21 Sep 2026
 
 `tools/plot_stinger.py`, `docs/diagrams/stinger_pipe.png`. The first figure
 in this project that draws the SOLVED pipe. `draw_layout.py` renders the
 Scene and deliberately draws no pipe, because tracker item 27 forbids a
 drawing that derives the pipe's shape from the arc formula. Every coordinate
 here is a solved displacement, so the rule is satisfied and the figure is
-allowed — and the first thing it shows is a defect.
+allowed — and the first thing it showed was a defect.
 
-### Two facts that cannot both be comfortable
+### Two facts that could not both be comfortable
 
-Every contact target is met to **1e-13 m** — and the material point that
-should sit at SR6 ends up **5.2 m away from the arc**.
+Every contact target was met to **1e-13 m** — and the material point that
+should sit at SR6 ended up **5.18 m** from the arc. Under arc-length node positioning the material point at arc
+`s` must land at `path.position(s)`: bending is inextensible to first order,
+which is item 16's whole argument. Every row of that table should be zero.
 
-Pure-arc case, R = 85 m, all rollers bidirectional, no gravity, no tension.
-"Slide" is the miss resolved along the path tangent:
+Pure-arc case, R = 85 m, 9 m spacing, all rollers bidirectional, no gravity,
+no tension. Miss = distance from the material point to its own arc point:
 
-| station | arc (x, y) | solved (x, y) | miss dx | miss dy | slide |
-|---|---|---|---|---|---|
-| VR5 (fixed) | 45.000, 0.000 | 45.000, −0.000 | 0.000 | 0.000 | 0.000 |
-| VR1 | 9.000, 0.000 | 9.389, 0.002 | +0.389 | +0.002 | +0.389 |
-| SR1 | −0.000, 0.000 | 0.401, −0.007 | +0.401 | −0.007 | +0.401 |
-| SR3 | −17.866, 1.899 | −18.238, 2.047 | −0.372 | +0.148 | −0.333 |
-| SR4 | −26.548, 4.252 | −26.816, 4.711 | −0.268 | +0.459 | −0.111 |
-| SR5 | −34.933, 7.510 | −34.644, 8.980 | +0.289 | **+1.470** | +0.868 |
-| SR6 | −42.927, 11.636 | −40.014, 15.997 | **+2.913** | **+4.361** | **+4.717** |
-| SR7 (load) | −50.440, 16.584 | −45.226, 23.087 | +5.214 | +6.504 | +8.056 |
+| station | s | miss BEFORE | miss AFTER |
+|---|---|---|---|
+| VR1 | −9 | 0.0011 | 0.0001 |
+| SR1 | 0 | 0.0012 | 0.0003 |
+| SR2 | 9 | 0.0043 | 0.0012 |
+| SR3 | 18 | 0.0599 | 0.0005 |
+| SR4 | 27 | 0.3364 | 0.0008 |
+| SR5 | 36 | 1.3230 | 0.0005 |
+| SR6 | 45 | **5.1797** | **0.0023** |
 
-Under arc-length node positioning the material point at arc `s` is supposed
-to land at `path.position(s)` — bending is inextensible to first order, which
-is item 16's whole argument. Every row here should be zero. They are not, and
-the error grows monotonically down the stinger.
+(The `arc_table` the tool now prints. At the 8 m spacing the test fixture
+uses, the same case reads 2.212 m at SR6 before and 0.0027 m after.)
 
-### What that means
+### The cause: a world vector used as model coefficients
 
-The constraint being satisfied is **not the constraint that puts the pipe on
-the stinger**. Each slot fixes the NORMAL component of an interpolated
-displacement and leaves the tangent free — by design, because a material
-point genuinely slides ~2 m over the rollers by SR6. But with one restraint
-in the whole model (VR5, all DOF) and no tension, nothing makes the
-tangential position determinate. The free direction absorbs metres of motion
-and the residual stays at 1e-13 throughout, because it is measuring the one
-direction that is held.
+`scene` speaks WORLD — `+x` toward the vessel. `model`, `physics` and `solve`
+speak MODEL — `s` toward the stinger, `x_world = -(s + u_s)`.
+`LayPath.normal` returns a world vector, correctly for a Scene quantity, and
+`contact_targets` handed it straight to the solver as the coefficients
+multiplying `(u_s, u_y)`. **The `s` component had the wrong sign.**
 
-**The boundary conditions are the problem, and the benchmark's tension is
-part of them.** Lay tension at the catenary end is not decoration on this
-case: it is what pulls the pipe taut along the path and makes the tangential
-position determinate. Panel B of the figure shows the other half of the same
-story — with the ruled one-sided set and gravity but no tension, six of ten
-rollers lift off and the pipe bridges from SR3 straight past the stinger tip.
+The reference program has no such boundary to cross: its nodal coordinate IS
+world `x` (`slay_sliding_v0_4.py:235`, *"decreasing with node id"*), so its
+`nx = -sin(theta)` is right there. Copied across the frame change, it is
+wrong here.
 
-This is the same conclusion as §5's load-path finding, reached independently
-and now visible rather than argued. It does not change the next task; it
-raises its priority and says what to check when the staged steps land: every
-row of the table above should go to zero.
+**Why it survived every check until this one.** `dn` is invariant under the
+error — flipping both `u_s` and `n_s` leaves the dot product alone — so the
+target was right, and a constraint enforcing the *wrong* normal to 1e-13 m
+looks exactly like a constraint enforcing the right one. The residual reports
+on the constrained direction and nothing else. Only a statement the
+constraint does not supply could catch it, and the arc position is that
+statement.
+
+The first diagnosis written in this section was **wrong**: it read the miss
+as tangential indeterminacy for want of lay tension, and argued the boundary
+conditions were incomplete. The fix carries no tension and the miss drops to
+2.7 mm. Recorded as L047 (the check) and L048 (the defect).
+
+Fix: `physics.contact.to_model_frame`, the one named place a world vector
+becomes a model coefficient. Guarded by
+`test_the_material_point_lands_on_its_own_arc_station`, which fails by
+0.037 m at SR2 with the conversion removed.
+
+### What the figure shows now
+
+Panel A — all rollers bidirectional, no gravity, no tension — the solved pipe
+lies on the roller-centreline locus, covering it. Panel B — the ruled
+one-sided set with gravity and no tension — VR2, VR1, SR1, SR5 and SR6 lift
+off, and **every nonzero miss in panel B is at a released roller**. That is
+consistent physics rather than a defect: a one-sided roller cannot pull, so
+with no tension the pipe hangs inside the arc past SR4. It is also the second
+half of §5's argument for why the benchmark applies 120 MT.
+
+### What it changed in the numbers
+
+Gravity only, no tension, 9 m spacing, peak Phase-1 strain:
+
+| R | BEFORE | AFTER | analytic `D/2R` | AFTER over analytic |
+|---|---|---|---|---|
+| 70 m | 0.2617% | **0.3365%** | 0.2903% | +15.9% |
+| 85 m | 0.2704% | **0.2751%** | 0.2391% | +15.1% |
+| 105 m | 0.2428% | **0.2099%** | 0.1935% | +8.5% |
+
+Before the fix, absolute strain barely moved with stinger radius and the
+amplification ran −9.8 / +13.1 / +25.5% — §5 called that "not a near-miss of
+the benchmark; a different problem", and it was. **After the fix strain falls
+with R as it must**, and the amplification is +16 / +15 / +9%, in the band
+the old program occupies against Abaqus (§4).
+
+The tension cases still fail on the first increment. §5's load-path finding
+stands untouched and is still the next task.
 
 ---
 
-## 5. Known case-construction gaps
+## 6. Known case-construction gaps
 
 Separate from the baseline question, and to be settled before any M1 number
 is quoted:
@@ -305,3 +346,4 @@ is quoted:
 | Date | Action |
 |---|---|
 | 21 Sep 2026 | T5 solver built and its machinery verified — contact targets met to 1e-13 m including 8.897 m at SR6, active set unit-tested, loops bounded, J2 state carried. M1 **blocked**: the §6 plain-pipe baseline does not reproduce from the reference code under any of 12 configurations, and no plain-pipe sliding reference exists at all. Raised as decision D5 with three options and a recommendation. Three case-construction gaps recorded. |
+| 21 Sep 2026 | **L048 found and fixed.** `tools/plot_stinger.py` drew the solved pipe for the first time; the material point that should sit at SR6 was 5.18 m off its own arc point while every contact target was met to 1e-13 m. Cause: `LayPath.normal` is a WORLD vector and `contact_targets` used it as coefficients on MODEL DOFs, so the `s` component had the wrong sign; `dn` is invariant under that error, which is why every existing check passed. Fixed with `physics.contact.to_model_frame` and guarded by `test_the_material_point_lands_on_its_own_arc_station`. Gravity-only peak strain now falls with stinger radius — 0.3365 / 0.2751 / 0.2099% at R = 70 / 85 / 105 against 0.2617 / 0.2704 / 0.2428% before — and the amplification over `D/2R` sits at +16 / +15 / +9%. The §5b diagnosis written earlier the same day (tangential indeterminacy for want of tension) was wrong and is marked as such. Tension cases still fail on the first increment; staged load steps remain the next task. |

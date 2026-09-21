@@ -13,9 +13,21 @@ DERIVED, not copied. Node reference positions are set by ARC LENGTH (item
 16's ruling), so the straight reference pipe continues along the deck line
 and the material point at arc `s` must travel to `path.position(s)`:
 
-    u = (R*theta - R*sin(theta),  R*(1 - cos(theta)))
-    n = (-sin(theta), -cos(theta))
+    u = (-(R*theta - R*sin(theta)),  R*(1 - cos(theta)))
+    n = (sin(theta), -cos(theta))
     dn = u . n = R*(1 - cos - theta*sin)
+
+BOTH VECTORS ARE IN THE MODEL FRAME, and that is the whole of lesson L048.
+`scene` speaks WORLD (`x` toward the vessel); `model`, `physics` and `solve`
+speak MODEL (`s` toward the stinger, `x_world = -(s + u_s)`). A normal read
+off the Scene is a world vector, and these coefficients multiply MODEL DOFs,
+so the `s` component flips sign and `y` does not -- `to_model_frame` below,
+the single place it happens. The reference program had no such boundary: its
+nodal coordinate IS world `x` (`slay_sliding_v0_4.py:235`, "decreasing with
+node id"), so its `nx = -sin(theta)` was right there and is wrong here. `dn`
+is unchanged either way -- flipping both `u_s` and `n_s` leaves the product
+alone -- which is exactly why the error survived a target that matched to
+machine precision.
 
 The old formula `dn = arc_y * ny` is NOT a general projection. It is the same
 dot product with the `ux*nx` term silently zero, which held only because
@@ -81,7 +93,7 @@ class ContactTarget:
     station: str
     s_material: float          # m, arc position on the pipe
     theta: float               # rad, turn angle at the station
-    normal: tuple              # unit vector, roller -> pipe
+    normal: tuple              # unit vector, roller -> pipe, MODEL frame
     dn: float                  # m, target normal displacement
     dn_arc: float              # m, the arc term alone
     lift: float                # m, centreline lift from the contact surface
@@ -113,9 +125,22 @@ def arc_target_by_projection(path, s: float) -> float:
     if s <= 0.0:
         return 0.0
     x, y = path.position(s)
-    ux, uy = x - (-s), y - 0.0          # straight reference along the deck
-    nx, ny = path.normal(s)
+    # MODEL frame, deliberately -- this checks the vector the solver is
+    # handed, not a world-frame twin of it that agrees by cancellation.
+    ux, uy = -(x - (-s)), y - 0.0       # straight reference along the deck
+    nx, ny = to_model_frame(path.normal(s))
     return ux * nx + uy * ny
+
+
+def to_model_frame(n) -> tuple:
+    """A world normal from `scene` -> coefficients on MODEL DOFs.
+
+    `x_world = -(s + u_s)`, so a world `x` component is an `s` component
+    with the sign flipped; `y` is shared by both frames and is untouched.
+    Every contact coefficient crosses this boundary and crosses it here.
+    """
+    nx, ny = n
+    return (-nx, ny)
 
 
 def _bracket(nodes_s, s: float):
@@ -197,7 +222,8 @@ def contact_targets(model, scene, assembly=None, shift: float = 0.0,
         i_lo, i_hi, w_lo, w_hi = _bracket(nodes_s, s_mat)
         out.append(ContactTarget(
             station=st.name, s_material=s_mat, theta=theta,
-            normal=st.normal, dn=dn_arc + lift, dn_arc=dn_arc, lift=lift,
+            normal=to_model_frame(st.normal), dn=dn_arc + lift,
+            dn_arc=dn_arc, lift=lift,
             surface_owner=owner, n_lo=i_lo, n_hi=i_hi, w_lo=w_lo, w_hi=w_hi,
             one_sided=st.one_sided, radius=st.radius))
     return out

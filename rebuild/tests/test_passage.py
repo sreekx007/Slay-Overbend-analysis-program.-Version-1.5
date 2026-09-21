@@ -29,7 +29,7 @@ from slay.scene.rollers import roller_stations      # noqa: E402
 from slay.scene.scene import Scene                  # noqa: E402
 from slay.solve import contact as ctc               # noqa: E402
 from slay.solve import passage                      # noqa: E402
-from slay.solve.kernel import mesh_of_problem       # noqa: E402
+from slay.solve.kernel import dof, mesh_of_problem  # noqa: E402
 
 
 def _scene(R=85.0, one_sided=None, n_sr=6, n_vr=3, spacing=8.0, elastic=16.0):
@@ -110,6 +110,36 @@ def test_slots_constrain_the_normal_only(arc_case):
         assert s.coeffs == pytest.approx(
             (t.w_lo * nx, t.w_lo * ny, t.w_hi * nx, t.w_hi * ny))
         assert math.hypot(nx, ny) == pytest.approx(1.0)
+
+
+def test_the_material_point_lands_on_its_own_arc_station(arc_case):
+    """THE CHECK L047 ASKED FOR, and the one that caught L048.
+
+    A contact slot holds the NORMAL component only, so a converged residual
+    is evidence about one direction. This is the independent statement:
+    node reference positions are set by ARC LENGTH, so the material point at
+    arc `s` must end up at `path.position(s)` -- position, both components,
+    no projection, nothing the constraint itself supplies.
+
+    It fails by METRES when the contact normal is a world vector applied to
+    model DOFs (L048): 2.21 m at SR6 with every target met to 1e-13. What is
+    left is real -- discrete supports 8 m apart let the pipe sag a couple of
+    millimetres between them, and it is bounded by span, not by R.
+    """
+    sc, p, r, _st, ms = arc_case
+    worst = 0.0
+    for t in p.contacts:
+        s_mat = t.s_material
+        us = sum(w * r.U[dof(ms, i, 0)]
+                 for i, w in ((t.n_lo, t.w_lo), (t.n_hi, t.w_hi)))
+        uy = sum(w * r.U[dof(ms, i, 1)]
+                 for i, w in ((t.n_lo, t.w_lo), (t.n_hi, t.w_hi)))
+        x, y = -(s_mat + us), uy
+        ax, ay = sc.path.position(s_mat)
+        miss = math.hypot(x - ax, y - ay)
+        assert miss < 5e-3, f'{t.station}: {miss:.4f} m off its own arc point'
+        worst = max(worst, miss)
+    assert worst > 1e-5, 'sag between supports is real; zero means no solve'
 
 
 # -- the active set --------------------------------------------------------

@@ -878,29 +878,57 @@
   date: 2026-09-21
 
 - id: L047
-  area: solve
-  class: defect
+  area: measure
+  class: finding
   symptom: >-
     Every contact target met to 1e-13 m, and the material point that should
-    sit at SR6 ends up 5.2 m from the arc. Miss grows monotonically down the
-    stinger: 0.4 m at SR1, 1.5 m at SR5, 5.2 m at SR6, 8.1 m at the tip.
+    sit at SR6 ends up 2.21 m from the arc (5.2 m in the one-sided gravity
+    case). Miss grows monotonically down the stinger and is invisible to the
+    residual.
   cause: >-
     A contact slot fixes the NORMAL component of an interpolated displacement
-    and leaves the tangent free -- correct, because a material point really
-    does slide ~2 m over the rollers by SR6. But with one restraint in the
-    whole model (VR5, all DOF) and no tension, nothing makes the tangential
-    position determinate. The free direction absorbs metres of motion while
-    the residual stays at 1e-13, because the residual measures the one
-    direction that IS held.
+    and leaves the tangent free, so the residual reports on one direction
+    only. The first diagnosis written here -- tangential indeterminacy for
+    want of tension -- was WRONG, and the arc-position check is what proved
+    it: the true cause was a mirrored contact normal (L048), and the miss
+    drops to 2.7 mm with that fixed and still no tension.
   rule: >-
-    A converged residual on a partial constraint is not evidence the model is
-    right -- it is evidence about the constrained direction only. Under
-    arc-length positioning the material point at arc s must land at
-    path.position(s); that is the check, and it is independent of any
-    residual. Lay tension is part of the BOUNDARY CONDITIONS on this case,
-    not a load on top of it: it is what pulls the pipe taut and makes the
-    tangential position determinate. When staged load steps land, every row
-    of the arc-position table must go to zero.
-  detect: '-'
-  refs: [tools/plot_stinger.py, docs/modules/T5_solve_spec.md, docs/diagrams/stinger_pipe.png]
+    A converged residual on a partial constraint is evidence about the
+    constrained direction and nothing else. Under arc-length positioning the
+    material point at arc s must land at path.position(s) -- both components,
+    no projection, nothing the constraint itself supplies. Measure that
+    before theorising about what is missing; a plausible story about
+    under-constraint is cheaper to write than a position to measure, and it
+    was wrong.
+  detect: test_the_material_point_lands_on_its_own_arc_station
+  refs: [tools/plot_stinger.py, docs/modules/T5_solve_spec.md, docs/diagrams/stinger_pipe.png, rebuild/tests/test_passage.py]
+  date: 2026-09-21
+
+- id: L048
+  area: physics
+  class: defect
+  symptom: >-
+    Contact normals carried the world-frame sign into model DOFs. Arc
+    stations missed their own arc point by up to 2.21 m at SR6 (R=85) while
+    every target was met to 1e-13 m. Rebuild peak strain barely moved with
+    stinger radius -- 0.2617/0.2704/0.2428 pct at R=70/85/105 -- when it must
+    fall like D/2R.
+  cause: >-
+    scene speaks WORLD (x toward the vessel); model, physics and solve speak
+    MODEL (s toward the stinger, x_world = -(s + u_s)). path.normal returns a
+    world vector and contact_targets handed it straight to the solver as
+    coefficients on (u_s, u_y), so the s component had the wrong sign. dn was
+    unaffected -- flipping both u_s and n_s leaves the dot product alone --
+    so the target matched to machine precision and the constraint was still
+    wrong. The reference program has no such boundary: its nodal coordinate
+    IS world x (slay_sliding_v0_4.py:235, "decreasing with node id"), so its
+    nx = -sin(theta) was right there and is wrong here.
+  rule: >-
+    A formula ported across a frame change is not a formula that survived the
+    port. Every world vector entering model/physics/solve passes through one
+    named conversion (physics.contact.to_model_frame) and no other place
+    flips a sign. A quantity that is invariant under the error -- here dn,
+    because both factors flip -- cannot be used to check the error.
+  detect: test_the_material_point_lands_on_its_own_arc_station
+  refs: [rebuild/slay/physics/contact.py, rebuild/slay/scene/path.py, slay_sliding_v0_4.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21
