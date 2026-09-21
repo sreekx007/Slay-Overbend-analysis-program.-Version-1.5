@@ -17,21 +17,24 @@ from slay.scene import LayPath, StationRole, build_scene, roller_stations
 # Check 1 -- arc length and x diverge on the stinger, agree on the deck
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize('R, expected', [(85.0, 1.460), (70.0, 2.142)])
+@pytest.mark.parametrize('R, expected', [(85.0, 2.07), (70.0, 3.04)])
 def test_arc_vs_rectangular_divergence(R, expected):
-    """The whole reason node positions follow arc length (tracker item 16).
+    """The whole reason node positions follow arc length (tracker item 16),
+    and now reproducing the tracker's OWN published figures.
 
-    NOTE these are the figures at the configured 8 m spacing. Tracker item
-    16 quotes 2.07 m and 3.04 m, which reproduce only at 9 m spacing -- a
-    test written from those numbers fails against the real default and
-    invites the conclusion that the code is wrong.
+    THIS TEST USED TO RECORD 1.460 AND 2.142, with a note saying item 16's
+    2.07 m and 3.04 m "reproduce only at 9 m spacing" -- treating the
+    mismatch as a quirk of the config rather than as evidence about it. The
+    source paper settled it on 21 Sep 2026: the Abaqus benchmark states 9 m
+    c/c, the config said 8.0, and item 16 was computed at 9 all along. The
+    evidence was already inside the repo and had been explained away.
     """
     sc = build_scene(R=R)
     sr1, sr6 = sc.by_name('SR1'), sc.by_name('SR6')
     arc = sr6.s_arc - sr1.s_arc
     dx = abs(sr6.x - sr1.x)
-    assert arc == pytest.approx(40.0)
-    assert (arc - dx) == pytest.approx(expected, abs=1e-3)
+    assert arc == pytest.approx(45.0)
+    assert (arc - dx) == pytest.approx(expected, abs=5e-3)
 
 
 def test_arc_and_x_agree_on_the_deck():
@@ -50,10 +53,10 @@ def test_arc_and_x_agree_on_the_deck():
 def test_sr6_geometry():
     sc = build_scene(R=85.0)
     sr6 = sc.by_name('SR6')
-    assert sr6.s_arc == pytest.approx(40.0)
-    assert sr6.x == pytest.approx(-38.540, abs=1e-3)
-    assert sr6.y == pytest.approx(9.239, abs=1e-3)
-    assert math.degrees(sc.path.theta(sr6.s_arc)) == pytest.approx(26.96, abs=0.01)
+    assert sr6.s_arc == pytest.approx(45.0)
+    assert sr6.x == pytest.approx(-42.927, abs=1e-3)
+    assert sr6.y == pytest.approx(11.636, abs=1e-3)
+    assert math.degrees(sc.path.theta(sr6.s_arc)) == pytest.approx(30.33, abs=0.01)
 
 
 def test_stations_ascend_in_arc_length():
@@ -75,10 +78,16 @@ def test_one_sided_vessel_pair_sits_where_the_old_code_put_it():
     beside the fixed station instead -- inverting the contact behaviour of
     two rollers in a model that still converges and still looks plausible.
     """
-    sc = build_scene()
+    # At the LEGACY 8 m spacing explicitly: this pins agreement with the old
+    # implementation's layout, and the old implementation runs at 8 m. The
+    # project default moved to the benchmark's 9 m on 21 Sep 2026, which
+    # moves every station -- but not the RULE this test is about.
+    sc = build_scene(spacing=8.0)
     xs = sorted(st.x for st in sc.stations
                 if st.name.startswith('VR') and st.one_sided)
     assert xs == [8.0, 16.0]
+    assert sorted(st.x for st in build_scene().stations
+                  if st.name.startswith('VR') and st.one_sided) == [9.0, 18.0]
 
 
 def test_vessel_one_sided_split():
@@ -218,12 +227,12 @@ def test_load_station_is_not_a_contact_slot():
 def test_sr1_is_on_the_deck_line_and_sr2_is_on_the_curve():
     """The correction to the first sketch: only SR1 is on the tangent line.
 
-    SR2 has already dropped 0.376 m at R=85 -- a 2.7% grade, shallow enough
+    SR2 has already dropped 0.476 m at R=85 -- a 5.3% grade, shallow enough
     to look flat and steep enough to matter.
     """
     sc = build_scene(R=85.0)
     assert sc.by_name('SR1').y == pytest.approx(0.0, abs=1e-12)
-    assert sc.by_name('SR2').y == pytest.approx(0.376, abs=1e-3)
+    assert sc.by_name('SR2').y == pytest.approx(0.476, abs=1e-3)
     assert sc.by_name('SR2').y > 0
 
 
@@ -286,7 +295,7 @@ def test_elastic_zones_that_would_overlap_are_refused():
 
 def test_zone_boundaries_are_the_interior_edges():
     sc = build_scene()
-    assert sc.elastic_zone_boundaries == pytest.approx((-24.0, 32.0))
+    assert sc.elastic_zone_boundaries == pytest.approx((-29.0, 38.0))
 
 
 # --------------------------------------------------------------------------

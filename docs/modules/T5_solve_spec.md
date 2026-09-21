@@ -154,6 +154,76 @@ stinger radius, and it is the thing to chase.
    rebuild landing in that band has reproduced the old program's behaviour,
    which is what §6 is for.
 
+## 5. First run against the benchmark — 21 Sep 2026
+
+`config.ROLLER_SPACING` moved **8.0 m -> 9.0 m** to match the benchmark.
+
+### The repo already contained the evidence, and had explained it away
+
+`test_arc_vs_rectangular_divergence` recorded 1.460 m and 2.142 m with this
+note: *"Tracker item 16 quotes 2.07 m and 3.04 m, which reproduce only at 9 m
+spacing -- a test written from those numbers fails against the real default
+and invites the conclusion that the code is wrong."* At 9 m the measured
+figures are **2.0728** and **3.0361** against item 16's **2.07** and **3.04**.
+
+A mismatch between a tracker figure and the config was read as a quirk of the
+tracker. It was evidence about the config.
+
+### Result: the tension cases do not converge
+
+| R | paper (120 MT) | rebuild | status |
+|---|---|---|---|
+| 70 m | 0.46% | — | **CUTBACK EXHAUSTED**, 0 increments |
+| 85 m | 0.38% | — | **CUTBACK EXHAUSTED**, 0 increments |
+| 105 m | 0.32% | — | **CUTBACK EXHAUSTED**, 0 increments |
+
+It fails on the **first increment**, at **30 MT** as readily as at 120. It
+reports the failure rather than returning 0.0 silently, which is the one
+thing the documented failure signature demands.
+
+What does converge, at R = 85: no gravity and no tension (the pure-arc case),
+and gravity alone.
+
+| R | rebuild, gravity only | analytical `D/2R` | over | rollers active |
+|---|---|---|---|---|
+| 70 m | 0.2617% | 0.2903% | −9.8% | 4/10 |
+| 85 m | 0.2704% | 0.2391% | +13.1% | 4/10 |
+| 105 m | 0.2428% | 0.1935% | +25.5% | 5/10 |
+
+**Those are not a near-miss of the benchmark; they are a different problem.**
+Absolute strain barely moves with R (0.24–0.27%) when it should fall, and
+only four or five of ten rollers carry. With no tension the one-sided stinger
+rollers cannot pull the pipe onto the arc — they only push — so the pipe sags
+between whatever it touches and the stinger radius stops governing. That is
+*why* the benchmark applies 120 MT.
+
+### The diagnosis: the load path is staged, and ours is proportional
+
+The paper's §V.D runs five steps:
+
+1. pretension at the catenary end, **vessel end fixed**
+2. **rotation** at the catenary end to bend the pipe along the stinger
+3. gravity
+4. lay tension at the catenary end
+5. translation at the vessel end
+
+`passage.solve` ramps **everything together** — contact targets, gravity and
+tension all scale with one `lam`. So at the first increment it applies a
+fraction of 1.18 MN at the tip of a 9 m overhang hanging past SR6 on a pipe
+that is still straight and anchored 99 m away. There is nothing to react it,
+and Newton diverges before the geometry exists that would carry the load.
+
+Step 2 is also **displacement**-controlled — a rotation imposed at the end —
+where ours is contact-target-driven throughout. Both differences point the
+same way: the benchmark builds the deformed shape first and loads it second.
+
+**Next task: staged load steps.** `solve` needs to take a sequence of steps,
+each ramping its own subset (geometry, then gravity, then tension), carrying
+state between them — which is what `SolveState` already exists to do. This is
+a well-defined piece of work, not a search.
+
+---
+
 ## 5. Known case-construction gaps
 
 Separate from the baseline question, and to be settled before any M1 number

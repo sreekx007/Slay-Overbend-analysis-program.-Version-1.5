@@ -67,7 +67,7 @@ def test_plain_pipe_element_count_is_recorded(scene):
     """109 elements at 2 x OD over the 88 m extent. Pinned, per G8 -- 'it ran
     without error' is not verification, so the number goes in the test."""
     m = build_model(scene)
-    assert (m.n_nodes, m.n_elems) == (110, 109)
+    assert (m.n_nodes, m.n_elems) == (123, 122)
     assert m.warnings == []
 
 

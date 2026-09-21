@@ -188,7 +188,11 @@ def test_physical_layout_of_the_one_sided_pair():
     x_of = lambda j: j * spacing
     one_sided_x = sorted(x_of(int(n[2:])) for n in config.ONE_SIDED_ROLLERS_DEFAULT
                          if n.startswith('VR'))
-    assert one_sided_x == [spacing, 2 * spacing] == [8.0, 16.0]
+    # The RULE is 'one and two spacings inboard of SR1', not a pair of
+    # absolute positions -- so it is stated against `spacing` and the
+    # literals follow it. They were [8.0, 16.0] until the default moved
+    # to the benchmark's 9 m on 21 Sep 2026; the rule did not change.
+    assert one_sided_x == [spacing, 2 * spacing] == [9.0, 18.0]
 
 
 # ---------------------------------------------------------------------------

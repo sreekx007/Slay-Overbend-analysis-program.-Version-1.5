@@ -178,7 +178,7 @@ def test_the_deck_asks_for_nothing_and_the_arc_asks_downward(scene, plain):
     arc = [targets[f'SR{i}'].dn for i in range(2, 7)]
     assert all(v < 0 for v in arc)
     assert arc == sorted(arc, reverse=True), 'monotone down the stinger'
-    assert targets['SR6'].dn == pytest.approx(-8.89707, abs=5e-6)
+    assert targets['SR6'].dn == pytest.approx(-11.09002, abs=5e-5)
 
 
 def test_the_target_takes_an_angle_not_an_arc_length(scene):
@@ -186,6 +186,8 @@ def test_the_target_takes_an_angle_not_an_arc_length(scene):
     only the absurd magnitude caught it: -1485 m at VR4, on a station whose
     target is exactly zero. A wrong-but-plausible number here is a wrong
     model that converges."""
+    # s = 40 m is a fixed arc position, NOT a station -- so this figure is
+    # independent of roller spacing and survived the move to 9 m untouched.
     s = 40.0
     assert ct.arc_target(scene.path.R, scene.path.theta(s)) == \
         pytest.approx(-8.89707, abs=5e-6)

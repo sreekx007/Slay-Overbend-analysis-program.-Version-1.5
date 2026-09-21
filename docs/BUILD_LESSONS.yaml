@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 44
+# entries: 46
 
 - id: L001
   area: kernel
@@ -826,4 +826,53 @@
     it moves every number in the project, so it is a decision, not a typo.
   detect: '-'
   refs: [docs/modules/T5_solve_spec.md]
+  date: 2026-09-21
+
+- id: L045
+  area: process
+  class: defect
+  symptom: >-
+    config.ROLLER_SPACING was 8.0 m; the benchmark is 9 m c/c. A test already
+    recorded the mismatch and rationalised it: "tracker item 16 quotes 2.07 m
+    and 3.04 m, which reproduce only at 9 m spacing -- a test written from
+    those numbers fails against the real default".
+  cause: >-
+    A disagreement between a recorded figure and the config was read as a
+    quirk of the figure. At 9 m the measured slide is 2.0728 and 3.0361
+    against item 16's 2.07 and 3.04 -- exact.
+  rule: >-
+    When a published figure will not reproduce against the configuration,
+    that is evidence ABOUT the configuration, not a footnote to write around
+    it. Spacing moved to 9.0 on 21 Sep 2026; every §6 figure taken from the
+    legacy toolchain is at 8 m, so state the spacing beside any number that
+    crosses the boundary. Tests pinning old-code AGREEMENT now pass
+    spacing=8.0 explicitly; tests recording the current default were updated.
+  detect: test_arc_vs_rectangular_divergence, test_physical_layout_of_the_one_sided_pair
+  refs: [rebuild/slay_config.yaml, rebuild/tests/test_scene.py]
+  date: 2026-09-21
+
+- id: L046
+  area: solve
+  class: finding
+  symptom: >-
+    passage.solve cannot reach the benchmark case: CUTBACK EXHAUSTED on the
+    FIRST increment at 30 MT of tension as readily as at 120.
+  cause: >-
+    The benchmark's load path is STAGED -- pretension with the vessel end
+    fixed, then a rotation-driven bend, then gravity, then lay tension, then
+    translation -- while solve ramps contact targets, gravity and tension
+    together on one lam. At the first increment that puts a fraction of
+    1.18 MN on the tip of a 9 m overhang past SR6, on a pipe still straight
+    and anchored 99 m away, with nothing to react it.
+  rule: >-
+    A proportional ramp is not a substitute for a staged one when the later
+    loads need geometry the earlier steps create. solve must take a SEQUENCE
+    of steps, each ramping its own subset and carrying state -- which is what
+    SolveState already exists for. Corollary measured: without tension the
+    one-sided stinger rollers cannot pull the pipe onto the arc, so only 4-5
+    of 10 carry, strain barely varies with R (0.2617/0.2704/0.2428 at
+    70/85/105) and stinger radius stops governing. Tension is not a load on
+    the benchmark case, it is what makes it the benchmark case.
+  detect: '-'
+  refs: [rebuild/slay/solve/passage.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21

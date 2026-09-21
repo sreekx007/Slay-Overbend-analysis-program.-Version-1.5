@@ -17,7 +17,15 @@ reference_pipeline:
                            # a coincidence, not a link.
 
 stinger_rollers:
-  spacing_m: 8.0
+  spacing_m: 9.0           # CHANGED 21 Sep 2026: was 8.0. The source
+                           # paper's Abaqus benchmark states 9 m c/c
+                           # ("Rollers are spaced out at length of 9m
+                           # c/c ... typical roller spacing in vessels,
+                           # more towards the conservative side").
+                           # The legacy Python toolchain used 8.0 and
+                           # every §6 figure taken from it is at 8 m --
+                           # state the spacing beside any number that
+                           # crosses that boundary.
   n_sr: 6                  # stinger rollers, EXCLUDING the tip station.
                             # SR1 sits at theta=0, ON the deck tangent line, and
                             # IS counted; SR2 is the first station on the curve.
