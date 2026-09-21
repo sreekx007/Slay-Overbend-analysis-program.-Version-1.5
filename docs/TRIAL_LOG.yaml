@@ -278,11 +278,14 @@
     All three archetypes build, mesh and solve step 1 (124/123/124 nodes,
     11 contacts each, status ok). Series 3 = GD-TP, Phase 1, reachable with
     T5 as built. Series 4 and 5 are Phase 2 in EVERY row and need the sweep
-    (T6/L7/M5, not built). The paper holds OD at 406.4 mm and thickens
-    inward; ThickPipeBody holds bore constant and thickens outward, giving
-    I ratios ours/paper of 1.186/1.384/1.637 at 32/42/53 mm.
+    (T6/L7/M5, not built). A geometry-convention conflict was raised and
+    WITHDRAWN the same day: TABLE XIX's OD=406.4 is the PIPELINE's, not the
+    component's. The paper thickens outward at constant bore, stating
+    "WT = 53 mm, OD = 471 mm at constant ID = 364 mm ... entirely outward"
+    and ~3.2x stiffness. ThickPipeBody computes 470.4 mm and I/Ip 3.248 for
+    that case, so the conventions MATCH.
   verdict: >-
-    GD-TP first; GD-SH and the combination are gated on T6. The geometry
-    convention must be settled before any Series 3 number is quoted.
+    GD-TP first and UNBLOCKED -- no convention decision needed. GD-SH and
+    the combination are gated on T6's sweep.
   lesson: L054, L055
   refs: [docs/modules/T9_components_spec.md, rebuild/component_spec.py]

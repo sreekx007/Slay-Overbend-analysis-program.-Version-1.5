@@ -1065,28 +1065,31 @@
   date: 2026-09-21
 
 - id: L054
-  area: physics
+  area: process
   class: finding
   symptom: >-
-    The paper's Series 3 thick-pipe cases hold OD at 406.4 mm and thicken
-    INWARD; component_spec.ThickPipeBody holds bore constant and thickens
-    OUTWARD. Second moment of area, ours/paper, at the same nominal wall:
-    1.186 (32 mm), 1.384 (42 mm), 1.637 (53 mm).
+    Read TABLE XIX's "OD (mm) 406.4" column as the COMPONENT's OD and
+    concluded the paper thickens inward at fixed OD while ThickPipeBody
+    thickens outward at fixed bore -- a 19-64 pct stiffness conflict. WRONG.
+    406.4 is the PIPELINE OD, repeated across the case rows as a fixed
+    parameter. Corrected by the user, same day, before any run.
   cause: >-
-    Sec.1.3 of the component spec makes constant bore the governing rule,
-    t_comp the free variable and OD_comp a read-only consequence. The paper
-    varies WT at fixed OD. Both are defensible; they are different
-    components, and Series 3 is a study of exactly that stiffness.
+    A fixed parameter repeated in every row of a case table looks like a
+    varying one. The disconfirming evidence was already in hand and in the
+    paper: the computed constant-bore I/Ip for the 53 mm case is 3.248, and
+    the paper states "approximately 3.2x the pipeline stiffness" and
+    "WT = 53 mm, OD = 471 mm at constant ID = 364 mm. The 2.54x wall
+    thickness increase is entirely outward". The number that would have
+    caught it was sitting in the comparison table as the supposed error.
   rule: >-
-    Check the geometry convention before comparing against a benchmark, not
-    after the numbers disagree. A 19-64 pct stiffness difference would read
-    as a solver error. A larger OD also lifts the centreline off the roller,
-    leaking the GD-SH mechanism into a GD-TP case the study exists to
-    isolate. Routes: declared section (cheap, reproduces the paper, no
-    mirror edit); upstream PR for a constant-OD mode (correct, slow);
-    or compare trends and say so on every number.
+    Check a derived quantity against the source's OWN stated derived value
+    before calling it a discrepancy -- the paper quotes 3.2x stiffness and
+    471 mm OD, both of which match constant bore. A column that does not
+    change across the cases of a case table is a fixed parameter, not the
+    variable. And a conflict found while scoping is a hypothesis: confirm it
+    against prose, not against a table header.
   detect: '-'
-  refs: [rebuild/component_spec.py, rebuild/slay/physics/sections.py, docs/modules/T9_components_spec.md]
+  refs: [rebuild/component_spec.py, docs/modules/T9_components_spec.md]
   date: 2026-09-21
 
 - id: L055

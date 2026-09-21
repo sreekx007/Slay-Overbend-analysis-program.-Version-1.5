@@ -96,49 +96,52 @@ Fixed: shroud L1 = 10D, L2 = 2.5D, V = 1D; R = 85 m, T = 100 MT.
 
 ---
 
-## 6. BLOCKER FOUND BEFORE ANY RUN — the paper thickens INWARD, we thicken OUTWARD
+## 6. Geometry convention — CONFIRMED TO MATCH, no blocker
 
-TABLE XIX holds **OD at 406.4 mm for all three cases** and varies WT, so the
-paper's thick section keeps its outside diameter and loses bore.
+A blocker was raised here and **withdrawn the same day, before any run**.
+The reading was that TABLE XIX's `OD (mm) = 406.4` column is the
+COMPONENT's outside diameter, making the paper's thick section thicken
+INWARD while `ThickPipeBody` thickens OUTWARD. It is not: **406.4 mm is the
+PIPELINE's OD**, repeated in every case row as a fixed parameter — TABLE
+XVII states it as "Pipeline 406.4 mm OD (16 in) × 21 mm WT" and lists the
+thick section's wall and length separately as "Varies".
 
-`component_spec.ThickPipeBody` does the opposite, and does it deliberately:
-Sec.1.3 makes **constant bore** the governing rule, `t_comp` the free
-variable and `OD_comp = ID + 2·t_comp` a read-only consequence — passing
-`OD_comp` is a `TypeError`. Second moment of area, computed 21 Sep 2026:
+The paper is explicit, and agrees with the component spec:
 
-| Case | t | paper: OD fixed | ours: bore fixed | I ours / I paper |
+> "…WT = 53 mm, OD = 471 mm **at constant ID = 364 mm**. The 2.54× wall
+> thickness increase is **entirely outward**; it raises the roller contact
+> elevation by 32 mm and increases bending stiffness by approximately
+> **3.2×**" — Fig. 17
+
+> "for the same ID and material, EI ∝ OD⁴ − ID⁴, giving approximately 3.2×
+> the pipeline stiffness" — §III
+
+`component_spec.ThickPipeBody` Sec.1.3 makes constant bore the governing
+rule, `t_comp` free and `OD_comp = ID + 2·t_comp` a read-only consequence.
+**That is the paper's convention exactly.** Our constant-bore computation
+for the 53 mm case gives `OD = 470.4 mm` and `I/Ip = 3.248` against the
+paper's 471 mm and ~3.2×.
+
+| Case | t | OD (ours) | I/Ip (ours) | paper |
 |---|---|---|---|---|
-| A1 | 32 mm | I/Ip = 1.403 | I/Ip = 1.664 | **1.186** |
-| A2 | 42 mm | I/Ip = 1.708 | I/Ip = 2.363 | **1.384** |
-| A3 | 53 mm | I/Ip = 1.984 | I/Ip = 3.248 | **1.637** |
+| A1 | 32 mm | 428.4 mm | 1.664 | — |
+| A2 | 42 mm | 448.4 mm | 2.363 | — |
+| A3 | 53 mm | 470.4 mm | **3.248** | **471 mm, ~3.2×** |
 
-**Our component is 19 / 38 / 64% stiffer than the paper's at the same
-nominal wall.** These are different components, and the whole of Series 3 is
-a study of exactly that stiffness. Running GD-TP against TABLE XX as it
-stands would disagree for a reason that has nothing to do with the solver.
+**GD-TP is unblocked.** No decision on geometry convention is required, and
+the declared-section workaround is not needed.
 
-A larger OD also lifts the pipe centreline off the roller — the GD-SH
-mechanism leaking into a GD-TP case, which Series 3 is specifically designed
-to isolate from.
+Recorded as L054 — kept as a process lesson rather than deleted, because the
+number that disproved the conflict (3.248) was sitting in the comparison
+table as the supposed error. A derived quantity should be checked against
+the source's own stated derived value before it is called a discrepancy.
 
-### Three routes, none taken here
-
-1. **Declared section.** `bind_sections`' `'declared'` rule already takes an
-   element section verbatim (`e.section.OD`, `e.section.t`), so a
-   constant-OD thick span can be modelled without a component at all and
-   without touching the mirror. Cheapest, and it reproduces the paper.
-   Loses the component's own geometry, contact surface and provenance.
-2. **Upstream change** to `component_spec.py` adding a constant-OD mode.
-   `component_spec.py` is MIRRORED and must never be edited here (G7), so
-   this is a PR against Slay-ILS-Designer-V1.0, like CUN-001 and the GD-SB
-   fix. Correct, and slow.
-3. **Accept the difference** and compare trends rather than values. Honest
-   only if stated on every number, and it abandons TABLE XX as a benchmark.
-
-**Not chosen.** It changes what the component IS, which is a modelling
-decision.
-
----
+Note the second consequence the paper draws and we must carry: the outward
+growth **raises the roller contact elevation by V = OD_comp/2 − OD_pipe/2**
+— 32 mm for the 53 mm case. That is the same centreline-lift mechanism
+`contact_targets` computes from `assembly.contact_at`, so a GD-TP case has a
+contact-surface effect as well as a stiffness effect, and they are not
+separable in the geometry.
 
 ## 7. What is already in place
 
@@ -169,4 +172,5 @@ decision.
 
 | Date | Action |
 |---|---|
+| 21 Sep 2026 | **Correction, same day:** the geometry-convention blocker below was WITHDRAWN. TABLE XIX's `OD = 406.4` is the pipeline's, not the component's; the paper thickens outward at constant bore, which is `ThickPipeBody`'s own rule. Our 53 mm case computes OD 470.4 mm and I/Ip 3.248 against the paper's stated 471 mm and ~3.2x. GD-TP unblocked; no convention decision needed. L054 rewritten as a process lesson. |
 | 21 Sep 2026 | Target register written. Paper series mapped to repo codes by mechanism. Series 3 (GD-TP) is Phase 1 and reachable with T5 as built; Series 4 and 5 are Phase 2 in every row and gated on the unbuilt sweep. All three archetypes confirmed to build, mesh and solve step 1. One blocker found before any run: the paper holds OD constant and thickens inward while `ThickPipeBody` holds bore constant and thickens outward, making our component 19–64% stiffer at the same nominal wall. Three routes recorded, none chosen. |
