@@ -97,6 +97,21 @@ def test_a_sweep_the_model_cannot_feed_is_refused(plain):
     with pytest.raises(ValueError, match='off the vessel end'):
         sweep.check_reach(plain, headroom + 0.1)
 
+    # The refusal must advise the SHORTFALL, not the whole sweep. It once
+    # said 18.128 m where 2.128 m suffices -- advice that over-sizes by the
+    # headroom it forgot to count.
+    big = sweep.sweep_length(8.128)
+    short = big - headroom
+    with pytest.raises(ValueError, match=rf'margin_vessel >= {short:.3f} m'):
+        sweep.check_reach(plain, big)
+    sweep.check_reach(
+        build_scene(R=85.0, spacing=8.0, margin_vessel=short,
+                    elastic_length=16.0), big)
+    with pytest.raises(ValueError):
+        sweep.check_reach(
+            build_scene(R=85.0, spacing=8.0, margin_vessel=short - 0.1,
+                        elastic_length=16.0), big)
+
     big = sweep.sweep_length(8.128)
     assert big > headroom
     sweep.check_reach(sweep.scene_for(R=85.0, spacing=8.0, L_comp=8.128,

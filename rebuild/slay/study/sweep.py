@@ -139,11 +139,17 @@ def check_reach(scene, total: float) -> None:
     inner = min(st.s_arc for st in contacts)
     s_lo = min(scene.extent)
     if inner - total < s_lo - 1e-9:
+        # The SHORTFALL, not the whole sweep: the station already sits
+        # `inner - s_lo` inboard of the model end, and that headroom counts.
+        need = total - (inner - s_lo)
         raise ValueError(
             f'sweep of {total:.3f} m runs the innermost contact station '
             f'({inner:+.3f}) off the vessel end of the model ({s_lo:+.3f}). '
-            f'Build the Scene with margin_vessel >= {inner - s_lo + total:.3f} '
-            f'-- see study.sweep.scene_for.')
+            f'It has {inner - s_lo:.3f} m of headroom, so this needs '
+            f'margin_vessel >= {need:.3f} m -- or use study.sweep.scene_for, '
+            f'which sizes it at the full {total:.3f} m and ignores the '
+            f'headroom on purpose, so the buffer does not depend on where '
+            f'the innermost roller happens to sit.')
 
 
 def _required_stations(scene) -> tuple:
