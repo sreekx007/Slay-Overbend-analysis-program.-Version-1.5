@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 58
+# entries: 60
 
 - id: L001
   area: kernel
@@ -1189,3 +1189,52 @@
   detect: '-'
   refs: [docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md, slay_sliding_v0_4.py]
   date: 2026-09-21
+
+- id: L059
+  area: model
+  class: defect
+  symptom: >-
+    With a vessel-side sweep buffer, build_problem raised "VR5 is at
+    s=-40.0000 and the nearest header node is at -39.8000. A restraint needs
+    a node under it." Every prior model had worked.
+  cause: >-
+    build_model registers PIPE-LO at the Scene extent and does NOT register
+    roller stations. At margin=0 the extent's vessel end coincided exactly
+    with the FIXED station, so the anchor had a node BY COINCIDENCE. Adding
+    margin_vessel moved the end and the mesh grid no longer landed on it.
+    boundary_conditions demands a node within 1e-6 m.
+  rule: >-
+    A restraint's node must be REQUESTED, never inherited from a boundary
+    that happens to coincide with it. study.sweep._required_stations passes
+    every FIXED station through build_model's extra_stations, which is the
+    documented route for a point an outside layer needs a node at. Contact
+    stations are deliberately NOT included -- they are interpolated inside
+    an element (G1).
+  detect: test_the_anchor_keeps_a_node_once_the_end_moves
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/model/assemble.py, rebuild/slay/physics/loads.py]
+  date: 2026-09-22
+
+- id: L060
+  area: solve
+  class: ruling
+  symptom: >-
+    Sweep length was previously chosen by hand (the reference's default
+    d_shift=1.0, n_shifts=4 -- 3.195 m, 40 pct of a roller spacing) and the
+    truncation twice produced a monotonic trend that was read as a maximum.
+  cause: >-
+    A passage length that does not follow from the component cannot be
+    known to cover the traverse. The reference also caps at ~90 pct of one
+    spacing regardless of n_vr, because its buffer is bought with roller
+    count rather than length.
+  rule: >-
+    RULED 22 Sep 2026. sweep_length = L_comp + clear_before + clear_after,
+    defaults 1.0 m each and adjustable: the component starts with its
+    LEADING edge clear_before short of SR2 and finishes with its TRAILING
+    edge clear_after past it. The swept length is added at the VESSEL end
+    (build_scene(margin_vessel=)) and nowhere else -- material leaves the
+    model at the stinger end and needs nothing there. check_reach refuses a
+    sweep the model cannot feed rather than reporting a number for a station
+    bearing on nothing.
+  detect: test_sweep_length_is_the_component_plus_both_clearances, test_the_swept_length_is_added_at_the_vessel_end_only, test_a_sweep_the_model_cannot_feed_is_refused
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, rebuild/tests/test_sweep.py]
+  date: 2026-09-22

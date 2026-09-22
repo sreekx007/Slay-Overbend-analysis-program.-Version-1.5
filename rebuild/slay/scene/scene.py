@@ -103,16 +103,24 @@ def build_scene(R: float = None,
                 spacing: float = None,
                 radii: dict = None,
                 margin: float = 0.0,
+                margin_vessel: float = 0.0,
                 elastic_length: float = None) -> Scene:
     """Assemble a Scene from a lay configuration.
 
-    `margin` extends the model beyond the outermost stations. It defaults to
-    zero: the sweep buffer is not sized here, because the reachable-sweep
-    rule is still open -- `slay_case.py` derives its ceiling from the fixed
-    station sitting one spacing from the roller beside it, and that sentence
-    was written when the vessel numbering ran the other way. Settling it is
-    the physics layer's business, and until then a caller asks for margin
-    explicitly rather than getting a guessed one.
+    `margin` extends the model beyond the outermost stations at BOTH ends.
+    It defaults to zero and a caller asks for it explicitly.
+
+    `margin_vessel` extends the VESSEL end only, and it is the sweep buffer.
+    As the pipeline advances by `sigma`, material that began at `s_lo` ends
+    up at `s_lo + sigma`, so a station at arc `s_arc` reads material from
+    `s_arc - sigma` (`physics.contact_targets`). Without extra material on
+    the vessel side the innermost station runs off the end of the model.
+    The reference program does the same thing by configuring `n_vr = 10`
+    against `run_slay`'s 3 -- a vessel-side buffer bought by adding rollers.
+    Here it is the length itself, which is what it always was.
+
+    Sized by `study.sweep.sweep_length`; the stinger end needs nothing,
+    because material LEAVES the model there.
 
     `elastic_length` defaults to `config.ELASTIC_END_ZONE_M`.
     """
@@ -127,8 +135,11 @@ def build_scene(R: float = None,
 
     if margin < 0:
         raise ValueError(f'margin must not be negative, got {margin}')
+    if margin_vessel < 0:
+        raise ValueError(
+            f'margin_vessel must not be negative, got {margin_vessel}')
 
-    s_lo = min(st.s_arc for st in stations) - margin
+    s_lo = min(st.s_arc for st in stations) - margin - margin_vessel
     s_hi = max(st.s_arc for st in stations) + margin
     extent = (s_lo, s_hi)
 

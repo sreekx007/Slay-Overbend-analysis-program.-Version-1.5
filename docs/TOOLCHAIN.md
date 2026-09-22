@@ -61,7 +61,8 @@ only in the reference clone. Plotting an ILS needs that clone on `sys.path`.
         │      mesh_component(c, line_id, target_len)   one component, standalone
         │
         ├─ slay.scene                       L3 — stinger arc, roller stations
-        │      build_scene(R, spacing, n_sr, n_vr, margin, elastic_length)
+        │      build_scene(R, spacing, n_sr, n_vr, margin, margin_vessel,
+        │                  elastic_length)
         │
         ├─ slay.model.assemble.build_model(scene, ils, s_centre, target_len)
         │      L4 — header + component, four-pass merge, global numbering
@@ -73,8 +74,10 @@ only in the reference clone. Plotting an ILS needs that clone on `sys.path`.
         ├─ slay.solve.passage.solve(problem, state_in) → (Result, SolveState)
         │      L6 — Newton, contact active set, increments, cutback
         │
-        ├─ slay.study                       L7 — Mode A / Mode B sweeps
-        │      **EMPTY. Docstring only. This is the missing sweep driver.**
+        ├─ slay.study.sweep                 L7 — the passage sweep
+        │      sweep_length(L_comp, clear_before, clear_after)
+        │      scene_for(...)  Scene with its buffer sized for the passage
+        │      run(scene, ils, L_comp, step, mode='A'|'B')
         │
         └─ slay.report                      L8 — strains, peaks, DNV, plots, IO
 
@@ -122,7 +125,7 @@ went unnoticed.
 | Tool | What it does |
 |---|---|
 | `stage_run.py` | **the four-step staged sequence** — displacements (all rollers held) → gravity (lift-off active) → tension → J2. Runs on the REBUILD. Reproduces `run_slay` within 1.7%. |
-| `slide_plain.py` | sequential sliding for plain pipe. Runs on the **ORIGINAL**, because the rebuild has no sweep driver. Uses a neutral component to pass `run_passage_sliding`'s guard. |
+| `slide_plain.py` | sequential sliding for plain pipe. Runs on the **ORIGINAL**. Predates `slay.study.sweep`; kept as the cross-check against it. Uses a neutral component to pass `run_passage_sliding`'s guard. |
 
 ### Archetype studies
 
@@ -167,8 +170,8 @@ the build order in §2.
 
 | Gap | Consequence |
 |---|---|
-| `slay/study/` is **empty** | no sweep driver in the rebuild; all sliding runs through the original |
-| `build_scene(margin=)` defaults to **0** | no vessel-side buffer, so the sweep is capped at ~90% of one roller spacing |
+| ~~`slay/study/` is empty~~ | **CLOSED 22 Sep 2026** — `slay/study/sweep.py` |
+| ~~`build_scene(margin=)` defaults to 0~~ | **CLOSED 22 Sep 2026** — `margin_vessel` sizes the vessel-side buffer from the sweep length |
 | No component-on-stinger plot | component placement cannot be checked by eye |
 | `Problem.elastic_zones` carried, never read | forced-elastic end zones do not exist in practice |
 | `S` / `D` connectors refused (G9) | only `F`, `W`, `P` assemble |
