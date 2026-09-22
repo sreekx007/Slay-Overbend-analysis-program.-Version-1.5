@@ -72,8 +72,10 @@ def test_the_swept_length_is_added_at_the_vessel_end_only(plain):
     L = 4.0
     buffered = sweep.scene_for(R=85.0, spacing=8.0, L_comp=L,
                                elastic_length=16.0)
-    total = sweep.sweep_length(L)
-    assert plain.extent[0] - buffered.extent[0] == pytest.approx(total)
+    # The SWEEP plus the tail clearance -- see
+    # `test_the_buffer_is_the_sweep_plus_tail_clearance` for why.
+    added = sweep.buffer_length(L)
+    assert plain.extent[0] - buffered.extent[0] == pytest.approx(added)
     assert buffered.extent[1] == pytest.approx(plain.extent[1])
     assert [s.s_arc for s in buffered.stations] == \
         [s.s_arc for s in plain.stations], 'stations do not move'
@@ -132,6 +134,72 @@ def test_the_anchor_keeps_a_node_once_the_end_moves(plain):
     buffered = sweep.scene_for(R=85.0, spacing=8.0, L_comp=1.0,
                                elastic_length=16.0)
     assert buffered.extent[0] < fixed[0].s_arc, 'buffered, it is not'
+
+
+# -- the buffer is supported, clear of the roller, and elastic -----------
+
+def test_the_buffer_is_the_sweep_plus_tail_clearance(plain):
+    """At exactly `sigma` the pipe's TAIL arrives at the last vessel roller
+    precisely as the sweep ends -- the roller sitting on the very end of the
+    pipe, with the model's own end support on top of it. The extra metre
+    keeps the tail and its support clear of that roller throughout."""
+    L = 1.0
+    sig = sweep.sweep_length(L)
+    assert sweep.buffer_length(L) == pytest.approx(sig + sweep.TAIL_CLEAR)
+    sc = sweep.scene_for(R=85.0, spacing=8.0, L_comp=L, elastic_length=16.0)
+    lo, hi = sweep.buffer_span(sc)
+    assert hi - lo == pytest.approx(sig + sweep.TAIL_CLEAR)
+    assert hi - (lo + sig) == pytest.approx(sweep.TAIL_CLEAR), \
+        'the tail stays clear of the roller at full sweep'
+    with pytest.raises(ValueError):
+        sweep.buffer_length(L, tail_clear=-0.1)
+
+
+def test_the_buffer_tail_is_vertically_supported_and_free_to_feed():
+    """Twenty metres of feedstock hanging off the back of the anchor is a
+    bare cantilever with bending stress it has no business having. The
+    support stands for the deck rollers behind the tensioner -- and holds
+    `uy` ALONE, or it would fight the feed it exists to allow."""
+    from slay.model.assemble import build_model
+    from slay.physics.problem import build_problem
+    sc = sweep.scene_for(R=85.0, spacing=8.0, L_comp=1.0, elastic_length=16.0)
+    lo, hi = sweep.buffer_span(sc)
+    m = build_model(sc, None, extra_stations=sweep._required_stations(sc))
+    p = build_problem(m, sc, vertical_at=(lo,), elastic_spans=((lo, hi),))
+
+    vert = [r for r in p.restraints if r.source.startswith('vertical')]
+    assert len(vert) == 1
+    assert vert[0].uy and not vert[0].ux and not vert[0].rz
+    fixed = [r for r in p.restraints if not r.source.startswith('vertical')]
+    assert len(fixed) == 1 and all((fixed[0].ux, fixed[0].uy, fixed[0].rz))
+
+
+def test_the_buffer_never_yields():
+    """Feedstock is not part of the answer. A plastic hinge in it would be
+    carried into every later position by the chained state, so the buffer
+    takes a LINEAR ELASTIC material whatever the case runs."""
+    import nlfea_v4 as fe
+    from slay.data.materials import material
+    from slay.model.assemble import build_model
+    from slay.physics.problem import build_problem
+    from slay.solve.kernel import mesh_of_problem
+
+    sc = sweep.scene_for(R=85.0, spacing=8.0, L_comp=1.0, elastic_length=16.0)
+    lo, hi = sweep.buffer_span(sc)
+    m = build_model(sc, None, extra_stations=sweep._required_stations(sc))
+    p = build_problem(m, sc, material=material('ro'),
+                      elastic_spans=((lo, hi),))
+    _ms, mdl, _ix = mesh_of_problem(p)
+
+    kinds = {mm.id: type(mm).__name__ for mm in mdl.materials}
+    assert set(kinds.values()) == {'Material', 'RambergOsgood'}
+    elastic_id = [k for k, v in kinds.items() if v == 'Material'][0]
+    s_of = {i: sv for (i, sv, _y) in p.nodes}
+    for e in mdl.elements:
+        mid = 0.5 * (s_of[e.node1_id] + s_of[e.node2_id])
+        inside = lo - 1e-9 <= mid <= hi + 1e-9
+        assert (e.material_id == elastic_id) == inside, \
+            f'element at s={mid:.3f} took the wrong material'
 
 
 def test_mode_must_be_a_or_b(plain):

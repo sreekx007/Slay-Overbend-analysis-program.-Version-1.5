@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 60
+# entries: 61
 
 - id: L001
   area: kernel
@@ -1237,4 +1237,33 @@
     bearing on nothing.
   detect: test_sweep_length_is_the_component_plus_both_clearances, test_the_swept_length_is_added_at_the_vessel_end_only, test_a_sweep_the_model_cannot_feed_is_refused
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, rebuild/tests/test_sweep.py]
+  date: 2026-09-22
+
+- id: L061
+  area: physics
+  class: ruling
+  symptom: >-
+    The first sweep buffer was bare pipe of length exactly sigma, hanging
+    off the back of the fully-fixed anchor with nothing under it. At 20 m of
+    feedstock that is a cantilever carrying real bending stress, and at
+    exactly sigma the pipe's tail arrives at the last vessel roller as the
+    sweep ends.
+  cause: >-
+    A buffer is feedstock, not structure. Left unsupported it develops
+    stress of its own; left exactly sigma long it collides with the roller
+    it was meant to feed past; left with the case material it can yield, and
+    a plastic hinge in it is carried into every later position by the
+    chained state.
+  rule: >-
+    RULED 22 Sep 2026, three parts. (1) Buffer = sweep + TAIL_CLEAR, default
+    1.0 m, so the tail and its support stay clear of the last vessel roller
+    for the whole passage. (2) A uy-ONLY support under the tail, standing
+    for the deck rollers behind the tensioner -- ux and rz stay free or the
+    support fights the feed it exists to allow. (3) elastic_spans forces the
+    buffer to a linear elastic material whatever the case runs. Note
+    elastic_spans is DISTINCT from elastic_zones, which is still only
+    carried: applying those would move every validated number, so the two
+    must be unified deliberately rather than by a rename.
+  detect: test_the_buffer_is_the_sweep_plus_tail_clearance, test_the_buffer_tail_is_vertically_supported_and_free_to_feed, test_the_buffer_never_yields
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/slay/solve/kernel.py]
   date: 2026-09-22

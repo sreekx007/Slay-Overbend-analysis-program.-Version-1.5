@@ -135,8 +135,19 @@ def lay_tension(model, scene, tension: float) -> list:
                       source=f'tension:{st.name}')]
 
 
-def boundary_conditions(model, scene, tol: float = 1e-6) -> list:
-    """All DOF at the FIXED station, and nothing else.
+def boundary_conditions(model, scene, tol: float = 1e-6,
+                        vertical_at=()) -> list:
+    """All DOF at the FIXED station, plus any VERTICAL-only supports asked
+    for.
+
+    `vertical_at` is a list of arc positions to restrain in `uy` alone. It
+    exists for the sweep buffer: spare pipe added at the vessel end to feed
+    the passage would otherwise hang off the back of the anchor as a bare
+    cantilever, and at 20 m of feedstock that is a real bending stress on a
+    length whose only job is to be there. A vertical support stands for the
+    deck rollers the pipe actually rests on behind the tensioner. It holds
+    `uy` only -- the pipe must still be free to move along its own axis and
+    to rotate, or the support would fight the feed it exists to allow.
 
     The FIXED station is the model's anchor and it is NOT a contact slot --
     `role` is what says so. A station list read through `one_sided` alone
@@ -158,4 +169,14 @@ def boundary_conditions(model, scene, tol: float = 1e-6) -> list:
                 f'node is at {at[node].s:.4f}. A restraint needs a node '
                 f'under it -- ask the model for the station.')
         out.append(Restraint(node=node, source=st.name))
+
+    for s_v in vertical_at:
+        node = min(ids, key=lambda i: abs(at[i].s - s_v))
+        if abs(at[node].s - s_v) > tol:
+            raise ValueError(
+                f'vertical support asked for at s={s_v:.4f} and the nearest '
+                f'header node is at {at[node].s:.4f}. A support needs a node '
+                f'under it -- ask the model for the station.')
+        out.append(Restraint(node=node, ux=False, uy=True, rz=False,
+                             source=f'vertical@{s_v:+.3f}'))
     return out

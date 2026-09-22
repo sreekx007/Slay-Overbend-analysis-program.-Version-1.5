@@ -32,9 +32,27 @@ passage than a 2.5D one to make the same traverse.
 WHERE THE SWEPT LENGTH GOES: at the vessel end, beyond the last vessel
 roller. Material leaves the model at the stinger end and needs nothing
 there; it is the vessel end that runs dry. The reference program buys the
-same buffer by configuring `n_vr = 10` against `run_slay`'s 3. Here it is
-`build_scene(margin_vessel=sweep_length(...))` -- the length itself rather
-than a roller count that stands in for it.
+same buffer by configuring `n_vr = 10` against `run_slay`'s 3; here it is
+the length itself rather than a roller count standing in for it.
+
+THE BUFFER IS `sigma + TAIL_CLEAR`, NOT `sigma`. At exactly `sigma` the
+tail of the pipe arrives at the last vessel roller precisely as the sweep
+ends -- the roller would sit on the very end of the pipe, with the model's
+end support on top of it. The extra metre keeps the tail, and its support,
+clear of that roller for the whole passage.
+
+THE BUFFER IS SUPPORTED AND ELASTIC, and both matter physically:
+
+  * `vertical_at` puts a uy-only support under the tail, standing for the
+    deck rollers the pipe really rests on behind the tensioner. Without it
+    20 m of feedstock hangs off the back of the anchor as a bare cantilever
+    and develops bending stress it has no business having. `uy` only: the
+    pipe must stay free to move along its own axis, or the support fights
+    the feed it exists to allow.
+  * `elastic_spans` forces the buffer to a LINEAR ELASTIC material whatever
+    the case runs. Feedstock is not part of the answer and must never be
+    allowed to yield -- a plastic hinge in the buffer would be carried
+    forward into every later position by the chained state.
 
 MODE A vs MODE B (`docs/SLAY_BUILD_INSTRUCTION.md`). Mode A carries state
 from position to position -- the real path a component travels. Mode B
@@ -54,6 +72,7 @@ from slay.solve.passage import solve
 CLEAR_BEFORE = 1.0        # m, leading edge clear of SR2 at the start
 CLEAR_AFTER = 1.0         # m, trailing edge clear of SR2 at the finish
 STATION = 'SR2'           # the station the passage is built around
+TAIL_CLEAR = 1.0          # m, buffer length BEYOND the sweep -- see below
 
 
 @dataclass(frozen=True)
@@ -114,13 +133,30 @@ def schedule(total: float, step: float) -> tuple:
     return tuple(out)
 
 
+def buffer_length(L_comp: float,
+                  clear_before: float = CLEAR_BEFORE,
+                  clear_after: float = CLEAR_AFTER,
+                  tail_clear: float = TAIL_CLEAR) -> float:
+    """Pipe to add at the vessel end: the sweep, plus tail clearance."""
+    if tail_clear < 0:
+        raise ValueError(f'tail_clear must not be negative, got {tail_clear}')
+    return sweep_length(L_comp, clear_before, clear_after) + tail_clear
+
+
 def scene_for(R=None, spacing=None, L_comp=0.0,
-              clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER, **kw):
+              clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER,
+              tail_clear=TAIL_CLEAR, **kw):
     """A Scene whose vessel-side buffer is sized for this exact passage."""
     from slay.scene.scene import build_scene
     return build_scene(R=R, spacing=spacing,
-                       margin_vessel=sweep_length(L_comp, clear_before,
-                                                  clear_after), **kw)
+                       margin_vessel=buffer_length(L_comp, clear_before,
+                                                   clear_after, tail_clear),
+                       **kw)
+
+
+def buffer_span(scene) -> tuple:
+    """(s_lo, s_first_station) -- the pipe added beyond the last station."""
+    return (min(scene.extent), min(st.s_arc for st in scene.stations))
 
 
 def check_reach(scene, total: float) -> None:
@@ -201,6 +237,12 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
         problem_kw.setdefault('assembly', ils.assembly)
         problem_kw.setdefault('ils', ils)
     problem_kw['s_centre'] = s_centre
+
+    # The buffer supports itself and stays elastic, for the whole passage.
+    lo, hi = buffer_span(scene)
+    if hi > lo + 1e-9:
+        problem_kw.setdefault('vertical_at', (lo,))
+        problem_kw.setdefault('elastic_spans', ((lo, hi),))
 
     # `s_centre` is a MATERIAL coordinate and does not move with the sweep.
     # The component stays where it is in the pipe; `shift` is what carries

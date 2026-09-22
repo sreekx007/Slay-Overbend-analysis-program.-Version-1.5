@@ -52,6 +52,7 @@ class Problem:
     loads: tuple                # NodalLoad
     restraints: tuple           # Restraint
     elastic_zones: tuple
+    elastic_spans: tuple = ()   # arc spans FORCED elastic, applied by solve
     material: object = None
     R: float = 0.0
 
@@ -93,11 +94,21 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                   s_centre: float = 0.0, tension: float = 0.0,
                   material=None, gravity: bool = True,
                   OD: float = None, t_wall: float = None,
-                  E: float = None) -> Problem:
+                  E: float = None, vertical_at=(),
+                  elastic_spans=()) -> Problem:
     """Pose one lay position.
 
     `shift` is an ARGUMENT, not a range. There is no loop over shifts in this
     module and no field on the result that remembers which one this was.
+
+    `vertical_at` adds uy-only supports (see `boundary_conditions`).
+
+    `elastic_spans` names arc spans whose elements take a LINEAR ELASTIC
+    material whatever `material` says. Distinct from `elastic_zones`, which
+    this layer still only carries: applying those would change every
+    validated number, and the two should be unified deliberately rather
+    than by a rename. The sweep uses this for its buffer pipe, which is
+    feedstock and must never be allowed to yield.
     """
     sections = bind_sections(model, assembly=assembly, s_centre=s_centre,
                              OD=OD, t_wall=t_wall, E=E)
@@ -119,8 +130,10 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                                        shift=shift, s_centre=s_centre,
                                        OD=OD)),
         loads=tuple(loads),
-        restraints=tuple(boundary_conditions(model, scene)),
+        restraints=tuple(boundary_conditions(model, scene,
+                                             vertical_at=vertical_at)),
         elastic_zones=tuple(scene.elastic_zones),
+        elastic_spans=tuple(tuple(z) for z in elastic_spans),
         material=bind_material(model, material),
         R=scene.path.R,
     )
@@ -134,7 +147,8 @@ def differs_only_in_contact(a: Problem, b: Problem) -> bool:
     that stays true by inspection right up until it does not.
     """
     for name in ('nodes', 'elements', 'sections', 'connectors',
-                 'associations', 'loads', 'restraints', 'elastic_zones', 'R'):
+                 'associations', 'loads', 'restraints', 'elastic_zones',
+                 'elastic_spans', 'R'):
         if getattr(a, name) != getattr(b, name):
             return False
     return True

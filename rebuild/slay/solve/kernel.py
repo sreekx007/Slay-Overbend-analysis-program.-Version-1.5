@@ -168,6 +168,19 @@ def mesh_of_problem(problem, n_points_polar: int = 8, n_fibres: int = 20,
     it is an argument rather than a constant.
     """
     secs = {s.index: s for s in problem.sections}
+    s_of = {i: sv for (i, sv, _y) in problem.nodes}
+
+    def forced_elastic(n1, n2) -> bool:
+        """Is this element inside a span the Problem forces elastic?
+
+        Judged on the element MIDPOINT: an element straddling the boundary
+        belongs to whichever side holds most of it, which is the same rule
+        the section binder uses and avoids a half-elastic element.
+        """
+        mid = 0.5 * (s_of[n1] + s_of[n2])
+        return any(lo - 1e-9 <= mid <= hi + 1e-9
+                   for (lo, hi) in problem.elastic_spans)
+
     sec_key, mat_key = {}, {}
     sections, materials = [], []
     for s in problem.sections:
@@ -177,11 +190,18 @@ def mesh_of_problem(problem, n_points_polar: int = 8, n_fibres: int = 20,
             sections.append(
                 fe.PipeSectionPolar(sec_key[k], s.OD, s.t, n_points_polar)
                 if polar else fe.PipeSection(sec_key[k], s.OD, s.t, n_fibres))
-        e = round(s.E, 6)
-        if e not in mat_key:
-            mat_key[e] = len(materials) + 1
-            materials.append(_kernel_material(mat_key[e], problem.material,
-                                              s.E))
+
+    # Materials are keyed by (E, elastic?) rather than E alone, so a forced
+    # -elastic span shares a section with its neighbours and differs only in
+    # constitutive law. `_kernel_material(..., None, E)` is the kernel's
+    # linear elastic path.
+    def material_id(E, elastic):
+        key = (round(E, 6), bool(elastic))
+        if key not in mat_key:
+            mat_key[key] = len(materials) + 1
+            materials.append(_kernel_material(
+                mat_key[key], None if elastic else problem.material, E))
+        return mat_key[key]
 
     elems, index_of = [], {}
     for (idx, n1, n2, _owner, _line) in problem.elements:
@@ -189,7 +209,7 @@ def mesh_of_problem(problem, n_points_polar: int = 8, n_fibres: int = 20,
         eid = len(elems)
         index_of[idx] = eid
         elems.append(fe.UserElement(eid, n1, n2,
-                                    mat_key[round(s.E, 6)],
+                                    material_id(s.E, forced_elastic(n1, n2)),
                                     sec_key[(round(s.OD, 12),
                                              round(s.t, 12))], seed=1))
     mdl = fe.Model(
