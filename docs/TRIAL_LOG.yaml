@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 21
+# entries: 22
 
 - id: T001
   date: 2026-09-21
@@ -519,3 +519,38 @@
     side being well past yield while the component side stays elastic.
   lesson: L067
   refs: [rebuild/slay/report/junction.py, rebuild/slay/solve/passage.py, tools/slide.py]
+
+- id: T022
+  date: 2026-09-28
+  goal: >-
+    Run the approved 200-case ML matrix and record every outcome, failures
+    included.
+  action: >-
+    tools/dataset.py, seed 20260928. 85 plain + 115 GD-TP over stinger
+    radius, roller spacing, pipe OD and wall, tension, and for the component
+    its length and wall. OFAT spine plus discrete Latin hypercube. Row = one
+    case; targets carried as both the envelope-position SNAPSHOT and the
+    per-location envelope over the passage.
+  case: 'R 60-150; spacing 6-12; OD 168.3-610; T 40-200 MT; L 1-10 xOD; t 1.5-4 x pipe'
+  outcome: success
+  evidence: >-
+    200 cases in 1.06 h: 185 fully converged, 12 partial, 3 failed. EVERY
+    non-convergence at R=60 or 70 (75/71 pct ok) and none at R>=85 (100 pct);
+    second factor is spacing, 100 pct at 6 m falling to 81 pct at 12 m.
+    Plain-pipe marginals: R 60-150 gives 0.701 down to 0.191 pct; spacing
+    6-12 gives 0.327 up to 0.472; tension 40-200 MT gives 0.330 up to 0.471;
+    pipe OD is U-SHAPED, 0.517 at 168.3 falling to 0.334 at 273.1 and rising
+    to 0.598 at 610. GD-TP: length 1-10 xOD raises the envelope 74 pct at a
+    FIXED stiffness ratio of 2.36. Over 107 converged GD-TP cases the
+    leading-junction pipe strain is a median 4.54x the component body peak
+    (range 1.57-27.82) and IS the passage envelope in 101 of 107.
+  verdict: >-
+    The dataset is usable and the convergence boundary is sharp and physical
+    rather than scattered, which is what a numerical defect would look like.
+    Two findings not predictable from eps=r/R: the diameter optimum near
+    273 mm, and component LENGTH mattering independently of stiffness ratio.
+    The trailing junction's own worst is a median 1.41x its value at the
+    envelope position, so carrying both readings was necessary, not
+    decorative.
+  lesson: '-'
+  refs: [tools/dataset.py, docs/dataset/DATASET.md, docs/RESULTS.md]

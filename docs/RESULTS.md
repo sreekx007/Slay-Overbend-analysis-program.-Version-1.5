@@ -403,11 +403,101 @@ largest element-to-element jump 101.3 kNm against a 30 kNm median (L068).
 
 ---
 
+## 6. The ML case matrix — 200 cases
+
+*28 Sep 2026. `tools/dataset.py`, seed 20260928. 200 cases in 1.06 h:
+85 plain pipe (`docs/dataset/dataset_plain.csv`, 43 columns) and 115 GD-TP
+(`docs/dataset/dataset_gdtp.csv`, 139 columns). Row = one case = one complete
+passage. Per-case detail in `docs/dataset/DATASET.md`.*
+
+**185 converged fully, 12 partly, 3 failed.**
+
+### 6.1 Where the method stops working — and it is a clean boundary
+
+| Stinger radius | Cases | Fully converged | | Roller spacing | Cases | Fully converged |
+|---|---|---|---|---|---|---|
+| 60 m | 28 | **75%** | | 6.0 m | 33 | 100% |
+| 70 m | 28 | **71%** | | 7.5 m | 33 | 97% |
+| 85 m | 62 | 100% | | 9.0 m | 69 | 96% |
+| 105 m | 28 | 100% | | 10.5 m | 33 | 85% |
+| 120 m | 28 | 100% | | 12.0 m | 32 | 81% |
+| 150 m | 26 | 100% | | | | |
+
+**Every non-converged case is at R = 60 or 70 m. None at R >= 85.** The
+second factor is wide spacing. Tight radius and long unsupported span is the
+physically hardest corner, and it is where the solver gives out — a sharp,
+interpretable boundary rather than scattered failures, which is what a
+numerical defect would look like. The three outright failures (P042, T060,
+T104) exhaust cutback at position 0.
+
+This is a limit of the current single-solve-per-position scheme, not of the
+sweep. Staging (`tools/stage_run.py`) exists and converges 120 MT where a
+single solve will not; folding it into `sweep.run` is the obvious fix and is
+listed as pending.
+
+### 6.2 Marginal trends — plain pipe, OFAT spine
+
+| Axis | Envelope strain |
+|---|---|
+| Stinger radius 60 → 150 m | 0.701 → 0.553 → 0.409 → 0.298 → 0.241 → **0.191%** |
+| Roller spacing 6 → 12 m | 0.327 → 0.375 → 0.409 → 0.439 → **0.472%** |
+| Tension 40 → 200 MT | 0.330 → 0.378 → 0.409 → 0.440 → **0.471%** |
+| Pipe OD 168.3 → 610 mm | 0.517 → 0.388 → **0.334** → 0.352 → 0.409 → 0.497 → 0.598% |
+
+Radius, spacing and tension are monotonic and unsurprising. **Pipe diameter
+is not: it is U-shaped, with a minimum near 273 mm.** A small pipe is
+flexible and sags between rollers, so its local curvature is high; a large
+one is dominated by `r/R` at the extreme fibre. The two effects trade, and
+the optimum sits in between. That is a real finding and not one that falls
+out of `eps = r/R`.
+
+The tension trend deserves a caveat: 40 → 200 MT moves the envelope by
+0.141%, where the membrane term alone accounts for about 0.026%. Tension is
+also changing the lift-off pattern and the sag, so this column is not a pure
+membrane effect and should not be read as one.
+
+### 6.3 Marginal trends — GD-TP
+
+| Axis | Envelope strain | I_comp/I_pipe |
+|---|---|---|
+| Component length 1 → 10 × OD | 0.536 → 0.575 → 0.679 → **0.933%** | 2.36 throughout |
+| Component wall 1.5 → 4.0 × pipe | 0.503 → 0.575 → 0.706 → **0.812%** | 1.63 → 2.36 → 4.17 → 6.50 |
+| Stinger radius 60 → 150 m | 0.905 → 0.739 → 0.575 → 0.425 → 0.332 → **0.232%** | 2.36 throughout |
+
+**Length matters independently of stiffness.** At a fixed `I` ratio of 2.36,
+going from 1×OD to 10×OD raises the envelope 74%. A longer rigid body spans
+further between rollers and forces more curvature into the pipe next to it,
+which the stiffness ratio alone does not capture — so a model given only
+`I_comp/I_pipe` would be blind to it.
+
+### 6.4 The junction governs, across the whole dataset
+
+Over all 107 converged GD-TP cases:
+
+| | |
+|---|---|
+| Leading-junction pipe strain ÷ component body peak | median **4.54×**, range 1.57–27.82× |
+| Cases where the leading junction IS the passage envelope | **101 / 107 (94%)** |
+| Trailing junction, `_env` ÷ snapshot | median **1.41×**, max 4.68× |
+
+The single-case finding of §5.6 holds across the matrix and is stronger than
+it looked: **recording only the component body peak understates the governing
+strain by a median factor of 4.5, and by up to 28×.** The leading junction is
+the envelope in 94% of cases.
+
+The last row justifies carrying both readings. The trailing junction's own
+worst is a median 41% above its value at the envelope position, and up to
+4.68× — so a snapshot-only dataset would systematically teach a model that
+the trailing junction is mild. It is not; it peaks somewhere else.
+
+---
+
 ## Action log
 
 | Date | Action |
 |---|---|
 | 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
+| 28 Sep 2026 | **§6 added.** 200-case ML matrix run: 185 ok, 12 partial, 3 failed. Every non-convergence at R = 60/70 m. Pipe diameter is U-shaped with a minimum near 273 mm. The junction governs in 94% of GD-TP cases and exceeds the body peak by a median 4.54×. |
 | 28 Sep 2026 | **§5.6–5.7 added.** Junction extraction and bending-moment recovery. Moment continuous across a junction, strain 4.3× discontinuous; the governing strain is the pipe outboard of the leading edge, and it IS the passage envelope. L067, L068, T021. |
 | 28 Sep 2026 | **§5.5 added.** `R_eff` wired in as opt-in and measured: −0.4 to −1.4% one-directional, default unchanged. A −14.51% first reading was L066, a sweep scheduling bug, not physics. T020. |
 | 28 Sep 2026 | **§5 added.** Sequential sliding in the rebuild: the sliding verified exact (0.08% at a whole-element step), the GD-TP envelope made step-independent by solving the edge crossings, three plain-pipe diameters, and the passage decay traced to carried plastic state rather than a defect. L063–L065, T016–T019. |
