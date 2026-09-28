@@ -59,17 +59,38 @@ exclude SR5/SR6/SR7. **8 m spacing, J2 both sides.**
 | 105 m | 0.2879% | 0.2903% | **−0.8%** | same |
 
 **Within 1.7% at every radius.** This is M1's question — does the rebuild
-behave like the old program — and it is answered.
+behave like the old program — and it is answered. A single proportional
+solve reaches the same numbers (§1.2); the staging is what makes the
+free-tip configuration converge at all, not what makes it accurate.
 
 At the paper's 9 m spacing: 0.5423 / 0.4014 / 0.2942% against the paper's
 0.46 / 0.38 / 0.32 (+18 / +6 / −8%), which reproduces the documented
 Python-vs-Abaqus R-trend divergence rather than removing it.
 
-### 1.2 Single proportional solve, for contrast
+### 1.2 Single proportional solve — **agrees with the staged sequence**
 
-Same case, no staging, D6 end condition, 8 m: 0.6390 / 0.4571 / 0.3216% —
-**+15 to +21%** above the reference with the peak displaced to SR6. Staging
-is what closes that gap.
+**CORRECTED 22 Sep 2026.** This section previously read "0.6390 / 0.4571 /
+0.3216%, +15 to +21% above the reference with the peak displaced to SR6.
+Staging is what closes that gap." That compared the single solve's
+WHOLE-MODEL peak against the staged sequence's BAND peak — two different
+quantities (L062).
+
+At matched metrics, 8 m, 120 MT, J2:
+
+| R | single, band | staged, band | diff | single, **whole model** | `run_slay` |
+|---|---|---|---|---|---|
+| 70 m | 0.5165% | 0.5179% | −0.3% | 0.6290% @ s=39.6 | 0.5271% |
+| 85 m | 0.3876% | 0.3884% | −0.2% | 0.4590% @ s=39.6 | 0.3937% |
+| 105 m | 0.2879% | 0.2879% | −0.0% | 0.3320% @ s=39.6 | 0.2903% |
+
+The two sequences give the same answer. **Staging is a convergence aid, not
+an accuracy gain** — it mattered when 120 MT sat on a free cantilever tip
+and diverged on the first Newton iteration (L050, L051); once D6 gave the
+terminal station a contact slot, the cold single solve converges too and
+lands in the same place.
+
+The whole-model column is D6's tip artefact at SR6, and it is exactly what
+the reporting band exists to exclude.
 
 ### 1.3 Gravity only, before and after the contact-normal fix (L048)
 
@@ -208,4 +229,5 @@ predictions.
 
 | Date | Action |
 |---|---|
+| 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
 | 21 Sep 2026 | Document created. All results from the 21 Sep session recorded with the program that produced each. §2.3 (0 MT diameters) left explicitly pending rather than omitted. |

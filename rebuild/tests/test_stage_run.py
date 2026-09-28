@@ -89,3 +89,42 @@ def test_the_excluded_zone_is_load_bearing(staged):
     assert profile['SR6'] > eps, 'the excluded tip is the higher number'
     whole_model = max(e for (_i, _s, e) in out[-1][2].strains)
     assert whole_model > eps
+
+
+def test_staged_and_single_solve_agree_at_the_same_metric(staged):
+    """L062, pinned. These were once recorded as 15-21% apart, with staging
+    credited for closing the gap. They are not apart at all.
+
+    The old comparison put the single solve's WHOLE-MODEL peak -- which
+    lands at s=39.60, inside the tip that D6's terminal contact slot
+    over-constrains -- against the staged sequence's BAND peak. Two
+    different quantities, differing by exactly the artefact the band exists
+    to remove.
+
+    So this asserts BOTH halves: the two sequences agree where the metric
+    matches, AND the two metrics genuinely differ, so nobody re-reads the
+    gap as physics.
+    """
+    from slay.data.materials import material
+    from slay.model.assemble import build_model
+    from slay.physics.problem import build_problem
+    from slay.solve.passage import solve
+    from slay.scene.scene import build_scene
+
+    sc = build_scene(R=85.0, spacing=8.0, elastic_length=16.0)
+    r, _state = solve(build_problem(
+        build_model(sc, None), sc, material=material('j2'),
+        gravity=True, tension=120.0 * 9806.65))
+    assert r.converged, r.status
+
+    s_max, _zone = stage_run.report_zone(sc)
+    _s, single_band = stage_run.peak_in_zone(r, s_max)
+    _ws, single_whole = r.peak_strain()
+
+    _sc, out, _st = staged
+    _ss, staged_band = stage_run.peak_in_zone(out[-1][2], s_max)
+
+    assert single_band == pytest.approx(staged_band, rel=0.01), \
+        'staging is a CONVERGENCE aid, not an accuracy gain'
+    assert single_whole > 1.15 * single_band, \
+        'the two metrics must stay visibly different, or the mix-up returns'

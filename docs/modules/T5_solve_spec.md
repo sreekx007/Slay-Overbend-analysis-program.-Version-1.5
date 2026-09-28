@@ -357,9 +357,12 @@ Like for like at the reference's own 8 m spacing, 120 MT, plain pipe:
 | 85 m | 0.4571% | 0.4700% | 0.3882% | 0.38% |
 | 105 m | 0.3216% | 0.3287% | 0.2790% | 0.32% |
 
-**+15 to +21% above the reference at matched spacing**, and the peak has
-moved: ours is at SR6 (`s = 39.6` at 8 m, `s = 44.8` at 9 m), the
-reference's at the SR2-SR3 span (`x = -8.38`).
+**CORRECTED 22 Sep 2026 (L062).** Those are WHOLE-MODEL peaks, and they land
+at `s = 39.6` -- inside the tip that D6's terminal contact slot
+over-constrains, which is precisely what the reporting band excludes. At the
+BAND metric the same solves read **0.5165 / 0.3876 / 0.2879%**, within 0.3%
+of the staged sequence and about 1.5% below `run_slay`. D6 reproduces; the
+gap was a reporting mismatch, not a modelling one.
 
 The cause is §6's SECOND gap, not this one. **`run_slay` at `n_sr=6` builds
 six stinger stations; ours builds seven.** Its `allc` runs
@@ -411,9 +414,11 @@ Results exclude the last three stinger rollers — SR5, SR6, SR7.
 | 85 m | **0.3884%** | **0.3937%** | **−1.3%** | same span (SR2–SR3) |
 | 105 m | 0.2879% | 0.2903% | **−0.8%** | same span |
 
-**Within 1.7% at every radius, with the peak in the same span.** The single
-proportional solve of the same case runs +15 to +21% high with the peak at
-SR6 (§5d). This is M1's actual question — does the rebuild behave like the
+**Within 1.7% at every radius, with the peak in the same span.** A single
+proportional solve of the same case reaches the same numbers at the same
+metric (§5d, corrected); the staging is what makes the free-tip
+configuration converge at all, not what makes it accurate. This is M1's
+actual question — does the rebuild behave like the
 old program — and the answer is yes.
 
 At the paper's 9 m spacing: 0.5423 / 0.4014 / 0.2942% against the paper's

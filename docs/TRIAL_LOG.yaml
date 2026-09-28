@@ -257,8 +257,10 @@
     0.4727 pct at R=85/9 m, ABOVE the reported peak, so the excluded zone is
     load-bearing.
   verdict: >-
-    The rebuild behaves like the reference program. Build the geometry
-    before applying the load the geometry must carry.
+    The rebuild behaves like the reference program. CORRECTED 22 Sep 2026
+    (L062): a single proportional solve reaches the same numbers at the same
+    metric, so "build the geometry before applying the load" is a
+    CONVERGENCE rule, not an accuracy claim.
   lesson: L053
   refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py]
 

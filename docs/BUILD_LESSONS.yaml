@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 61
+# entries: 62
 
 - id: L001
   area: kernel
@@ -1013,24 +1013,25 @@
   class: ruling
   symptom: >-
     D6 taken: the terminal stinger station is a bidirectional contact slot
-    that also bears the lay tension. 120 MT converges at every radius for
-    the first time. It does NOT reproduce the reference -- 0.6390/0.4571/
-    0.3216 pct at R=70/85/105, 8 m spacing, against run_slay's 0.5274/
-    0.3882/0.2790, with the peak at SR6 instead of the SR2-SR3 span.
+    that also bears the lay tension. 120 MT converges at every radius.
+    ORIGINALLY RECORDED as "does NOT reproduce -- +15 to +21 pct with the
+    peak at SR6 instead of SR2". THAT COMPARISON WAS WRONG (see L062): it
+    put the single solve's WHOLE-MODEL peak against the staged sequence's
+    BAND peak. At the band metric D6 reads 0.5165/0.3876/0.2879 pct at
+    R=70/85/105 against run_slay's 0.5271/0.3937/0.2903 -- about 1.5 pct
+    low, and it does reproduce.
   cause: >-
-    Removing the free cantilever removed the divergence and exposed the
-    station-count rule underneath. run_slay at n_sr=6 builds SIX stinger
-    stations and puts the tension on the last; ours builds SEVEN and now
-    constrains the extra one to the arc, bending the pipe further round than
-    the reference does. The sliding reference (7 slots, last exempt) and
-    run_slay (6 slots) are different configurations and only the second has
-    plain-pipe numbers.
+    Removing the free cantilever removed the divergence. The terminal
+    contact slot DOES over-constrain the tip -- the whole-model peak sits at
+    SR6 (0.6290/0.4590/0.3320 pct, all at s=39.60) -- which is precisely why
+    the reported band excludes the last three stinger rollers. Inside the
+    band the tip artefact is not present and the result is sound.
   rule: >-
     bears_tension is ORTHOGONAL to role: a station may bear contact and
     carry the load, and load_station selects on the attribute -- a role test
-    would match nothing and apply no load silently. Converging is not
-    reproducing: state the comparison at MATCHED spacing and say which
-    reference configuration is being matched before quoting a milestone.
+    would match nothing and apply no load silently. Quote D6 results at the
+    band metric; the whole-model peak is the tip artefact the band exists to
+    exclude, and the two must never be compared with each other.
   detect: test_the_tension_station_is_also_a_contact_slot, test_there_is_no_unconstrained_overhang
   refs: [rebuild/slay/scene/rollers.py, rebuild/slay/physics/loads.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21
@@ -1039,27 +1040,26 @@
   area: solve
   class: finding
   symptom: >-
-    A four-step staged solve -- displacements with all rollers bidirectional,
-    then gravity with lift-off active, then tension, then J2 -- reproduces
-    run_slay to within 1.7 pct at R=70/85/105 (0.5179/0.3884/0.2879 against
-    0.5271/0.3937/0.2903, 8 m, 120 MT, J2) with the peak in the same span.
-    The single proportional solve of the same case runs +15 to +21 pct high
-    with the peak displaced to SR6.
+    A four-step staged solve -- displacements with all rollers
+    bidirectional, then gravity with lift-off, then tension, then J2 --
+    reproduces run_slay to within 1.7 pct at R=70/85/105 (0.5179/0.3884/
+    0.2879 against 0.5271/0.3937/0.2903, 8 m, 120 MT, J2, band metric).
+    ORIGINALLY RECORDED as beating a single proportional solve by +15 to
+    +21 pct. IT DOES NOT: at the same band metric the single solve gives
+    0.5165/0.3876/0.2879, within 0.3 pct of the staged result at every
+    radius. The comparison was against a different metric (L062).
   cause: >-
-    The blocker was never the ramp sequence: assemble does not scale loads by
-    lam in either program (L050), so there is no ramp to change. It was that
-    the geometric stiffness reacting 120 MT did not exist yet on a straight
-    unstressed pipe (L051). Bending the pipe onto the arc FIRST creates it.
-    Step 1 must hold every roller bidirectionally -- a one-sided roller
-    cannot pull, so with no tension the stinger rollers release and the pipe
-    never reaches the arc at all.
+    The staging matters for CONVERGENCE, not accuracy, and only where the
+    geometry cannot react the load yet: 120 MT on a straight unstressed pipe
+    with a free tip diverged on the first Newton iteration (L050, L051).
+    Once D6 gave the terminal station a contact slot, the cold single solve
+    converges too, and lands in the same place.
   rule: >-
     Build the geometry before applying the load that the geometry has to
-    carry. Where a load needs stiffness that only deformation provides,
-    staging is a modelling decision, not a solver tuning knob. And the
-    reported zone travels with the number: this result excludes SR5/SR6/SR7,
-    SR6 carries MORE strain than the reported peak, so the headline is wrong
-    without the zone beside it.
+    carry -- that is a convergence rule, not an accuracy claim, and it must
+    not be quoted as one. The reported zone travels with the number: this
+    result excludes SR5/SR6/SR7, SR6 carries MORE strain than the reported
+    peak, so the headline is wrong without the zone beside it.
   detect: test_it_reproduces_the_reference_program, test_the_excluded_zone_is_load_bearing
   refs: [tools/stage_run.py, rebuild/tests/test_stage_run.py, slay_overbend_v1_50.py, docs/modules/T5_solve_spec.md]
   date: 2026-09-21
@@ -1266,4 +1266,30 @@
     must be unified deliberately rather than by a rename.
   detect: test_the_buffer_is_the_sweep_plus_tail_clearance, test_the_buffer_tail_is_vertically_supported_and_free_to_feed, test_the_buffer_never_yields
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/slay/solve/kernel.py]
+  date: 2026-09-22
+
+- id: L062
+  area: measure
+  class: defect
+  symptom: >-
+    Recorded that the four-step staged sequence beat a single proportional
+    solve by "+15 to +21 pct, with the peak displaced to SR6". Re-measured
+    22 Sep at matched metrics the two agree within 0.3 pct at every radius.
+    The claim propagated into L052, L053, RESULTS.md 1.1-1.2, T5 spec 5d
+    and 5e, and TRIAL_LOG T010 and T012.
+  cause: >-
+    The single solve was reported with Result.peak_strain() -- the
+    WHOLE-MODEL peak, which lands at s=39.60 inside the excluded tip where
+    D6's terminal contact slot over-constrains -- and the staged sequence
+    with peak_in_zone(), the BAND peak excluding SR5/SR6/SR7. Two different
+    quantities, differing by exactly the tip artefact the band exists to
+    remove. Both runs were correct; only the comparison was not.
+  rule: >-
+    A comparison is between two numbers computed the SAME way. Record the
+    metric beside every peak -- whole-model or band, and which stations the
+    band drops -- and refuse to difference two peaks whose zones differ. A
+    15-21 pct discrepancy that happens to equal a known artefact is a
+    reporting bug before it is a physics finding.
+  detect: test_staged_and_single_solve_agree_at_the_same_metric
+  refs: [docs/RESULTS.md, docs/modules/T5_solve_spec.md, tools/stage_run.py, rebuild/tests/test_stage_run.py]
   date: 2026-09-22
