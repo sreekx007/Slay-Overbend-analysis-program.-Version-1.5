@@ -1458,3 +1458,27 @@
   detect: test_elastic_moment_is_EI_kappa_on_a_solved_arc, test_moment_and_strain_agree_through_the_curvature
   refs: [rebuild/slay/solve/passage.py]
   date: 2026-09-28
+
+- id: L069
+  area: plot
+  class: ruling
+  symptom: >-
+    The first component-on-stinger figure drew the strain trace as one
+    continuous line straight through each junction, so the 4.3x step read as
+    a steep ramp into the component rather than as a discontinuity.
+  cause: >-
+    Strain STEPS across a section change -- the same moment on two section
+    moduli gives two strains -- so a line drawn through it asserts a gradient
+    the model does not have. report.junction already refuses to interpolate
+    across the step for exactly this reason; the figure was doing what the
+    extraction forbids.
+  rule: >-
+    Break every profile trace at a section change: group elements into
+    contiguous runs of one OD and plot each run separately, so the gap in the
+    line IS the discontinuity. A figure may not assert continuity the data
+    layer declines to assert. Also shade the excluded reporting band -- the
+    D6 tip artefact is the tallest feature on an unshaded plot and reads as
+    the answer.
+  detect: '-'
+  refs: [tools/plot_stinger.py, rebuild/slay/report/junction.py]
+  date: 2026-09-28

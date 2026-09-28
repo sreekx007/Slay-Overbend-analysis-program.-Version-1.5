@@ -22,6 +22,26 @@ backwards and the pipe is drawn as a mirror image that still looks
 plausible -- a straight line on a deck and an arc are both symmetric.
 
     python3 tools/plot_stinger.py [--R 85] [--out FILE]
+    python3 tools/plot_stinger.py --archetype ILS-TP [--shift 1.0]
+                                  [--L-OD 2.5] [--t-ratio 2.0]
+
+THE COMPONENT FIGURE (`--archetype`) is the one this project went longest
+without, and its absence is why a GD-TP placement mismatch survived a run
+whose numbers all agreed: there was no way to SEE where the component was.
+It draws the solved passage at its ENVELOPE position by default -- the worst
+position of the sweep, which is where the leading edge crosses SR2 -- with
+
+  * the component's own span drawn heavier on the pipe, and shaded, so the
+    section change is visible rather than inferred;
+  * every junction marked, in the world coordinate of the SOLVED pipe;
+  * a second panel of strain against the same axis, carrying the junction
+    probes and the +/-2/4/6 x OD sample points.
+
+The second panel is the picture of the result in RESULTS.md 5.6: moment is
+continuous across a junction and strain is not, so the strain trace STEPS
+there. Over the dataset the leading-junction pipe strain is a median 4.54x
+the component body peak, and the panel shows why -- the component body sits
+in a trough of the trace, not on a peak.
 """
 
 from __future__ import annotations
@@ -56,6 +76,11 @@ UPLIFT_ARROW = 1.6                  # m, the 'may lift off' arrow's length
 # threshold. See section 5 of `docs/modules/T5_solve_spec.md`.
 TENSION_MT = 120.0
 
+FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
+OFFSET_COL = '#6b4ea8'
+JUNC_COL = '#c1121f'
+COMP_FILL = '#f2e3c4'
+
 
 def world(s, y, us, uy):
     """Model (s, y) + displacement -> world (x, y). See the module docstring."""
@@ -80,6 +105,97 @@ def case(R=85.0, one_sided=None, gravity=True, tension_mt=0.0, elastic=16.0):
     ms, _mdl, _ix = mesh_of_problem(p)
     slots = ctc.slots_from_targets(p.contacts, ms)
     return sc, m, p, r, ms, slots
+
+
+def build_component_ils(arch_id='ILS-TP', OD=None, t_wall=None,
+                        L_OD=None, t_ratio=None):
+    """The archetype, optionally re-dimensioned.
+
+    Edits the archetype's own definition rather than constructing geometry
+    here, so `ils_builder` stays the single author of what a component IS
+    (G7) and the constant-bore outward growth comes with it.
+    """
+    import copy
+    import json
+
+    import ils_builder
+    spec = copy.deepcopy({a['id']: a for a in json.loads(
+        FIXTURE.read_text())['archetypes']}[arch_id]['definition'])
+    if OD is not None:
+        spec['pipeline']['OD_pipe'] = OD
+    if t_wall is not None:
+        spec['pipeline']['t_pipe'] = t_wall
+    od = spec['pipeline']['OD_pipe']
+    tw = spec['pipeline']['t_pipe']
+    if L_OD is not None and spec.get('components'):
+        spec['components'][0]['L_comp'] = L_OD * od
+    if t_ratio is not None and spec.get('components'):
+        spec['components'][0]['t_comp'] = t_ratio * tw
+    return ils_builder.build_ils(spec)
+
+
+def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
+                   tension_mt=TENSION_MT, shift=None, L_OD=None,
+                   t_ratio=None, step=None):
+    """Solve the passage; return the position asked for, or the ENVELOPE.
+
+    The envelope is the default because it is the position the design is
+    governed by and the only one that does not have to be justified. A
+    `--shift` is honoured by taking the solved position nearest it, never by
+    solving a position the sweep did not -- the schedule includes the edge
+    crossings on purpose (`study.sweep.critical_shifts`).
+    """
+    from slay.report import passage as rp
+    from slay.study import sweep
+
+    ils = build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
+    OD = ils.assembly.pipe.OD_pipe
+    L = ils.extent[1] - ils.extent[0]
+    step = 2.0 * OD if step is None else step
+    sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L)
+    s_centre = sweep.start_centre(sc, L)
+    positions = sweep.run(sc, ils, L_comp=L, step=step,
+                          tension=tension_mt * TON, material=material('j2'))
+    recs = rp.measure(positions, sc, L_comp=L)
+    env = rp.envelope(recs)
+    if shift is None:
+        pos = positions[env.index]
+        note = 'envelope position'
+    else:
+        ok = [p_ for p_ in positions if p_.converged]
+        pos = min(ok, key=lambda p_: abs(p_.shift - shift))
+        note = f'nearest solved position to shift {shift:.3f} m'
+
+    m = build_model(sc, ils, s_centre=s_centre,
+                    extra_stations=sweep._required_stations(sc))
+    lo, hi = sweep.buffer_span(sc)
+    p = build_problem(m, sc, shift=pos.shift, assembly=ils.assembly, ils=ils,
+                      s_centre=s_centre, tension=tension_mt * TON,
+                      material=material('j2'), vertical_at=(lo,),
+                      elastic_spans=((lo, hi),))
+    ms, _mdl, _ix = mesh_of_problem(p)
+    slots = ctc.slots_from_targets(p.contacts, ms)
+    return dict(scene=sc, model=m, problem=p, result=pos.result, ms=ms,
+                slots=slots, s_centre=s_centre, L_comp=L, OD=OD,
+                position=pos, records=recs, envelope=env, note=note,
+                n_positions=len(positions))
+
+
+def s_to_x(m, ms, U):
+    """Interpolator: material `s` -> world `x` on the SOLVED pipe.
+
+    Needed because strains are reported at MATERIAL element midpoints while
+    the figure is drawn in world coordinates, and the pipe slides metres over
+    the rollers. Placing a strain mark at its undeformed `s` would put it
+    beside the pipe rather than on it.
+    """
+    at = {n.index: n for n in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    sv = np.array([at[i].s for i in ids])
+    xv = np.array([world(at[i].s, at[i].y,
+                         U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in ids])
+    return lambda q: np.interp(q, sv, xv)
 
 
 def pipe_xy(m, ms, U):
@@ -301,6 +417,258 @@ def plot(cases, out):
     print(f'\nwrote {Path(out).relative_to(REPO)}')
 
 
+def plot_component(c, out):
+    """Two panels on one axis: the solved geometry, and the strain trace.
+
+    SHARED X, and that is the point of the figure. The strain step at a
+    junction sits directly under the section change that causes it, so the
+    reader does not have to correlate two plots by eye.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle
+
+    from slay.report import junction as jr
+
+    sc, m, p, r = c['scene'], c['model'], c['problem'], c['result']
+    ms, U, OD = c['ms'], c['result'].U, c['OD']
+    L, s_c, pos = c['L_comp'], c['s_centre'], c['position']
+    fx = s_to_x(m, ms, U)
+
+    # THREE PANELS, because one cannot do this job. The component is about a
+    # metre on a hundred-metre stinger, so a single shared axis either shows
+    # where it sits or shows what happens there, never both. Panels 1 and 2
+    # share x and answer "where"; panel 3 has its own window and answers
+    # "what", at a scale where the junction step is legible.
+    fig, (ax, bx, cx) = plt.subplots(
+        3, 1, figsize=(13.5, 12.4),
+        gridspec_kw=dict(height_ratios=[1.25, 1.0, 1.0], hspace=0.28))
+    bx.sharex(ax)
+
+    # ---- panel 1: geometry ------------------------------------------------
+    ss = np.linspace(min(t.s_arc for t in sc.stations),
+                     max(t.s_arc for t in sc.stations), 400)
+    lx, ly = zip(*(sc.path.position(v) for v in ss))
+    ax.plot(lx, ly, color='#b9c2cb', lw=1.0, ls='--', zorder=1)
+
+    active = {s_.name: a for s_, a in zip(c['slots'], r.active)}
+    for st in sc.stations:
+        if st.role is StationRole.CONTACT:
+            col = '#2f6f3e' if active.get(st.name, True) else '#b44d12'
+        elif st.role is StationRole.FIXED:
+            col = '#111111'
+        else:
+            col = OFFSET_COL
+        ax.add_patch(Circle((st.x, st.y), st.radius, facecolor='none',
+                            edgecolor=col, lw=1.6, zorder=4))
+        ax.annotate(st.name, (st.x, st.y), textcoords='offset points',
+                    xytext=(0, -14), ha='center', fontsize=7, color=col)
+        if st.role is StationRole.CONTACT and st.one_sided:
+            ax.annotate('', xy=(st.x, st.y - UPLIFT_ARROW),
+                        xytext=(st.x, st.y - 0.35),
+                        arrowprops=dict(arrowstyle='-|>', lw=1.1, color=col,
+                                        shrinkA=0, shrinkB=0), zorder=4)
+
+    px, py, _ids = pipe_xy(m, ms, U)
+    ax.plot(px, py, color='#1f7a8c', lw=2.2, zorder=5)
+
+    # THE COMPONENT, drawn from the SOLVED pipe over its own material span --
+    # not as a box at a nominal position. This is the check that was missing.
+    s_lo, s_hi = s_c - L / 2.0, s_c + L / 2.0
+    at = {n.index: n for n in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    seg = [i for i in ids if s_lo - 1e-9 <= at[i].s <= s_hi + 1e-9]
+    if seg:
+        sx = [world(at[i].s, at[i].y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0]
+              for i in seg]
+        sy = [world(at[i].s, at[i].y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])[1]
+              for i in seg]
+        ax.plot(sx, sy, color='#8a5a00', lw=6.5, solid_capstyle='butt',
+                zorder=6, alpha=0.9)
+
+    juncs = jr.junctions(p)
+    for panel in (ax, bx, cx):
+        panel.axvspan(fx(s_hi), fx(s_lo), color=COMP_FILL, alpha=0.55,
+                      zorder=0)
+        for j in juncs:
+            panel.axvline(fx(j.s), color=JUNC_COL, lw=1.1, ls=(0, (4, 2)),
+                          alpha=0.8, zorder=2)
+
+    ax.set_aspect('equal')
+    ax.invert_yaxis()
+    lo_y = min(list(ly) + list(py) + [t.y for t in sc.stations])
+    hi_y = max(list(ly) + list(py) + [t.y for t in sc.stations])
+    ax.set_ylim(hi_y + 1.5, lo_y - (UPLIFT_ARROW + 1.2))
+    ax.grid(alpha=0.2)
+    ax.set_ylabel('y (m), down')
+    ratio = jr.stiffness_ratio(p)
+    ax.set_title(
+        f'{c["arch_id"]} on the stinger  --  R = {sc.path.R:.0f} m, '
+        f'spacing {sc.spacing:.0f} m, {c["tension_mt"]:.0f} MT, '
+        f'L = {L:.3f} m ({L / OD:.2g} x OD), I_comp/I_pipe = {ratio:.3f}\n'
+        f'shift {pos.shift:.3f} m of {c["n_positions"]} solved positions '
+        f'({c["note"]}); lead at station {pos.s_lead:.3f} m',
+        fontsize=10, loc='left')
+
+    # ---- panel 2: strain, on the same axis --------------------------------
+    # THE TRACE IS BROKEN AT EVERY JUNCTION, and that is not decoration.
+    # Strain STEPS across a section change -- the same moment on two section
+    # moduli -- so a line drawn through it asserts a gradient the model does
+    # not have, and would read as a smooth ramp into the component. It is the
+    # same refusal `report.junction` makes when it declines to interpolate
+    # across the step; the figure must not do what the extraction forbids.
+    secs = {q.index: q for q in p.sections}
+    s_of = {i: sv for (i, sv, _y) in p.nodes}
+    runs, cur, last_od = [], [], None
+    for (idx, q, e) in sorted(r.strains, key=lambda t: t[1]):
+        od = secs[idx].OD if idx in secs else last_od
+        if last_od is not None and od is not None and abs(od - last_od) > 1e-9:
+            runs.append(cur)
+            cur = []
+        cur.append((q, e))
+        last_od = od
+    if cur:
+        runs.append(cur)
+    sm = np.array([q for (_i, q, _e) in r.strains])
+    ev = np.array([e for (_i, _q, e) in r.strains])
+    probes = jr.measure(pos, p, OD)
+    e_body, _mb, s_body = jr.body_peak(pos, p)
+    env = c['envelope']
+
+    # THE EXCLUDED ZONE, shaded on both. Without it the tip spike -- D6's
+    # terminal contact slot over-constraining the last three rollers -- is
+    # the tallest thing on the plot and reads as the answer. It is exactly
+    # what the reporting band exists to remove.
+    s_cut = env.zone_s_max
+    x_cut = fx(s_cut - pos.shift)
+    for panel in (bx, cx):
+        for run in runs:
+            if len(run) < 2:
+                continue
+            panel.plot(fx(np.array([q for q, _e in run])),
+                       100.0 * np.array([e for _q, e in run]),
+                       color='#1f7a8c', lw=1.7, zorder=5)
+        panel.axhline(100 * env.peak_strain, color='#c1121f', lw=0.8,
+                      ls=':', alpha=0.75)
+        for q in probes:
+            if not q.in_model:
+                continue
+            xq = fx(q.s)
+            if q.offset_OD == 0.0:
+                panel.plot([xq], [100 * q.strain], marker='o', ms=7.0,
+                           mfc=JUNC_COL, mec='white', mew=1.2, zorder=8)
+            else:
+                panel.plot([xq], [100 * q.strain], marker='s', ms=5.0,
+                           mfc='white', mec=OFFSET_COL, mew=1.3, zorder=7)
+        if e_body > 0:
+            panel.plot([fx(s_body)], [100 * e_body], marker='v', ms=7.0,
+                       mfc='#8a5a00', mec='white', mew=1.1, zorder=8)
+    x0 = min(fx(sm)) - 2.0
+    bx.axvspan(x0, x_cut, color='#c9ccd1', alpha=0.38, zorder=1)
+    bx.annotate('excluded from the reporting band\n(last 3 stinger rollers,\n'
+                'D6 tip artefact)', (0.5 * (x0 + x_cut), 0.94),
+                xycoords=('data', 'axes fraction'), ha='center', va='top',
+                fontsize=7.5, color='#5a6068', zorder=6)
+
+    # Panel 3: the component neighbourhood, where the step is legible.
+    half = max(8.0 * OD, 1.2 * L)
+    cx.set_xlim(fx(s_c + L / 2.0 + half), fx(s_c - L / 2.0 - half))
+    near = [100 * e for (q, e) in zip(sm, ev)
+            if s_c - L / 2 - half <= q <= s_c + L / 2 + half]
+    if near:
+        cx.set_ylim(0.0, 1.18 * max(near))
+    for q in probes:
+        if not q.in_model or q.offset_OD == 0.0:
+            continue
+        cx.annotate(f'{q.offset_OD:+g}xOD', (fx(q.s), 100 * q.strain),
+                    textcoords='offset points', xytext=(0, 9), ha='center',
+                    fontsize=7.5, color=OFFSET_COL, zorder=9)
+    if e_body > 0:
+        cx.annotate(f'body peak {100 * e_body:.3f}%',
+                    (fx(s_body), 100 * e_body), textcoords='offset points',
+                    xytext=(0, -22), ha='center', fontsize=8.5,
+                    color='#8a5a00', zorder=9)
+    cx.set_ylabel('extreme-fibre strain (%)')
+    cx.set_xlabel('x (m)   --   +x toward the vessel, so the stinger is on '
+                  'the LEFT (starboard view, no flip)')
+    cx.grid(alpha=0.2)
+    cx.set_title('zoom on the component -- the junction step, at a scale '
+                 'where it can be read', fontsize=9.5, loc='left')
+    lead = [q for q in probes
+            if q.offset_OD == 0.0 and q.side == 'pipe'
+            and abs(q.s - max(j.s for j in juncs)) < 1e-6]
+    if lead:
+        q = lead[0]
+        ratio_txt = (f'  =  {q.strain / e_body:.2f} x the body peak'
+                     if e_body > 0 else '')
+        cx.annotate(f'junction, pipe side: {100 * q.strain:.3f}%{ratio_txt}',
+                    (fx(q.s), 100 * q.strain), textcoords='offset points',
+                    xytext=(26, 16), ha='left', fontsize=9.5, color='#8d0801',
+                    zorder=10,
+                    bbox=dict(boxstyle='round,pad=0.32', fc='white',
+                              ec=JUNC_COL, lw=0.9, alpha=0.95),
+                    arrowprops=dict(arrowstyle='-', color=JUNC_COL, lw=0.9,
+                                    shrinkA=0, shrinkB=3))
+    bx.set_ylabel('extreme-fibre strain (%)')
+    bx.grid(alpha=0.2)
+    bx.set_ylim(bottom=0.0)
+    bx.set_title('the whole model', fontsize=9.5, loc='left')
+
+    handles = [plt.Line2D([], [], color='#1f7a8c', lw=2.2,
+                          label='pipe / strain, SOLVED'),
+               plt.Line2D([], [], color='#8a5a00', lw=6.5,
+                          label='component span, on the solved pipe'),
+               plt.Line2D([], [], color=JUNC_COL, lw=1.1, ls=(0, (4, 2)),
+                          label='junction (section step)'),
+               plt.Line2D([], [], ls='none', marker='o', ms=7, mfc=JUNC_COL,
+                          mec='white', mew=1.2, label='junction probe'),
+               plt.Line2D([], [], ls='none', marker='s', ms=5, mfc='white',
+                          mec=OFFSET_COL, mew=1.3,
+                          label='+/- 2, 4, 6 x OD probe'),
+               plt.Line2D([], [], ls='none', marker='v', ms=7, mfc='#8a5a00',
+                          mec='white', mew=1.1, label='component body peak'),
+               plt.Line2D([], [], color='#c1121f', lw=0.8, ls=':',
+                          label='passage envelope')]
+    handles.append(plt.Line2D([], [], color='#c9ccd1', lw=8,
+                              label='outside the reporting band'))
+    bx.legend(handles=handles, fontsize=7.5, ncol=2, loc='upper right',
+              framealpha=0.94)
+
+    fig.suptitle(
+        'Component on the stinger, at the passage envelope. Every pipe and '
+        'strain coordinate is a SOLVED value placed by MATERIAL position on '
+        'the deformed pipe.\nMoment is continuous across a junction and '
+        'strain is not -- so the trace STEPS there, and the component body '
+        'sits in a trough rather than on a peak.', fontsize=11)
+    fig.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.055)
+    fig.savefig(out, dpi=140)
+    print(f'\nwrote {Path(out).relative_to(REPO)}')
+
+
+def report_component(c):
+    from slay.report import junction as jr
+    p, pos = c['problem'], c['position']
+    print(f'  {c["note"]}: shift {pos.shift:.3f} m, '
+          f'lead {pos.s_lead:.3f}, trail {pos.s_trail:.3f}')
+    print(f'  I_comp/I_pipe = {jr.stiffness_ratio(p):.4f}   '
+          f'junctions {len(jr.junctions(p))}')
+    e, mo, sb = jr.body_peak(pos, p)
+    print(f'  body peak {100 * e:.4f}%  {mo / 1e3:.1f} kNm  at s = {sb:.2f}')
+    print(f'  {"probe":>18}{"s":>9}{"strain":>10}{"moment kNm":>12}  side')
+    for q in jr.measure(pos, p, c['OD']):
+        if not q.in_model:
+            print(f'  {"j%d %+gOD" % (q.junction, q.offset_OD):>18}'
+                  f'{q.s:9.3f}{"--":>10}{"--":>12}  off model')
+            continue
+        tag = (f'j{q.junction} at {q.side}' if q.offset_OD == 0.0
+               else f'j{q.junction} {q.offset_OD:+g}OD')
+        print(f'  {tag:>18}{q.s:9.3f}{100 * q.strain:9.4f}%'
+              f'{q.moment / 1e3:12.1f}  {q.side}'
+              f'{"  clamped" if q.clamped else ""}')
+
+
 def main() -> int:
     R = 85.0
     if '--R' in sys.argv:
@@ -308,6 +676,25 @@ def main() -> int:
     out = (REPO / 'docs' / 'diagrams' / 'stinger_pipe.png')
     if '--out' in sys.argv:
         out = Path(sys.argv[sys.argv.index('--out') + 1])
+
+    def arg(flag, cast=float, default=None):
+        if flag in sys.argv:
+            return cast(sys.argv[sys.argv.index(flag) + 1])
+        return default
+
+    if '--archetype' in sys.argv:
+        aid = sys.argv[sys.argv.index('--archetype') + 1]
+        tension = arg('--tension', float, TENSION_MT)
+        if '--out' not in sys.argv:
+            out = REPO / 'docs' / 'diagrams' / f'stinger_{aid.lower()}.png'
+        print(f'\n=== {aid} on the stinger (R = {R:.0f} m) ===')
+        c = component_case(aid, R=R, spacing=arg('--spacing', float, 9.0),
+                           tension_mt=tension, shift=arg('--shift'),
+                           L_OD=arg('--L-OD'), t_ratio=arg('--t-ratio'))
+        c['arch_id'], c['tension_mt'] = aid, tension
+        report_component(c)
+        plot_component(c, out)
+        return 0
 
     built = []
     for title, kw in (
