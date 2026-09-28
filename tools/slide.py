@@ -41,6 +41,14 @@ TWO THINGS THE PASSAGE GETS RIGHT THAT A READER SHOULD KNOW ABOUT.
   its tail in `uy` alone, and forces it linear elastic. Feedstock is not part
   of the answer and must never yield.
 
+CONTACT SURFACE. `--contact-surface bottom` rides the pipe centreline at
+`R + r_roller + OD/2` instead of driving it onto the R arc, which is what the
+rollers physically do -- `R` is measured to the roller CENTRELINE. Off by
+default: 'centreline' is what every validated number in `docs/RESULTS.md` was
+computed with, so the flag moves nothing until it is asked for. See
+`physics.contact` for why it enters through the radius and never as a
+per-roller offset.
+
 MODE A vs MODE B. A carries state between positions -- the real path a
 component travels, and the mode that captures accumulated plastic strain. B
 solves each position from virgin state, which is the worst position anywhere
@@ -128,7 +136,7 @@ def archetype(arch_id: str):
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
-            verbose=True):
+            contact_surface='centreline', verbose=True):
     """Run one passage. Returns (scene, L_comp, records)."""
     ils = archetype(arch_id)
     if ils is None:
@@ -149,7 +157,8 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
                          clear_before=cb, clear_after=ca)
 
     kw = dict(tension=tension_mt * TON,
-              material=None if elastic else material('j2'))
+              material=None if elastic else material('j2'),
+              contact_surface=contact_surface)
     if OD != OD_DEF:
         kw['OD'] = OD
     if t_wall is not None:
@@ -159,7 +168,8 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
         s_max, label = rp.zone(sc)
         print(f'{arch_id:10s} R={R:.0f} m  spacing={spacing:.0f} m  '
               f'T={tension_mt:.0f} MT  OD={OD:.4f} m  mode {mode}'
-              f'{"  ELASTIC" if elastic else ""}')
+              f'{"  ELASTIC" if elastic else ""}'
+              f'  surface={contact_surface}')
         print(f'{"":10s} L_comp={L_comp:.3f} m  sweep={total:.3f} m  '
               f'step={step:.4f} m  buffer={sweep.buffer_length(L_comp, cb, ca):.3f} m')
         print(f'{"":10s} zone: station s < {s_max:.1f} m ({label})')
@@ -279,6 +289,7 @@ def main() -> int:
               tension_mt=opt('--tension', TENSION_MT_DEF, float),
               step=opt('--step', None, float),
               mode=opt('--mode', 'A'),
+              contact_surface=opt('--contact-surface', 'centreline'),
               elastic='--elastic' in a)
     csv_out = opt('--csv')
 
@@ -296,6 +307,7 @@ def main() -> int:
         rp.to_csv(rows, csv_out, extra=dict(
             archetype=kw['arch_id'], R=kw['R'], spacing=kw['spacing'],
             tension_mt=kw['tension_mt'], mode=kw['mode'],
+            contact_surface=kw['contact_surface'],
             OD=allrec[0][0], L_comp=allrec[0][1]))
         print(f'\nwrote {csv_out} ({len(rows)} rows)')
     return 0

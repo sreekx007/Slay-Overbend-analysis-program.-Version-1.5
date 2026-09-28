@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 19
+# entries: 20
 
 - id: T001
   date: 2026-09-21
@@ -456,3 +456,33 @@
     needed for the reference program is not needed here.
   lesson: '-'
   refs: [tools/slide.py]
+
+- id: T020
+  date: 2026-09-28
+  goal: >-
+    Close the T4 open item on R_eff: wire the roller/pipe radius offset in as
+    an opt-in and measure what adopting it would cost every validated number.
+  action: >-
+    contact_surface='centreline'|'bottom' on physics.contact.contact_targets
+    and build_problem, --contact-surface on tools/slide.py. 'bottom' rides the
+    pipe centreline at R + r_roller + OD/2, applied through the RADIUS only,
+    with the material position corrected by (R_eff - R)*theta. Default
+    unchanged. Measured against the M1 benchmark at three radii, the GD-TP
+    passage envelope, and a linear-elastic plain pipe.
+  case: 'R=70/85/105; spacing 9; T=120 MT; 406.4x21; r_roller 0.30'
+  outcome: success
+  evidence: >-
+    R_eff = 85.5032 at R=85, +0.592 pct. Deck targets stay exactly 0.00000 --
+    no translation. Material correction 0 on the deck to 0.3197 m at SR7.
+    Closed form at R_eff equals the projection on an R_eff path to 5e-15.
+    Solved delta: plain J2 -1.04/-0.98/-0.72 pct at R=70/85/105; plain elastic
+    -0.46/-0.50/-0.39 pct against a naive 1/R_eff prediction of
+    -0.71/-0.59/-0.48; GD-TP envelope -1.36 pct, start position -1.20 pct.
+  verdict: >-
+    Adopting 'bottom' would lower every strain by roughly 0.4-1.4 pct, one
+    directional. Small but systematic, so it is a deliberate decision rather
+    than a default change; 'centreline' stays default and every number in
+    RESULTS.md is untouched. First measurement showed -14.51 pct on the
+    envelope, which was L066 -- a scheduling bug in the sweep, not physics.
+  lesson: L066
+  refs: [rebuild/slay/physics/contact.py, rebuild/tests/test_contact_surface.py, tools/slide.py]

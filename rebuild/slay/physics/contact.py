@@ -55,15 +55,42 @@ into the assembly and never a second implementation. Combination is the
 assembly's LOWEST-surface rule, not a sum: where a thick body and a shroud
 overlap, only the deeper one is touched, and adding them double-counts.
 
-WHAT IS DELIBERATELY NOT HERE -- see `docs/modules/T4_physics_spec.md`:
+THE CONTACT SURFACE, `contact_surface`, and it is OPT-IN.
 
-  * `R_eff = R + r_roller + r_pipe`. `LayPath.R` is to the ROLLER CENTRELINE,
-    so the pipe centreline really rides at `R + r_roller + r_pipe` from the
-    arc centre. Driving the pipe CENTRELINE onto the R arc -- what the
-    formula above does -- is v0.4's "centreline mode". v0.5 added the offset
-    form. Both are defensible and they differ; the station's `radius` is
-    carried on every target so the decision can be made with a number, and
-    it is raised as an open item rather than chosen here by default.
+`LayPath.R` is measured to the ROLLER CENTRELINE. The roller top is
+`r_roller` above that and the pipe's bottom surface rests on it, so the pipe
+CENTRELINE really rides at `R + r_roller + r_pipe` from the arc centre:
+
+    'centreline'  the pipe centreline is driven onto the R arc. What every
+                  validated number in `docs/RESULTS.md` was computed with,
+                  and the default, so adopting this option moves nothing
+                  until a caller asks for it.
+    'bottom'      the physical one: `R_eff = R + r_roller + OD/2`.
+
+IT ENTERS THROUGH THE RADIUS, NEVER AS AN OFFSET ON EACH TARGET, and that is
+not a stylistic choice. A uniform normal offset is physically meaningful only
+through the curvature it produces; along the straight deck it is a rigid
+translation with no strain effect at all. Offsetting the targets was tried in
+the reference toolchain and is WRONG -- the anchor pins its node to ZERO
+displacement, so lifting every roller while the anchor stays put forces a
+spurious kink, and the measured plain-pipe peak jumped from x = -38 m (on the
+stinger, correct) to x = +79 m (the anchor) and rose 10.5%. The closed form
+already has this property: `arc_target(R_eff, 0) = 0`, so the deck sees
+nothing and only the curved region moves.
+
+AND THE MATERIAL POSITION MOVES WITH IT -- the hard pair again. Nodes here
+are placed by ARC LENGTH, and the pipe does not stretch, so the material
+touching the roller at angle `theta` lies at pipe-arc `R_eff * theta`, not at
+the station's own `s_arc = R * theta`. The correction
+
+    s_ref = s_arc + (R_eff - R) * theta
+
+is zero on the deck (`theta = 0`) and grows along the arc, reaching 0.32 m at
+SR7 for R = 85. Change `dn` without it and the target is right but applied to
+the wrong material; that is the same class of error as L048 and it would
+converge just as happily.
+
+WHAT IS DELIBERATELY NOT HERE -- see `docs/modules/T4_physics_spec.md`:
 
   * HERMITE interpolation. The coefficients below are LINEAR in the two
     bracketing nodes, which is what the old code did and what M1 must
@@ -104,11 +131,32 @@ class ContactTarget:
     w_lo: float
     w_hi: float
     one_sided: bool
-    radius: float              # m, the roller's own radius -- carried, unused
+    radius: float              # m, the roller's own radius
+    R_eff: float = 0.0         # m, radius the pipe centreline rides at
+    s_station: float = 0.0     # m, the station's own arc position
 
     @property
     def weights(self) -> dict:
         return {self.n_lo: self.w_lo, self.n_hi: self.w_hi}
+
+
+SURFACES = ('centreline', 'bottom')
+
+
+def effective_radius(R: float, r_roller: float, OD: float,
+                     contact_surface: str = 'centreline') -> float:
+    """Radius the pipe CENTRELINE rides at.
+
+    `R` for 'centreline'; `R + r_roller + OD/2` for 'bottom', because `R` is
+    measured to the roller centreline and the pipe's bottom rests on the
+    roller's top.
+    """
+    if contact_surface not in SURFACES:
+        raise ValueError(f'contact_surface must be one of {SURFACES}, '
+                         f'got {contact_surface!r}')
+    if contact_surface == 'centreline':
+        return R
+    return R + r_roller + OD / 2.0
 
 
 def arc_target(R: float, theta: float) -> float:
@@ -169,8 +217,34 @@ def header_nodes(model):
     return sorted(((i, at[i].s) for i in ids), key=lambda p: p[1])
 
 
+def station_material(scene, contact_surface: str = 'centreline',
+                     OD: float = None) -> dict:
+    """{station name: pipe-arc position of the material under it at shift 0}.
+
+    THE ONE PLACE THIS MAPPING LIVES. `contact_targets` needs it to bracket
+    the right nodes and `study.sweep.critical_shifts` needs it to know when a
+    component edge reaches a roller, and those two must agree or the sweep
+    samples travels the contact does not see. Measured when they did not: the
+    GD-TP envelope read 14.5% low and moved to the wrong position, because
+    the schedule was still crossing edges at `s_arc` while the slots had moved
+    to `s_arc + (R_eff - R) * theta`.
+
+    Equals `s_arc` under 'centreline', and on the deck under either.
+    """
+    OD = config.OD_PIPE_DEF if OD is None else OD
+    out = {}
+    for st in scene.stations:
+        if st.role is not StationRole.CONTACT:
+            continue
+        theta = scene.path.theta(st.s_arc)
+        R_eff = effective_radius(scene.path.R, st.radius, OD, contact_surface)
+        out[st.name] = st.s_arc + (R_eff - scene.path.R) * theta
+    return out
+
+
 def contact_targets(model, scene, assembly=None, shift: float = 0.0,
-                    s_centre: float = 0.0, OD: float = None) -> list:
+                    s_centre: float = 0.0, OD: float = None,
+                    contact_surface: str = 'centreline') -> list:
     """One `ContactTarget` per CONTACT station, in station order.
 
     `shift` is the arc distance the pipeline has advanced toward the stinger.
@@ -190,19 +264,27 @@ def contact_targets(model, scene, assembly=None, shift: float = 0.0,
     nodes_s = header_nodes(model)
     if not nodes_s:
         raise ValueError('no pipeline nodes to bear on')
+    s_ref_of = station_material(scene, contact_surface, OD)
 
     out = []
     for st in scene.stations:
         if st.role is not StationRole.CONTACT:
             continue
-        s_mat = st.s_arc - shift
         # `arc_target` takes an ANGLE. Passing `s_arc` straight in reads an
         # arc length as radians and returns metres of nonsense -- caught the
         # first time it ran, at -1485 m, and only because the magnitude was
         # absurd. A wrong-but-plausible number here is a wrong model that
         # converges.
+        #
+        # The ANGLE is the station's own, off the roller arc, and it does not
+        # depend on the contact surface: concentric arcs share their angles.
         theta = scene.path.theta(st.s_arc)
-        dn_arc = arc_target(scene.path.R, theta)
+        R_eff = effective_radius(scene.path.R, st.radius, OD, contact_surface)
+        dn_arc = arc_target(R_eff, theta)
+        # Arc length is preserved, so a pipe riding further out reaches the
+        # same ANGLE at a greater pipe-arc. Zero on the deck, where theta is.
+        # `station_material` owns this, because the sweep reads it too.
+        s_mat = s_ref_of[st.name] - shift
 
         lift, owner = 0.0, 'pipe'
         if assembly is not None:
@@ -215,5 +297,6 @@ def contact_targets(model, scene, assembly=None, shift: float = 0.0,
             normal=to_model_frame(st.normal), dn=dn_arc + lift,
             dn_arc=dn_arc, lift=lift,
             surface_owner=owner, n_lo=i_lo, n_hi=i_hi, w_lo=w_lo, w_hi=w_hi,
-            one_sided=st.one_sided, radius=st.radius))
+            one_sided=st.one_sided, radius=st.radius, R_eff=R_eff,
+            s_station=st.s_arc))
     return out

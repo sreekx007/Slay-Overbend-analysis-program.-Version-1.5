@@ -1376,3 +1376,31 @@
   detect: test_a_plain_elastic_passage_is_invariant_in_station_space
   refs: [rebuild/slay/physics/contact.py, docs/modules/T4_physics_spec.md, tools/slide.py]
   date: 2026-09-28
+
+- id: L066
+  area: physics
+  class: defect
+  symptom: >-
+    Adding contact_surface='bottom' moved the GD-TP passage envelope by
+    -14.51 pct, against -1.2 pct at the start position of the same passage
+    and -0.7 to -1.0 pct on plain pipe at three radii. The envelope also
+    jumped from shift 1.000 to shift 2.000 -- from the LEADING edge crossing
+    SR2 to the TRAILING edge crossing it.
+  cause: >-
+    study.sweep.critical_shifts computed the edge-crossing travels from the
+    station's own s_arc, while the contact slots had moved to
+    s_arc + (R_eff - R)*theta. Under 'bottom' the schedule therefore solved
+    travels the contact never saw: at SR2 the crossing is 53 mm later than
+    the schedule believed, the leading-edge peak was never sampled, and the
+    max fell back to a different position. The physics change was about
+    1 pct; the other 13 was a sampling artefact of my own making.
+  rule: >-
+    dn and the material position under a station are a HARD PAIR, and so is
+    anything that SCHEDULES against that position. physics.contact.
+    station_material is the single owner of the mapping; contact_targets and
+    critical_shifts both read it, neither restates it. After the fix the
+    envelope delta is -1.36 pct and lands at shift 1.053 = 1.000 + 0.053, the
+    SR2 correction exactly.
+  detect: test_the_edge_crossings_follow_the_contact_surface, test_the_crossing_offset_is_the_material_correction
+  refs: [rebuild/slay/physics/contact.py, rebuild/slay/study/sweep.py]
+  date: 2026-09-28

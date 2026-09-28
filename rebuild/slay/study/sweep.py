@@ -146,7 +146,9 @@ def schedule(total: float, step: float, include=()) -> tuple:
     return tuple(keep)
 
 
-def critical_shifts(scene, L_comp: float, s_centre: float) -> tuple:
+def critical_shifts(scene, L_comp: float, s_centre: float,
+                    contact_surface: str = 'centreline',
+                    OD: float = None) -> tuple:
     """Travels at which a component EDGE sits exactly on a contact station.
 
     WHY THESE ARE NOT OPTIONAL. The passage envelope is not at either end of
@@ -163,24 +165,29 @@ def critical_shifts(scene, L_comp: float, s_centre: float) -> tuple:
     edge-crossings exactly buys it where it actually lives. So these travels
     go into every schedule and the step only sets the sampling between them.
 
-    A station at `s_arc` is crossed by the leading edge when
-    `s_centre + L/2 + shift == s_arc`, and by the trailing edge when
-    `s_centre - L/2 + shift == s_arc`. Both matter: the edges are where the
+    A station is crossed by the leading edge when `s_centre + L/2 + shift`
+    reaches THE MATERIAL THE STATION BEARS ON, and by the trailing edge when
+    `s_centre - L/2 + shift` does. Both matter: the edges are where the
     section changes, and a section change over a roller is the whole reason
     this component is interesting.
+
+    THE MATERIAL, NOT THE STATION'S OWN ARC, and they are the same number
+    only under 'centreline'. `physics.contact.station_material` owns the
+    mapping and is asked for it here rather than restated -- when the two
+    disagreed the GD-TP envelope read 14.5% low and landed on the wrong
+    position, because the schedule crossed edges where the slots no longer
+    were.
 
     Empty for plain pipe -- there are no edges, and nothing distinguishes one
     travel from another.
     """
-    from slay.scene.rollers import StationRole
+    from slay.physics.contact import station_material
     if L_comp <= 0.0:
         return ()
     out = []
-    for st in scene.stations:
-        if st.role is not StationRole.CONTACT:
-            continue
+    for s_ref in station_material(scene, contact_surface, OD).values():
         for edge in (s_centre + L_comp / 2.0, s_centre - L_comp / 2.0):
-            out.append(st.s_arc - edge)
+            out.append(s_ref - edge)
     return tuple(sorted(v for v in out if v > 0.0))
 
 
@@ -303,7 +310,11 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     # `s_centre` is a MATERIAL coordinate and does not move with the sweep.
     # The component stays where it is in the pipe; `shift` is what carries
     # the pipe past the rollers.
-    crit = critical_shifts(scene, L_comp, s_centre) if include_critical else ()
+    # The schedule must cross edges where the SLOTS are, so it reads the same
+    # contact surface the Problems are built with.
+    crit = critical_shifts(scene, L_comp, s_centre,
+                           problem_kw.get('contact_surface', 'centreline'),
+                           problem_kw.get('OD')) if include_critical else ()
     out, state = [], None
     for i, shift in enumerate(schedule(total, step, include=crit)):
         problem = build_problem(model, scene, shift=shift, **problem_kw)

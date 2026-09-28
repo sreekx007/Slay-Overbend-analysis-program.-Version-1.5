@@ -95,13 +95,21 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                   material=None, gravity: bool = True,
                   OD: float = None, t_wall: float = None,
                   E: float = None, vertical_at=(),
-                  elastic_spans=()) -> Problem:
+                  elastic_spans=(),
+                  contact_surface: str = 'centreline') -> Problem:
     """Pose one lay position.
 
     `shift` is an ARGUMENT, not a range. There is no loop over shifts in this
     module and no field on the result that remembers which one this was.
 
     `vertical_at` adds uy-only supports (see `boundary_conditions`).
+
+    `contact_surface` selects what the rollers are taken to touch --
+    'centreline' (the default, and what every validated result used) or
+    'bottom', the physical one, which rides the pipe centreline at
+    `R + r_roller + OD/2`. See `physics.contact`. It is a property of the
+    CONTACT and of nothing else, so two Problems differing only in it still
+    satisfy `differs_only_in_contact`.
 
     `elastic_spans` names arc spans whose elements take a LINEAR ELASTIC
     material whatever `material` says. Distinct from `elastic_zones`, which
@@ -128,7 +136,8 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
         associations=tuple(model.associations),
         contacts=tuple(contact_targets(model, scene, assembly=assembly,
                                        shift=shift, s_centre=s_centre,
-                                       OD=OD)),
+                                       OD=OD,
+                                       contact_surface=contact_surface)),
         loads=tuple(loads),
         restraints=tuple(boundary_conditions(model, scene,
                                              vertical_at=vertical_at)),

@@ -17,7 +17,7 @@ source paper it is labelled as such and is a TARGET, not a result.
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Commit at time of writing | `5e67a7a` (63 commits); §5 added at `2302897`+ (28 Sep) |
 | Rebuild status | T0–T5 complete; **L7 sweep and L8 passage report built and verified (28 Sep)**; T9 scoped |
-| Test suite | 425 passing at creation; **451 passing at 28 Sep**, layer linter clean |
+| Test suite | 425 passing at creation; **466 passing at 28 Sep**, layer linter clean |
 | Registers | `BUILD_LESSONS.yaml` 58 entries · `TRIAL_LOG.yaml` 15 entries |
 
 ### Which program produced which result
@@ -304,6 +304,46 @@ look like a defect was reading the passage in **material** coordinates, where
 the peak appears frozen at one element (s = 9.28) while its value decays.
 Every number in §5 is in **station** coordinates (L063).
 
+### 5.5 Contact surface — `R_eff`, opt-in, and what adopting it would cost
+
+*`--contact-surface bottom`. `LayPath.R` is to the roller **centreline**, so
+the pipe centreline really rides at `R + r_roller + OD/2` = 85.5032 m at
+R = 85, **+0.592%**. Default stays `centreline`; every number above is
+unaffected.*
+
+Geometry, before any solve:
+
+| | |
+|---|---|
+| Deck targets (θ = 0) | **exactly 0.00000** — enters through curvature, never as a translation |
+| Arc targets | deepen by exactly `R_eff/R` at every station |
+| Material correction `(R_eff−R)·θ` | 0 on the deck → **0.3197 m at SR7** |
+| Closed form vs projection on an `R_eff` path | agree to **5e-15** |
+
+Solved delta:
+
+| Case | centreline | bottom | delta |
+|---|---|---|---|
+| Plain J2, R = 70 | 0.5531% | 0.5474% | **−1.04%** |
+| Plain J2, R = 85 | 0.4086% | 0.4046% | **−0.98%** |
+| Plain J2, R = 105 | 0.2978% | 0.2957% | **−0.72%** |
+| Plain elastic, R = 70 / 85 / 105 | 0.3773 / 0.3161 / 0.2599% | 0.3756 / 0.3146 / 0.2589% | −0.46 / −0.50 / −0.39% |
+| GD-TP envelope | 0.5727% | 0.5649% | **−1.36%** |
+| GD-TP start position | 0.4597% | 0.4542% | −1.20% |
+
+Adopting it lowers every strain by **0.4–1.4%, one-directional** — small, but
+systematic, which is why it is a deliberate decision rather than a default
+change.
+
+**The first measurement said −14.51%, and that was a bug I introduced**, not
+physics. `sweep.critical_shifts` was still crossing edges at the station's
+`s_arc` while the slots had moved to `s_arc + (R_eff−R)·θ`, so under `bottom`
+the schedule solved travels the contact never saw and the leading-edge peak
+was never sampled — the envelope fell back to the trailing-edge crossing at
+shift 2.000. Both now read `physics.contact.station_material`, and the
+envelope lands at shift **1.053 = 1.000 + 0.053**, the SR2 correction exactly
+(L066).
+
 ---
 
 ## Action log
@@ -311,5 +351,6 @@ Every number in §5 is in **station** coordinates (L063).
 | Date | Action |
 |---|---|
 | 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
+| 28 Sep 2026 | **§5.5 added.** `R_eff` wired in as opt-in and measured: −0.4 to −1.4% one-directional, default unchanged. A −14.51% first reading was L066, a sweep scheduling bug, not physics. T020. |
 | 28 Sep 2026 | **§5 added.** Sequential sliding in the rebuild: the sliding verified exact (0.08% at a whole-element step), the GD-TP envelope made step-independent by solving the edge crossings, three plain-pipe diameters, and the passage decay traced to carried plastic state rather than a defect. L063–L065, T016–T019. |
 | 21 Sep 2026 | Document created. All results from the 21 Sep session recorded with the program that produced each. §2.3 (0 MT diameters) left explicitly pending rather than omitted. |
