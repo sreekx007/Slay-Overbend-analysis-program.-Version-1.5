@@ -134,7 +134,7 @@ def archetype(arch_id: str):
     return ils_builder.build_ils(by_id[arch_id]['definition'])
 
 
-def _problem_at(scene, ils, pos, L_comp, OD, **kw):
+def _problem_at(scene, ils, pos, L_comp, **kw):
     """Re-pose the Problem a solved Position came from.
 
     The sweep keeps only the `Result`, and junction extraction needs the
@@ -158,8 +158,9 @@ def _problem_at(scene, ils, pos, L_comp, OD, **kw):
         extra = dict(assembly=ils.assembly, ils=ils)
     if hi > lo + 1e-9:
         extra.update(vertical_at=(lo,), elastic_spans=((lo, hi),))
-    if OD != OD_DEF:
-        extra['OD'] = OD
+    # `OD` is NOT taken separately here: it already travels in `kw` when the
+    # case is off the default pipe. Passing it both ways is a TypeError that
+    # only fires on a non-default diameter -- invisible on the baseline.
     return build_problem(model, scene, shift=pos.shift, s_centre=c,
                          **extra, **kw)
 
@@ -167,9 +168,14 @@ def _problem_at(scene, ils, pos, L_comp, OD, **kw):
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
-            contact_surface='centreline', verbose=True):
-    """Run one passage. Returns (scene, L_comp, records)."""
-    ils = archetype(arch_id)
+            contact_surface='centreline', ils=None, verbose=True):
+    """Run one passage. Returns (scene, L_comp, records, junction rows).
+
+    `ils` overrides `arch_id` with an already-built assembly, which is how
+    the dataset runner varies component length and wall: those are fields of
+    an ILS definition, not of a fixture name.
+    """
+    ils = archetype(arch_id) if ils is None else ils
     if ils is None:
         # No component, so no traverse to size the sweep from. Sweep a fixed
         # multiple of the diameter instead, and say so rather than letting
@@ -215,7 +221,7 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
         if not pos.converged:
             junc.append({})
             continue
-        pr = _problem_at(sc, ils, pos, L_comp, OD, clear_before=cb, **kw)
+        pr = _problem_at(sc, ils, pos, L_comp, clear_before=cb, **kw)
         junc.append(jr.row(pos, pr, OD))
     if verbose:
         _table(records, L_comp, time.time() - t0)

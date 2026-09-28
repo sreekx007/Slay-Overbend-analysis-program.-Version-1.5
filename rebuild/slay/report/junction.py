@@ -290,3 +290,39 @@ def row(position, problem, OD: float, offsets=OFFSETS_OD) -> dict:
         out[tag + '_s'] = p.s
         out[tag + '_clamped'] = p.clamped
     return out
+
+
+def case_row(rows, env_index: int) -> dict:
+    """One dataset row per CASE, from every position's `row()`.
+
+    TWO READINGS OF THE SAME PASSAGE, because they answer different
+    questions and only one of them is what a reader usually assumes:
+
+      SNAPSHOT (bare column names) -- every value as it stood at the
+        envelope position. Self-consistent: one real instant of one lay.
+      PER-LOCATION ENVELOPE (`_env`) -- the worst each location saw at ANY
+        position. Not one instant; a design envelope assembled from several.
+
+    They differ, and by a lot at any location that does not govern. Measured
+    on GD-TP: the trailing junction reads 0.3297% at the envelope position
+    but 0.4620% at its own worst, when the trailing edge sits on SR2 -- the
+    snapshot understates it by 40%. A model trained on the snapshot alone
+    would learn that the trailing junction is mild; it is not, it merely
+    peaks somewhere else.
+
+    Both come from the same solve, so carrying both costs nothing but
+    columns. `_s` and `_clamped` stay snapshot-only: a location and a
+    clamping flag are properties of a position, and maxing them would be
+    meaningless.
+    """
+    live = [r for r in rows if r]
+    if not live:
+        return {}
+    snap = dict(rows[env_index]) if rows[env_index] else dict(live[0])
+    out = dict(snap)
+    for k in snap:
+        if not (k.endswith('_strain') or k.endswith('_moment')):
+            continue
+        vals = [r[k] for r in live if k in r and r[k] == r[k]]   # drop NaN
+        out[k + '_env'] = max(vals) if vals else float('nan')
+    return out

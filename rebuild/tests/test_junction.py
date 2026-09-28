@@ -288,3 +288,36 @@ def test_moment_and_strain_agree_through_the_curvature():
     assert resid
     assert max(resid) - min(resid) < 0.05 * max(resid), \
         f'membrane term is not constant: {resid}'
+
+
+# -- the case row ----------------------------------------------------------
+
+def test_the_case_row_carries_both_the_snapshot_and_the_envelope():
+    """A location that does not govern peaks at a DIFFERENT position, so the
+    snapshot understates it. Measured on GD-TP: the trailing junction reads
+    0.3297% at the envelope position and 0.4620% at its own worst."""
+    rows = [{'j0_at_pipe_strain': 0.002, 'j0_at_pipe_moment': 1.0,
+             'j0_at_pipe_s': 7.0, 'j0_at_pipe_clamped': True},
+            {'j0_at_pipe_strain': 0.005, 'j0_at_pipe_moment': 3.0,
+             'j0_at_pipe_s': 7.0, 'j0_at_pipe_clamped': True},
+            {'j0_at_pipe_strain': 0.004, 'j0_at_pipe_moment': 2.0,
+             'j0_at_pipe_s': 7.0, 'j0_at_pipe_clamped': True}]
+    got = jn.case_row(rows, env_index=0)
+    assert got['j0_at_pipe_strain'] == pytest.approx(0.002), 'the snapshot'
+    assert got['j0_at_pipe_strain_env'] == pytest.approx(0.005), 'the worst'
+    assert got['j0_at_pipe_moment_env'] == pytest.approx(3.0)
+    assert 'j0_at_pipe_s_env' not in got, 'a location is not maxed'
+    assert 'j0_at_pipe_clamped_env' not in got, 'nor is a flag'
+
+
+def test_the_case_row_skips_positions_that_failed():
+    """A diverged position contributes no dict; it must not blank the row."""
+    rows = [{'a_strain': 0.002}, {}, {'a_strain': 0.009}]
+    got = jn.case_row(rows, env_index=0)
+    assert got['a_strain'] == pytest.approx(0.002)
+    assert got['a_strain_env'] == pytest.approx(0.009)
+
+
+def test_a_case_with_no_junctions_gives_an_empty_row():
+    """Plain pipe. The derived columns live on the passage record instead."""
+    assert jn.case_row([{}, {}], env_index=0) == {}
