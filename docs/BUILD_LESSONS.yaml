@@ -1293,3 +1293,86 @@
   detect: test_staged_and_single_solve_agree_at_the_same_metric
   refs: [docs/RESULTS.md, docs/modules/T5_solve_spec.md, tools/stage_run.py, rebuild/tests/test_stage_run.py]
   date: 2026-09-22
+
+- id: L063
+  area: measure
+  class: ruling
+  symptom: >-
+    A plain-pipe passage read in MATERIAL coordinates appears to have its
+    peak frozen at one element (s=9.28 at every position) while the value
+    decays 13 pct over 4 m of travel. It reads as a solver defect. Chasing
+    it cost four wrong hypotheses: a non-sliding tension point (disproved,
+    identical to 4 decimals), a soft chained penalty (disproved, targets met
+    to 1e-13 at 1e4, 1e6 and 1e8 alike), the terminal station's slot
+    degenerating onto the tip node (disproved, survives a stinger margin),
+    and the carried active set (disproved, reset changes nothing).
+  cause: >-
+    Model `s` is a MATERIAL coordinate: it labels a point on the pipe and
+    travels with it. After the pipeline advances by `shift`, material `s`
+    sits at station position `s + shift`, so a strain reported at material
+    `s` is at a DIFFERENT PLACE ON THE STINGER at every position. A table of
+    material-s peaks down a passage compares nothing to nothing. The real
+    cause of the decay was the carried PLASTIC STATE -- isolated by resetting
+    it, which flattens the passage -- i.e. accumulated yielding as material
+    traverses the stinger, which is the effect sequential sliding exists to
+    capture, not a defect at all.
+  rule: >-
+    Report every passage quantity in STATION coordinates, carry the material
+    coordinate beside it, and apply the reporting zone on the station value.
+    Before calling a passage trend a defect, reproduce it LINEAR ELASTIC:
+    there a plain pipe on fixed rollers must be invariant, so anything left
+    is either discretisation or real material history.
+  detect: test_the_zone_cuts_on_station_not_material, test_station_strains_are_keyed_by_place_not_by_material, test_a_plain_elastic_passage_is_invariant_in_station_space
+  refs: [rebuild/slay/report/passage.py, tools/slide.py]
+  date: 2026-09-28
+
+- id: L064
+  area: measure
+  class: finding
+  symptom: >-
+    The GD-TP passage envelope depended on the sweep step over a 20 pct
+    range: 0.4715 pct at a 2.0-element step, 0.4772 at 1.0, 0.5482 at 0.5,
+    0.5678 at 0.25. Refining the step moved the answer and gave no sign of
+    having converged.
+  cause: >-
+    The envelope sits where the component's LEADING EDGE crosses a roller --
+    peak location converging on lead = 9.016 m against SR2 at 9.000 -- which
+    is not a step boundary. Any step steps over it; a coarse step misses it
+    by 16 pct. Refining the step everywhere pays for resolution across the
+    whole passage to buy it at one travel.
+  rule: >-
+    Solve the edge crossings exactly. `study.sweep.critical_shifts` returns
+    the travels at which either component edge sits on a contact station and
+    the schedule includes them whatever the step, on by default. Measured,
+    that makes the envelope step-INDEPENDENT: 0.5731/0.5727/0.5722/0.5689 pct
+    across the same 4x range of step, a 0.7 pct spread instead of 20, and
+    found in 5 positions rather than 16.
+  detect: test_critical_shifts_are_the_edge_crossings, test_the_schedule_carries_the_critical_shifts_whatever_the_step
+  refs: [rebuild/slay/study/sweep.py, tools/slide.py]
+  date: 2026-09-28
+
+- id: L065
+  area: physics
+  class: finding
+  symptom: >-
+    Open item from the T4 spec: the contact slot interpolates LINEARLY
+    between the two bracketing nodes, where a beam's transverse displacement
+    is really cubic. Estimated at about 1 mm and raised rather than changed.
+  cause: >-
+    Now measured on a plain LINEAR ELASTIC passage, where station-space
+    strain must be invariant. Stepped a WHOLE element it holds to 0.03-0.08
+    pct at SR1-SR4. Stepped HALF an element the values alternate -- SR1
+    0.1947, 0.1863, 0.1947, 0.1863, 0.1948 pct -- with no trend: a contact
+    point interpolated to mid-element is softer than one sitting on a node.
+    Worth 4.40 pct at SR1, 0.83 pct at SR2, 0.26 at SR3, 0.04 at SR4, at
+    2xOD elements.
+  rule: >-
+    The linear slot costs up to 4.4 pct at the first stinger roller when the
+    contact point falls mid-element, and that is now a number rather than an
+    estimate. It is twenty times smaller than the 16 pct cost of
+    undersampling the envelope (L064), so refining the step is right and
+    Hermite interpolation stays an open item -- but a passage whose positions
+    all sit mid-element carries this bias systematically.
+  detect: test_a_plain_elastic_passage_is_invariant_in_station_space
+  refs: [rebuild/slay/physics/contact.py, docs/modules/T4_physics_spec.md, tools/slide.py]
+  date: 2026-09-28

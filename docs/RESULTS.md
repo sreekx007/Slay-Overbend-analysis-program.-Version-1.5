@@ -15,9 +15,9 @@ source paper it is labelled as such and is a TARGET, not a result.
 | **Date** | 21 September 2026 |
 | Repository | `Slay-Overbend-analysis-program.-Version-1.5` |
 | Branch | `claude/program-rebuild-status-bya72s` |
-| Commit at time of writing | `5e67a7a` (63 commits) |
-| Rebuild status | T0–T5 complete; T6 (study/sweep) not built; T9 scoped |
-| Test suite | 425 passing, layer linter clean |
+| Commit at time of writing | `5e67a7a` (63 commits); §5 added at `2302897`+ (28 Sep) |
+| Rebuild status | T0–T5 complete; **L7 sweep and L8 passage report built and verified (28 Sep)**; T9 scoped |
+| Test suite | 425 passing at creation; **451 passing at 28 Sep**, layer linter clean |
 | Registers | `BUILD_LESSONS.yaml` 58 entries · `TRIAL_LOG.yaml` 15 entries |
 
 ### Which program produced which result
@@ -225,9 +225,91 @@ predictions.
 
 ---
 
+## 5. Sequential sliding — REBUILD
+
+*28 September 2026. `tools/slide.py`, driving `slay.study.sweep` (L7) and
+`slay.report.passage` (L8). Mode A (state carried between positions), J2
+plasticity, R = 85 m, 9 m spacing, 120 MT, 406.4 × 21 unless stated.*
+
+### 5.1 The sliding is exact — plain pipe, LINEAR ELASTIC
+
+The check that licenses everything below. The rollers impose the same
+geometry at every position, so a plain elastic pipe must read the same strain
+at the same **station** however far it has slid.
+
+| Step | SR1 | SR2 | SR3 | SR4 |
+|---|---|---|---|---|
+| **2 × OD (one element)** | **0.079%** | **0.031%** | **0.044%** | **0.032%** |
+| 1 × OD (half an element) | 4.40% | 0.83% | 0.26% | 0.04% |
+
+*(spread = (max − min)/max across the passage)*
+
+At a whole-element step the passage is invariant to **0.08%**. At half an
+element SR1 alternates `0.1947, 0.1863, 0.1947, 0.1863, 0.1948%` — period
+two, **no trend** — which is the LINEAR contact slot being softer when the
+interpolated contact point falls mid-element. That closes the Hermite open
+item in the T4 spec with a number: **4.4% at SR1, 0.83% at SR2** (L065).
+
+### 5.2 GD-TP across SR2 — the envelope is step-independent
+
+| Step | Positions | Envelope, no edge crossings | Positions | Envelope, **with** edge crossings |
+|---|---|---|---|---|
+| 2.0 element | 3 | 0.4715% | 5 | **0.5731%** |
+| 1.0 element | 5 | 0.4772% | 7 | **0.5727%** |
+| 0.5 element | 9 | 0.5482% | 11 | **0.5722%** |
+| 0.25 element | 16 | 0.5678% | 18 | **0.5689%** |
+| | | spread **20%** | | spread **0.7%** |
+
+Every edge-crossing run puts the envelope at shift 1.000 m, where the
+component's **leading edge sits exactly on SR2** (lead 9.000 against
+s_arc 9.000). `study.sweep.critical_shifts` adds those travels to every
+schedule, which is what turns a step-dependent number into a converged one —
+and it finds it in 5 positions where blind refinement needed 16 (L064).
+
+**A single-position solve at the start reads 0.4597% — 24.6% below the
+envelope.** That is the argument for sliding, in one number.
+
+### 5.3 Plain pipe by diameter — REBUILD, no component at all
+
+*Travel 4 × OD, step 0.8128 m.*
+
+| OD | Envelope | At station | At position | Trend after |
+|---|---|---|---|---|
+| 168.3 mm | 0.2916% | 8.98 m | 0 | 0.2831% by pos 1 |
+| 406.4 mm | 0.4085% | 9.26 m | 0 | 0.3945 → 0.3807% |
+| 508.0 mm | 0.5134% | 9.09 m | 0 | 0.5053 → 0.4942 → 0.4887% |
+
+Peak at SR2 in all three. **Plain pipe needs no sweep for its envelope** —
+there is no edge to cross, so the start position *is* the envelope. This is a
+genuine bare-pipe baseline with no component present; the neutral-component
+device `tools/slide_plain.py` needs for the reference program is not needed
+here.
+
+### 5.4 The monotonic fall after position 0 is not a defect
+
+A 13%-over-4 m decay in the plain-pipe J2 passage read as a solver defect.
+Four hypotheses tested and eliminated:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Lay tension not sliding with the material | re-seat it on the material under the load station | identical to 4 decimals |
+| Chained penalty too soft (1e4 vs 1e8) | run at 1e4, 1e6, 1e8 | identical; targets met to 2e-9 / 2e-11 / 2e-13 |
+| Terminal slot clamping onto the tip node | add a stinger-side margin so it interpolates | decay survives |
+| Carried active set | reset it each position | identical; VR1, VR2 released either way |
+| **Carried plastic state** | **reset it each position** | **passage flattens** — 0.4023/0.4096/0.4123/0.3964 vs 0.4023/0.3799/0.3684/0.3489 |
+
+It is accumulated plastic strain travelling with the material as it traverses
+the stinger — the effect sequential sliding exists to capture. What made it
+look like a defect was reading the passage in **material** coordinates, where
+the peak appears frozen at one element (s = 9.28) while its value decays.
+Every number in §5 is in **station** coordinates (L063).
+
+---
+
 ## Action log
 
 | Date | Action |
 |---|---|
 | 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
+| 28 Sep 2026 | **§5 added.** Sequential sliding in the rebuild: the sliding verified exact (0.08% at a whole-element step), the GD-TP envelope made step-independent by solving the edge crossings, three plain-pipe diameters, and the passage decay traced to carried plastic state rather than a defect. L063–L065, T016–T019. |
 | 21 Sep 2026 | Document created. All results from the 21 Sep session recorded with the program that produced each. §2.3 (0 MT diameters) left explicitly pending rather than omitted. |

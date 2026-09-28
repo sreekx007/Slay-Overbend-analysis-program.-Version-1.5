@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 15
+# entries: 19
 
 - id: T001
   date: 2026-09-21
@@ -354,3 +354,105 @@
     reading any passage trend as settled.
   lesson: '-'
   refs: [tools/slide_plain.py, docs/modules/T5_solve_spec.md]
+
+- id: T016
+  date: 2026-09-28
+  goal: >-
+    Verify the rebuild's sliding contact is exact, on a plain LINEAR ELASTIC
+    passage where station-space strain must be invariant because the rollers
+    impose the same geometry at every position.
+  action: >-
+    Plain pipe, R=85, spacing 9, 120 MT, no plasticity, through
+    slay.study.sweep.run in mode A. Strain read at each stinger station in
+    STATION coordinates (material s + shift) and compared across positions,
+    at a whole-element step (2xOD) and a half-element step (1xOD).
+  case: 'R=85; spacing 9; T=120 MT; 406.4x21; linear elastic'
+  outcome: success
+  evidence: >-
+    Whole-element step: spread 0.079/0.031/0.044/0.032 pct at SR1/SR2/SR3/SR4
+    over three positions. Half-element step: SR1 alternates 0.1947, 0.1863,
+    0.1947, 0.1863, 0.1948 pct -- period two, no trend -- for a 4.40 pct
+    spread; SR2 0.83, SR3 0.26, SR4 0.04.
+  verdict: >-
+    The sliding is exact: advance the pipe a whole element and the same
+    station reads the same strain to 0.08 pct. The half-element alternation
+    is the LINEAR slot interpolating mid-element, now measured rather than
+    estimated.
+  lesson: L065
+  refs: [tools/slide.py, rebuild/tests/test_report_passage.py]
+
+- id: T017
+  date: 2026-09-28
+  goal: >-
+    Explain a 13 pct monotonic decay in the plain-pipe J2 passage peak, which
+    read as a solver defect.
+  action: >-
+    Four hypotheses tested and eliminated in turn, then the cause isolated by
+    selectively resetting each field of the chained state.
+  case: 'R=85; spacing 9; T=120 MT; 406.4x21; J2; 4 m travel'
+  outcome: measurement
+  evidence: >-
+    Re-seating lay tension on the material under the load station: identical
+    to 4 decimals. Chained penalty at 1e4/1e6/1e8: identical, with contact
+    targets met to 2e-9/2e-11/2e-13 -- never the constraint. A stinger-side
+    margin so the terminal slot interpolates instead of clamping onto the tip
+    node: decay survives. Active set reset: identical, VR1 and VR2 released
+    at every position either way. PLASTIC state reset: passage flattens,
+    0.4023/0.4096/0.4123/0.3964 against 0.4023/0.3799/0.3684/0.3489.
+  verdict: >-
+    The decay is accumulated plastic strain travelling with the material as
+    it traverses the stinger -- the effect sequential sliding exists to
+    capture. What made it look like a defect was reading the passage in
+    MATERIAL coordinates, where the peak appears frozen at one element.
+  lesson: L063
+  refs: [rebuild/slay/report/passage.py]
+
+- id: T018
+  date: 2026-09-28
+  goal: >-
+    Establish whether the GD-TP passage envelope is a converged number or an
+    artefact of the sweep step.
+  action: >-
+    ILS-TP (L = 1.000 m, lift 21 mm on 406.4 pipe) swept across SR2 at four
+    steps spanning 4x, with and without the edge-crossing travels in the
+    schedule.
+  case: 'R=85; spacing 9; T=120 MT; 406.4x21; J2; sweep 3.000 m; mode A'
+  outcome: success
+  evidence: >-
+    Without edge crossings: 0.4715 (2.0 elem, 3 pos), 0.4772 (1.0, 5),
+    0.5482 (0.5, 9), 0.5678 (0.25, 16) -- a 20 pct spread, not converged.
+    With them: 0.5731, 0.5727, 0.5722, 0.5689 -- a 0.7 pct spread, every one
+    at shift 1.000 where the leading edge sits on SR2 at 9.000. A single
+    solve at the start position reads 0.4597 pct, 24.6 pct below the
+    envelope.
+  verdict: >-
+    The envelope is at the leading edge crossing the roller and nowhere near
+    either end of the passage, so it cannot be reached by choosing a position
+    in advance. Including the edge crossings makes it step-independent and
+    cheaper: 5 positions beat the 16-position refinement.
+  lesson: L064
+  refs: [rebuild/slay/study/sweep.py, tools/slide.py]
+
+- id: T019
+  date: 2026-09-28
+  goal: >-
+    Plain-pipe sliding passage at three diameters through the REBUILD, the
+    counterpart of T015's run through the reference program.
+  action: >-
+    tools/slide.py --pipes 0.1683,0.4064,0.508 --step 0.8128, mode A, J2,
+    travel 4xOD per diameter.
+  case: 'R=85; spacing 9; T=120 MT; OD 168.3/406.4/508; J2'
+  outcome: success
+  evidence: >-
+    Every position converges. Band envelope 0.2916/0.4085/0.5134 pct at
+    OD 168.3/406.4/508 mm, at position 0 in all three, falling monotonically
+    thereafter (406.4: 0.4085 -> 0.3945 -> 0.3807). Peak at station 8.98/9.26/
+    9.09 m, i.e. at SR2, in all three.
+  verdict: >-
+    Plain pipe needs no sweep for its envelope -- there is no edge to cross,
+    so the start position IS the envelope and the fall after it is the
+    accumulated plasticity of T017. A genuine bare-pipe baseline, with no
+    component present at all: the neutral-component device tools/slide_plain.py
+    needed for the reference program is not needed here.
+  lesson: '-'
+  refs: [tools/slide.py]

@@ -1,0 +1,305 @@
+#!/usr/bin/env python3
+"""slide.py -- sequential sliding contact through the rebuild. NOT a single
+position solve.
+
+    python3 tools/slide.py                          plain pipe, 4xOD passage
+    python3 tools/slide.py --archetype ILS-TP       GD-TP across SR2
+    python3 tools/slide.py --archetype ILS-TP --csv out.csv
+    python3 tools/slide.py --pipes 0.1683,0.4064,0.508
+
+WHAT THIS IS THE COUNTERPART OF. `slay_sliding_v0_5.py::run_passage_sliding`
+in the reference toolchain. The physics is the same and the layering is not:
+there, one 450-line function owned the mesh, the slots, the Newton loop, the
+strain recovery and the position loop together. Here each of those is a layer
+and this file only sequences them -- `study.sweep` owns the position loop
+(G11), `physics.contact` owns the slots, `solve.passage` owns Newton, and
+`report.passage` owns the measurement.
+
+WHY SLIDING AND NOT ONE POSITION. Measured here, GD-TP at R = 85 m, 9 m
+spacing, 120 MT, step 1xOD:
+
+    shift 0.000   band 0.4597%      <- where a single-position solve looks
+    shift 1.219   band 0.5482%      <- the envelope, leading edge at SR2
+    shift 3.000   band 0.4968%
+
+The start position is 19% LOW. The worst position is not at either end of the
+passage, so it cannot be reached by picking a position in advance; it has to
+be swept for. That is the whole argument.
+
+TWO THINGS THE PASSAGE GETS RIGHT THAT A READER SHOULD KNOW ABOUT.
+
+  THE SWEEP LENGTH IS DERIVED. `L_comp + clear_before + clear_after`, so the
+  component starts clear of SR2 and finishes clear past it. It is not a
+  chosen number of metres and it grows with the component.
+
+  THE ENVELOPE IS NOT AT A STEP BOUNDARY. It is where a component edge
+  crosses a roller, so those travels are added to every schedule by
+  `study.sweep.critical_shifts` and the step only samples between them.
+
+  THE VESSEL END IS FED. Material advances toward the stinger, so the vessel
+  end runs dry; `study.sweep` adds `sweep + 1 m` of buffer pipe there, holds
+  its tail in `uy` alone, and forces it linear elastic. Feedstock is not part
+  of the answer and must never yield.
+
+MODE A vs MODE B. A carries state between positions -- the real path a
+component travels, and the mode that captures accumulated plastic strain. B
+solves each position from virgin state, which is the worst position anywhere
+whether or not a real lay would reach it. A is the default because a lay is
+sequential; B is the check.
+
+VERIFIED, and this is the measurement that says the sliding is right: run
+LINEAR ELASTIC on plain pipe, where station-space strain must be invariant
+under a shift because the rollers impose the same geometry at every position.
+`--verify` runs it. Measured:
+
+    step = 2xOD (one element)      spread 0.03 - 0.08%   <- exact
+    step = 1xOD (half an element)  spread 0.83% at SR2, 4.40% at SR1
+
+So the sliding itself is EXACT: advance the pipe by a whole element and the
+same station reads the same strain to 0.08%.
+
+TWO STEP EFFECTS PULL OPPOSITE WAYS, and the bigger one wins.
+
+  SLOT INTERPOLATION, worth 0.8% at SR2 and 4.4% at SR1. The half-element
+  column above ALTERNATES -- 0.1947, 0.1863, 0.1947, 0.1863, 0.1948 -- with no
+  trend. A contact point interpolated to the middle of an element is softer
+  than one on a node, because the slot coefficients are LINEAR in the two
+  bracketing nodes (`physics.contact`: Hermite "raised, measured, not silently
+  changed"). This is that measurement.
+
+  UNDERSAMPLING THE ENVELOPE, worth 16%. The passage peak is where the
+  component's leading edge crosses a roller, and a whole-element step steps
+  straight over it: GD-TP envelope 0.4772% at 1.00 element, 0.5482% at 0.50,
+  0.5678% at 0.25, the peak converging on lead = 9.016 m ~ SR2.
+
+So refine the step -- undersampling costs twenty times what the jitter does.
+Better still, `study.sweep.critical_shifts` puts every edge-crossing travel
+into the schedule whatever the step is, which is on by default and is what
+makes the envelope independent of the step rather than a function of it.
+"""
+
+from __future__ import annotations
+
+import json
+import sys
+import time
+from pathlib import Path
+
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / 'rebuild'))
+sys.path.insert(0, str(REPO))
+
+import ils_builder                                          # noqa: E402
+
+from slay.data.materials import material                    # noqa: E402
+from slay.report import passage as rp                       # noqa: E402
+from slay.study import sweep                                # noqa: E402
+
+TON = 9806.65
+FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
+
+R_DEF = 85.0
+SPACING_DEF = 9.0
+TENSION_MT_DEF = 120.0
+OD_DEF = 0.4064
+PLAIN_TRAVEL_OD = 4.0            # plain pipe has no component: sweep 4xOD
+
+
+def archetype(arch_id: str):
+    """An ILS assembly by archetype id, or None for `none`/plain pipe.
+
+    PLAIN PIPE IS PLAIN PIPE HERE. `sweep.run(scene, None)` builds a bare
+    pipeline and no contact surface is consulted at all. The reference module
+    needed `allow_plain_pipe=True` for this because its earlier revisions
+    faked a baseline with a zero-length shroud whose lift cancelled -- right
+    by accident, as v0.5 says. There is nothing to opt into here: no
+    component means no assembly.
+    """
+    if arch_id in (None, '', 'none', 'plain'):
+        return None
+    d = json.loads(FIXTURE.read_text())
+    by_id = {a['id']: a for a in d['archetypes']}
+    if arch_id not in by_id:
+        raise SystemExit(f'unknown archetype {arch_id!r}; '
+                         f'have {", ".join(sorted(by_id))}')
+    return ils_builder.build_ils(by_id[arch_id]['definition'])
+
+
+def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
+            tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
+            mode='A', elastic=False, clear_before=None, clear_after=None,
+            verbose=True):
+    """Run one passage. Returns (scene, L_comp, records)."""
+    ils = archetype(arch_id)
+    if ils is None:
+        # No component, so no traverse to size the sweep from. Sweep a fixed
+        # multiple of the diameter instead, and say so rather than letting
+        # `sweep_length(0)` quietly return the clearances alone.
+        L_comp = 0.0
+        cb = 0.0 if clear_before is None else clear_before
+        ca = PLAIN_TRAVEL_OD * OD if clear_after is None else clear_after
+    else:
+        L_comp = ils.extent[1] - ils.extent[0]
+        cb = sweep.CLEAR_BEFORE if clear_before is None else clear_before
+        ca = sweep.CLEAR_AFTER if clear_after is None else clear_after
+
+    total = sweep.sweep_length(L_comp, cb, ca)
+    step = OD if step is None else step
+    sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L_comp,
+                         clear_before=cb, clear_after=ca)
+
+    kw = dict(tension=tension_mt * TON,
+              material=None if elastic else material('j2'))
+    if OD != OD_DEF:
+        kw['OD'] = OD
+    if t_wall is not None:
+        kw['t_wall'] = t_wall
+
+    if verbose:
+        s_max, label = rp.zone(sc)
+        print(f'{arch_id:10s} R={R:.0f} m  spacing={spacing:.0f} m  '
+              f'T={tension_mt:.0f} MT  OD={OD:.4f} m  mode {mode}'
+              f'{"  ELASTIC" if elastic else ""}')
+        print(f'{"":10s} L_comp={L_comp:.3f} m  sweep={total:.3f} m  '
+              f'step={step:.4f} m  buffer={sweep.buffer_length(L_comp, cb, ca):.3f} m')
+        print(f'{"":10s} zone: station s < {s_max:.1f} m ({label})')
+        _warn_step(step, OD)
+
+    t0 = time.time()
+    positions = sweep.run(sc, ils, L_comp=L_comp, step=step,
+                          clear_before=cb, clear_after=ca, mode=mode, **kw)
+    records = rp.measure(positions, sc, L_comp=L_comp)
+    if verbose:
+        _table(records, L_comp, time.time() - t0)
+    return sc, L_comp, records
+
+
+def _warn_step(step, OD):
+    """Say how the step sits against one element, and what that costs.
+
+    One element is 2xOD (the ruled mesh density). A step that is not a whole
+    number of them makes successive positions alternate between a node-
+    aligned contact point and an interpolated one, which is worth up to 4.4%
+    at SR1 -- see the module docstring. Reported, not corrected: a finer step
+    resolves the component's position better and that may be the trade the
+    caller wants.
+    """
+    elem = 2.0 * OD
+    n = step / elem
+    note = ('  <- a whole element: coarse enough to step over the envelope, '
+            'which sits at an edge crossing') if abs(n - round(n)) < 1e-6 \
+        else '  <- sub-element: up to 4.4% slot-interpolation jitter at SR1'
+    print(f'{"":10s} step = {n:.3f} element ({elem:.4f} m at 2xOD){note}')
+    print(f'{"":10s} edge-crossing travels are solved regardless of the step')
+
+
+def _table(records, L_comp, secs):
+    print(f'  {"pos":>3} {"shift":>8} {"status":>10} {"act":>7} '
+          f'{"peak":>9} {"at sta":>8} {"at mat":>8}'
+          + (f' {"lead":>8} {"trail":>8}' if L_comp > 0 else ''))
+    for r in records:
+        pk = f'{100 * r.peak_strain:8.4f}%' if r.converged else f'{"--":>9}'
+        row = (f'  {r.index:3d} {r.shift:8.3f} {r.status:>10} '
+               f'{r.n_active:3d}/{r.n_slots:<3d} {pk} '
+               f'{r.peak_s_station:8.2f} {r.peak_s_material:8.2f}')
+        if L_comp > 0:
+            row += f' {r.s_lead:8.3f} {r.s_trail:8.3f}'
+        print(row)
+    try:
+        env = rp.envelope(records)
+    except ValueError as exc:
+        print(f'  NO ENVELOPE: {exc}')
+        return
+    start = records[0]
+    gain = (100.0 * (env.peak_strain / start.peak_strain - 1.0)
+            if start.converged and start.peak_strain > 0 else float('nan'))
+    print(f'  envelope {100 * env.peak_strain:.4f}% at position {env.index} '
+          f'(shift {env.shift:.3f} m, station {env.peak_s_station:.2f} m)')
+    print(f'  a single solve at the start position would read '
+          f'{100 * start.peak_strain:.4f}% -- {gain:+.1f}% off the envelope')
+    print(f'  {len(records)} positions in {secs:.1f} s')
+
+
+def verify(R=R_DEF, spacing=SPACING_DEF, tension_mt=TENSION_MT_DEF):
+    """Plain pipe, LINEAR ELASTIC: station-space strain must not vary.
+
+    The rollers impose the same geometry at every position, so a plain
+    elastic pipe must give the same strain at the same STATION however far it
+    has slid. What is left is discretisation: the interpolated contact point
+    moves within an element as the shift advances. A trend here would mean
+    the sliding is wrong; jitter without a trend is the mesh.
+
+    The tip stations are reported but not judged -- D6 makes the terminal
+    station a contact slot and the last three rollers are outside the zone.
+    """
+    sc, _L, _r = passage('none', R=R, spacing=spacing, tension_mt=tension_mt,
+                         elastic=True, verbose=False)
+    positions = sweep.run(sc, None, L_comp=0.0, clear_before=0.0,
+                          clear_after=PLAIN_TRAVEL_OD * OD_DEF,
+                          step=OD_DEF, tension=tension_mt * TON, material=None)
+    records = rp.measure(positions, sc)
+    s_max, _ = rp.zone(sc)
+    print('plain pipe, linear elastic -- strain by STATION, one column per shift')
+    print(f'  {"station":>8} ' + ' '.join(f'{r.shift:8.3f}' for r in records)
+          + f' {"spread":>8}  in zone')
+    worst = 0.0
+    for st in sorted((s for s in sc.stations if s.name.startswith('SR')),
+                     key=lambda t: t.s_arc):
+        vals = [r.stations.get(st.name) for r in records]
+        if any(v is None for v in vals):
+            continue
+        spread = (max(vals) - min(vals)) / max(vals) * 100.0
+        inzone = st.s_arc < s_max
+        if inzone:
+            worst = max(worst, spread)
+        print(f'  {st.name:>8} ' + ' '.join(f'{100 * v:7.4f}%' for v in vals)
+              + f' {spread:7.2f}%  {"yes" if inzone else "no"}')
+    print(f'  worst in-zone spread {worst:.2f}% over '
+          f'{records[-1].shift:.3f} m of travel')
+    return worst
+
+
+def main() -> int:
+    a = sys.argv[1:]
+
+    def opt(flag, default=None, cast=str):
+        if flag in a:
+            return cast(a[a.index(flag) + 1])
+        return default
+
+    if '--verify' in a:
+        verify(R=opt('--R', R_DEF, float),
+               spacing=opt('--spacing', SPACING_DEF, float),
+               tension_mt=opt('--tension', TENSION_MT_DEF, float))
+        return 0
+
+    kw = dict(arch_id=opt('--archetype', 'none'),
+              R=opt('--R', R_DEF, float),
+              spacing=opt('--spacing', SPACING_DEF, float),
+              tension_mt=opt('--tension', TENSION_MT_DEF, float),
+              step=opt('--step', None, float),
+              mode=opt('--mode', 'A'),
+              elastic='--elastic' in a)
+    csv_out = opt('--csv')
+
+    pipes = opt('--pipes')
+    ods = [float(x) for x in pipes.split(',')] if pipes else [opt('--OD', OD_DEF, float)]
+
+    allrec = []
+    for od in ods:
+        if len(ods) > 1:
+            print()
+        sc, L, records = passage(OD=od, **kw)
+        allrec += [(od, L, r) for r in records]
+    if csv_out:
+        rows = [r for (_od, _L, r) in allrec]
+        rp.to_csv(rows, csv_out, extra=dict(
+            archetype=kw['arch_id'], R=kw['R'], spacing=kw['spacing'],
+            tension_mt=kw['tension_mt'], mode=kw['mode'],
+            OD=allrec[0][0], L_comp=allrec[0][1]))
+        print(f'\nwrote {csv_out} ({len(rows)} rows)')
+    return 0
+
+
+if __name__ == '__main__':
+    raise SystemExit(main())

@@ -117,12 +117,17 @@ def start_centre(scene, L_comp: float,
     return scene.by_name(station).s_arc - clear_before - L_comp / 2.0
 
 
-def schedule(total: float, step: float) -> tuple:
+def schedule(total: float, step: float, include=()) -> tuple:
     """Travels in metres, starting at 0 and INCLUDING `total`.
 
     The final position is the one the sweep was sized for, so it is never
     dropped for not landing on a step boundary -- the last interval is
     short instead.
+
+    `include` are extra travels that must be solved whatever the step lands
+    on -- see `critical_shifts`. Merged in, sorted, and de-duplicated to a
+    micron, because two positions a nanometre apart are the same position
+    solved twice.
     """
     if step <= 0:
         raise ValueError(f'step must be positive, got {step}')
@@ -130,7 +135,53 @@ def schedule(total: float, step: float) -> tuple:
     while x < total - 1e-9:
         x = min(x + step, total)
         out.append(x)
-    return tuple(out)
+    for v in include:
+        if 0.0 <= v <= total:
+            out.append(float(v))
+    out.sort()
+    keep = [out[0]]
+    for v in out[1:]:
+        if v - keep[-1] > 1e-6:
+            keep.append(v)
+    return tuple(keep)
+
+
+def critical_shifts(scene, L_comp: float, s_centre: float) -> tuple:
+    """Travels at which a component EDGE sits exactly on a contact station.
+
+    WHY THESE ARE NOT OPTIONAL. The passage envelope is not at either end of
+    the sweep and it is not on a step boundary: measured on GD-TP at R = 85 m,
+    9 m spacing, 120 MT, it is where the LEADING EDGE crosses SR2, and the
+    peak sharpens as the step refines --
+
+        step 1.00 element   envelope 0.4772%   (missed it)
+        step 0.50 element   envelope 0.5482%
+        step 0.25 element   envelope 0.5678%   peak at lead = 9.016 ~ SR2
+
+    A whole-element step undersamples the answer by 16%. Refining the step
+    everywhere pays for that resolution across the entire passage; solving the
+    edge-crossings exactly buys it where it actually lives. So these travels
+    go into every schedule and the step only sets the sampling between them.
+
+    A station at `s_arc` is crossed by the leading edge when
+    `s_centre + L/2 + shift == s_arc`, and by the trailing edge when
+    `s_centre - L/2 + shift == s_arc`. Both matter: the edges are where the
+    section changes, and a section change over a roller is the whole reason
+    this component is interesting.
+
+    Empty for plain pipe -- there are no edges, and nothing distinguishes one
+    travel from another.
+    """
+    from slay.scene.rollers import StationRole
+    if L_comp <= 0.0:
+        return ()
+    out = []
+    for st in scene.stations:
+        if st.role is not StationRole.CONTACT:
+            continue
+        for edge in (s_centre + L_comp / 2.0, s_centre - L_comp / 2.0):
+            out.append(st.s_arc - edge)
+    return tuple(sorted(v for v in out if v > 0.0))
 
 
 def buffer_length(L_comp: float,
@@ -203,11 +254,16 @@ def _required_stations(scene) -> tuple:
 def run(scene, ils=None, *, L_comp=0.0, step=None,
         clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER,
         station=STATION, mode='A', s_centre=None,
-        target_len=None, verbose=False, **problem_kw) -> list:
+        target_len=None, include_critical=True, verbose=False,
+        **problem_kw) -> list:
     """Solve the passage. Returns a list of `Position`, one per lay position.
 
     `mode='A'` carries state forward; `mode='B'` solves each position from
     virgin state. Any other keyword goes to `build_problem`.
+
+    `include_critical` adds the edge-crossing travels (`critical_shifts`) to
+    the schedule whatever `step` lands on. On by default because without them
+    the envelope depends on the step -- see that function for the numbers.
     """
     if mode not in ('A', 'B'):
         raise ValueError(f"mode must be 'A' or 'B', got {mode!r}")
@@ -247,8 +303,9 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     # `s_centre` is a MATERIAL coordinate and does not move with the sweep.
     # The component stays where it is in the pipe; `shift` is what carries
     # the pipe past the rollers.
+    crit = critical_shifts(scene, L_comp, s_centre) if include_critical else ()
     out, state = [], None
-    for i, shift in enumerate(schedule(total, step)):
+    for i, shift in enumerate(schedule(total, step, include=crit)):
         problem = build_problem(model, scene, shift=shift, **problem_kw)
         result, state_out = solve(problem, state_in=state)
         out.append(Position(index=i, shift=shift,
