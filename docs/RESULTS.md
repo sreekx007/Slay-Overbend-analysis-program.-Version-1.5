@@ -17,7 +17,7 @@ source paper it is labelled as such and is a TARGET, not a result.
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Commit at time of writing | `5e67a7a` (63 commits); §5 added at `2302897`+ (28 Sep) |
 | Rebuild status | T0–T5 complete; **L7 sweep and L8 passage report built and verified (28 Sep)**; T9 scoped |
-| Test suite | 425 passing at creation; **466 passing at 28 Sep**, layer linter clean |
+| Test suite | 425 passing at creation; **481 passing at 28 Sep**, layer linter clean |
 | Registers | `BUILD_LESSONS.yaml` 58 entries · `TRIAL_LOG.yaml` 15 entries |
 
 ### Which program produced which result
@@ -344,6 +344,63 @@ shift 2.000. Both now read `physics.contact.station_material`, and the
 envelope lands at shift **1.053 = 1.000 + 0.053**, the SR2 correction exactly
 (L066).
 
+### 5.6 Junction extraction — GD-TP, at the passage envelope
+
+*28 Sep 2026. `slay.report.junction`, on ILS-TP (L = 1.000 m, OD 448.4 mm on
+a constant 364.4 mm bore — wall 42 mm against the pipe's 21). R = 85 m, 9 m
+spacing, 120 MT, J2, mode A, at the envelope position (shift 1.000 m, leading
+edge on SR2).*
+
+**`I_comp / I_pipe` = 2.3631.**
+
+| Location | Strain | Moment (kNm) | |
+|---|---|---|---|
+| Body peak (component) | **0.1336%** | 1274.7 | |
+| Junction 0 (trailing), component side | 0.1265% | 1201.7 | clamped |
+| Junction 0 (trailing), pipe side | 0.3297% | 1111.5 | clamped |
+| −2 / −4 / −6 × OD (pipe) | 0.2927 / 0.2383 / 0.2097% | 1060.5 / 963.1 / 875.5 | |
+| **Junction 1 (leading), component side** | **0.1336%** | **1274.7** | clamped |
+| **Junction 1 (leading), pipe side** | **0.5727%** | **1265.7** | clamped |
+| +2 / +4 / +6 × OD (pipe) | 0.5122 / 0.4157 / 0.3512% | 1224.1 / 1149.3 / 1089.7 | |
+
+Two things fall out, and both are the reason the extraction exists:
+
+**Moment is continuous across the junction, strain is not.** 1274.7 vs
+1265.7 kNm (0.7% apart) against 0.1336% vs 0.5727% — a factor of **4.3**.
+Elastic theory predicts 2.14× from the section moduli alone; the rest is
+plasticity, the pipe side being well past yield (0.22%) while the component
+side stays elastic.
+
+**The governing strain is the pipe just outboard of the leading edge**, and
+`j1_at_pipe = 0.5727%` *is* the passage envelope of §5.2. Recording the
+component body peak alone would understate the design value **4.3×**.
+
+Probes are interpolated within a body and never across the step; `clamped`
+marks a probe the run ended before, and `s_elem` always says where the number
+came from (L067).
+
+### 5.7 Bending moment — recovery and verification
+
+The rebuild had no moment recovery; `Result` now carries `moments` on the
+same element grid as `strains`. Verified two independent ways on a plain
+elastic passage:
+
+| Check | Result |
+|---|---|
+| `M` against `EI/R` on the arc | oscillates 0.94–1.11 about 1.0 — real sag between discrete rollers |
+| `eps_reported − κ·OD/2` along a uniform run | constant at 0.0192–0.0195% — the membrane term from tension |
+
+The second is the stronger one: the kernel's fibre-strain recovery and this
+module's fibre-moment recovery are separate code paths, and they agree
+through the curvature to 1.6%.
+
+Each Gauss point is paired with **its own** curvature and **its own** plastic
+state. The reference tool carries a v1.48 fix for exactly this — pairing the
+element-mean curvature with the GP0-only plastic state produced a spurious
+single-element moment collapse, ~500 kNm where ~1330 kNm was right. Checked
+absent here: J2 moments run 879.8 → 1187.7 kNm smoothly into the SR2 peak,
+largest element-to-element jump 101.3 kNm against a 30 kNm median (L068).
+
 ---
 
 ## Action log
@@ -351,6 +408,7 @@ envelope lands at shift **1.053 = 1.000 + 0.053**, the SR2 correction exactly
 | Date | Action |
 |---|---|
 | 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
+| 28 Sep 2026 | **§5.6–5.7 added.** Junction extraction and bending-moment recovery. Moment continuous across a junction, strain 4.3× discontinuous; the governing strain is the pipe outboard of the leading edge, and it IS the passage envelope. L067, L068, T021. |
 | 28 Sep 2026 | **§5.5 added.** `R_eff` wired in as opt-in and measured: −0.4 to −1.4% one-directional, default unchanged. A −14.51% first reading was L066, a sweep scheduling bug, not physics. T020. |
 | 28 Sep 2026 | **§5 added.** Sequential sliding in the rebuild: the sliding verified exact (0.08% at a whole-element step), the GD-TP envelope made step-independent by solving the edge crossings, three plain-pipe diameters, and the passage decay traced to carried plastic state rather than a defect. L063–L065, T016–T019. |
 | 21 Sep 2026 | Document created. All results from the 21 Sep session recorded with the program that produced each. §2.3 (0 MT diameters) left explicitly pending rather than omitted. |

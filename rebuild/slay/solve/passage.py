@@ -36,6 +36,7 @@ study layer's.
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 
 import numpy as np
@@ -90,6 +91,7 @@ class Result:
     contact_passes: int = 0
     residual: float = 0.0
     strains: tuple = ()        # (element index, s_mid, eps_max)
+    moments: tuple = ()        # (element index, s_mid, M) in N.m
     runner: object = field(default=None, repr=False)
 
     @property
@@ -254,6 +256,7 @@ def solve(problem, state_in: SolveState = None, *,
     res.U, res.residual = U, rc
     res.active, res.released = tuple(active), tuple(sorted(released))
     res.strains, res.runner = _strains(problem, ms, mdl, U, ps, index_of)
+    res.moments = _moments(problem, ms, U, th, ps, index_of)
     return res, SolveState(U=U, theta=th, plastic=ps, active=tuple(active))
 
 
@@ -307,6 +310,110 @@ def _plastic_state(ms, problem, state_in, n_fib):
             ps.eps_p[:] = old.eps_p
             ps.kap[:] = old.kap
     return ps
+
+
+# Two-point Gauss rule, DERIVED rather than copied: the points of the
+# 2-point Legendre rule on [-1, 1].
+GAUSS_XI_2 = (-1.0 / math.sqrt(3.0), +1.0 / math.sqrt(3.0))
+
+
+def _element_kinematics(ms, U, th):
+    """(eps0, u3, u6, L0) per mesh element -- the co-rotational strip.
+
+    Ported from the reference `_moment_profile`. `th` carries the committed
+    element rotation so the co-rotational angle unwraps continuously; without
+    it an element passing +/-pi jumps by 2*pi and its curvature inverts.
+    """
+    dof, coords, L0 = ms.elem_dof_array, ms.elem_coords, ms.elem_L0
+    ux1, uy1, rz1 = U[dof[:, 0]], U[dof[:, 1]], U[dof[:, 2]]
+    ux2, uy2, rz2 = U[dof[:, 3]], U[dof[:, 4]], U[dof[:, 5]]
+    x1d, y1d = coords[:, 0] + ux1, coords[:, 1] + uy1
+    x2d, y2d = coords[:, 2] + ux2, coords[:, 3] + uy2
+    dx, dy = x2d - x1d, y2d - y1d
+    Ld = np.hypot(dx, dy)
+    theta0 = np.arctan2(coords[:, 3] - coords[:, 1],
+                        coords[:, 2] - coords[:, 0])
+    raw = np.arctan2(dy, dx)
+    theta = raw.copy()
+    ok = ~np.isnan(th)
+    if ok.any():
+        d = raw[ok] - th[ok]
+        d -= 2 * np.pi * np.round(d / (2 * np.pi))
+        theta[ok] = th[ok] + d
+    dth = theta - theta0
+    return (Ld - L0) / L0, rz1 - dth, rz2 - dth, L0
+
+
+def _moments(problem, ms, U, th, ps, index_of):
+    """(element index, s at the midpoint, M in N.m) per element.
+
+    M = sum(sigma_f * y_f * A_f) over fibres, evaluated at BOTH Gauss points
+    and averaged onto the element midpoint -- the same grid `_strains`
+    reports on, so a moment and a strain at one location are comparable.
+
+    EACH GAUSS POINT GETS ITS OWN CURVATURE AND ITS OWN PLASTIC STATE, and
+    that pairing is the whole care of this function. The reference tool
+    carried a v1.48 fix for exactly this: pairing the ELEMENT-MEAN curvature
+    with the GP0-only plastic state gave a spurious single-element moment
+    collapse -- about 500 kNm reported where ~1330 kNm was right -- because
+    near a contact node the two Gauss points hold very different plastic
+    strain, and GP0 was the low-plastic point in one element and the high one
+    in its neighbour. Strain never showed it: strain does not read the
+    plastic state.
+
+    MIDPOINT AVERAGING, NOT NODAL EXTRAPOLATION, and deliberately. A section
+    moment SATURATES plastically, so extrapolating past the Gauss points
+    returns values above the section capacity. Abaqus shows the same artefact
+    -- it is why nodal stress contours can exceed yield. Nodal recovery is
+    right for contouring a smooth field, not for reading a peak off a
+    plastically saturated one.
+    """
+    eps0, u3, u6, L0 = _element_kinematics(ms, U, th)
+    s_of = {i: sv for (i, sv, _y) in problem.nodes}
+    coords = ms.elem_coords
+    out = []
+    for (idx, n1, n2, _owner, _line) in problem.elements:
+        ie = index_of[idx]
+        M = 0.0
+        for xi in GAUSS_XI_2:
+            kap = ((3.0 * xi - 1.0) / L0[ie] * u3[ie]
+                   + (3.0 * xi + 1.0) / L0[ie] * u6[ie])
+            M += _section_moment(ms, ie, eps0[ie], kap, ps,
+                                 GAUSS_XI_2.index(xi))
+        out.append((idx, 0.5 * (coords[ie, 0] + coords[ie, 2]), 0.5 * M))
+    return tuple(out)
+
+
+def _section_moment(ms, ie, eps0, kap, ps, g):
+    """One Gauss point's moment, by whichever constitutive law it carries.
+
+    Three paths, and a fourth that REFUSES. A section whose law is not
+    recognised returns no number rather than `E*I*kappa`, which would be
+    wrong wherever it mattered and plausible everywhere -- the exact shape of
+    defect this project keeps finding.
+    """
+    if ms.elem_ep[ie]:                       # J2, incremental: path-dependent
+        fy, fA = ms.elem_fibres[ie]
+        mat = ms.elem_ep_mat[ie]
+        nf = len(fy)
+        eps_f = eps0 + fy * kap
+        if ps is None:
+            zero = np.zeros(nf)
+            sigma, *_ = fe._ep_return_mapping(eps_f, zero, zero, mat.E, mat)
+        else:
+            sigma, *_ = fe._ep_return_mapping(
+                eps_f, ps.eps_p[ie, g, :nf], ps.kap[ie, g, :nf], mat.E, mat)
+        return float(np.sum(sigma * fy * fA))
+    if ms.elem_inelastic[ie]:                # Ramberg-Osgood: path-INdependent
+        fy, fA = ms.elem_fibres[ie]
+        E_r, sig_y, alpha, n_ro = ms.elem_ro_params[ie]
+        sigma = fe._ro_stress(eps0 + fy * kap, E_r, sig_y, alpha, n_ro)
+        return float(np.sum(sigma * fy * fA))
+    if ms.elem_fibres[ie] is None:           # linear elastic: M = E I kappa
+        return float(ms.elem_E[ie] * ms.elem_I[ie] * kap)
+    raise NotImplementedError(
+        f'element {ie} has fibres but no recognised constitutive law; '
+        f'refusing to report E*I*kappa for it')
 
 
 def _strains(problem, ms, mdl, U, ps, index_of):

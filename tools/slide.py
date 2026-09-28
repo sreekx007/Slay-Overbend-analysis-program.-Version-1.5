@@ -100,6 +100,7 @@ sys.path.insert(0, str(REPO))
 import ils_builder                                          # noqa: E402
 
 from slay.data.materials import material                    # noqa: E402
+from slay.report import junction as jr                      # noqa: E402
 from slay.report import passage as rp                       # noqa: E402
 from slay.study import sweep                                # noqa: E402
 
@@ -131,6 +132,36 @@ def archetype(arch_id: str):
         raise SystemExit(f'unknown archetype {arch_id!r}; '
                          f'have {", ".join(sorted(by_id))}')
     return ils_builder.build_ils(by_id[arch_id]['definition'])
+
+
+def _problem_at(scene, ils, pos, L_comp, OD, **kw):
+    """Re-pose the Problem a solved Position came from.
+
+    The sweep keeps only the `Result`, and junction extraction needs the
+    SECTIONS -- which body each element belongs to. Rebuilt with the same
+    placement the sweep used, never guessed: `s_centre` and `shift` are read
+    off the sweep, so the sections line up with the strains element for
+    element.
+    """
+    from slay.model.assemble import build_model
+    from slay.physics.problem import build_problem
+    # Popped UNCONDITIONALLY: inside the ternary it short-circuits on plain
+    # pipe and leaks a sweep argument into `build_problem`.
+    cb = kw.pop('clear_before')
+    c = sweep.start_centre(scene, L_comp, cb, sweep.STATION) \
+        if L_comp > 0 else 0.0
+    model = build_model(scene, ils, s_centre=c,
+                        extra_stations=sweep._required_stations(scene))
+    lo, hi = sweep.buffer_span(scene)
+    extra = {}
+    if ils is not None:
+        extra = dict(assembly=ils.assembly, ils=ils)
+    if hi > lo + 1e-9:
+        extra.update(vertical_at=(lo,), elastic_spans=((lo, hi),))
+    if OD != OD_DEF:
+        extra['OD'] = OD
+    return build_problem(model, scene, shift=pos.shift, s_centre=c,
+                         **extra, **kw)
 
 
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
@@ -179,9 +210,17 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     positions = sweep.run(sc, ils, L_comp=L_comp, step=step,
                           clear_before=cb, clear_after=ca, mode=mode, **kw)
     records = rp.measure(positions, sc, L_comp=L_comp)
+    junc = []
+    for pos in positions:
+        if not pos.converged:
+            junc.append({})
+            continue
+        pr = _problem_at(sc, ils, pos, L_comp, OD, clear_before=cb, **kw)
+        junc.append(jr.row(pos, pr, OD))
     if verbose:
         _table(records, L_comp, time.time() - t0)
-    return sc, L_comp, records
+        _junction_table(records, junc)
+    return sc, L_comp, records, junc
 
 
 def _warn_step(step, OD):
@@ -230,6 +269,27 @@ def _table(records, L_comp, secs):
     print(f'  {len(records)} positions in {secs:.1f} s')
 
 
+def _junction_table(records, junc):
+    """The junction numbers at the envelope position."""
+    try:
+        env = rp.envelope(records)
+    except ValueError:
+        return
+    d = junc[env.index]
+    if not d or not d.get('n_junctions'):
+        return
+    print(f'  junctions at the envelope (position {env.index}): '
+          f'I_comp/I_pipe = {d["stiffness_ratio"]:.4f}, '
+          f'body peak {100 * d["body_peak_strain"]:.4f}%')
+    keys = sorted(k[:-7] for k in d if k.endswith('_strain')
+                  and k != 'body_peak_strain')
+    print(f'    {"location":22s}{"strain":>10}{"moment kNm":>13}{"":>3}')
+    for k in keys:
+        eps, M = d[k + '_strain'], d[k + '_moment']
+        flag = ' clamped' if d.get(k + '_clamped') else ''
+        print(f'    {k:22s}{100 * eps:9.4f}%{M / 1e3:13.1f}{flag}')
+
+
 def verify(R=R_DEF, spacing=SPACING_DEF, tension_mt=TENSION_MT_DEF):
     """Plain pipe, LINEAR ELASTIC: station-space strain must not vary.
 
@@ -242,8 +302,9 @@ def verify(R=R_DEF, spacing=SPACING_DEF, tension_mt=TENSION_MT_DEF):
     The tip stations are reported but not judged -- D6 makes the terminal
     station a contact slot and the last three rollers are outside the zone.
     """
-    sc, _L, _r = passage('none', R=R, spacing=spacing, tension_mt=tension_mt,
-                         elastic=True, verbose=False)
+    sc, _L, _r, _j = passage('none', R=R, spacing=spacing,
+                             tension_mt=tension_mt, elastic=True,
+                             verbose=False)
     positions = sweep.run(sc, None, L_comp=0.0, clear_before=0.0,
                           clear_after=PLAIN_TRAVEL_OD * OD_DEF,
                           step=OD_DEF, tension=tension_mt * TON, material=None)
@@ -300,11 +361,12 @@ def main() -> int:
     for od in ods:
         if len(ods) > 1:
             print()
-        sc, L, records = passage(OD=od, **kw)
-        allrec += [(od, L, r) for r in records]
+        sc, L, records, junc = passage(OD=od, **kw)
+        allrec += [(od, L, r, junc[i]) for i, r in enumerate(records)]
     if csv_out:
-        rows = [r for (_od, _L, r) in allrec]
-        rp.to_csv(rows, csv_out, extra=dict(
+        rows = [r for (_od, _L, r, _j) in allrec]
+        rp.to_csv(rows, csv_out, per_row=[j for (_od, _L, _r, j) in allrec],
+                  extra=dict(
             archetype=kw['arch_id'], R=kw['R'], spacing=kw['spacing'],
             tension_mt=kw['tension_mt'], mode=kw['mode'],
             contact_surface=kw['contact_surface'],

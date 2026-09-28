@@ -1404,3 +1404,57 @@
   detect: test_the_edge_crossings_follow_the_contact_surface, test_the_crossing_offset_is_the_material_correction
   refs: [rebuild/slay/physics/contact.py, rebuild/slay/study/sweep.py]
   date: 2026-09-28
+
+- id: L067
+  area: measure
+  class: defect
+  symptom: >-
+    The +/-2xOD junction probe returned the same element, and therefore
+    exactly the same strain and moment, as the junction probe itself. A row
+    labelled 2xOD carried the 1xOD number.
+  cause: >-
+    Probes were answered by "the element CONTAINING the requested point". At
+    the ruled 2xOD mesh, element midpoints sit at ODD multiples of 1xOD from
+    a junction, so no element centre is ever at 2, 4 or 6xOD from one and
+    every requested offset falls between two midpoints. The containing
+    element can be up to half an element away, which at 2xOD is a full
+    diameter.
+  rule: >-
+    Interpolate between the two nearest element midpoints INSIDE the
+    requested point's own contiguous section run -- never across the step,
+    where strain is genuinely discontinuous. Where the run ends first (the
+    junction itself, or an offset that overshoots a short body) clamp to the
+    end midpoint and set `clamped`. Every probe carries `s_elem`, so a reader
+    can always see where the number really came from.
+  detect: test_a_probe_lands_at_the_offset_it_is_labelled_with, test_offsets_on_one_side_are_distinct_values
+  refs: [rebuild/slay/report/junction.py]
+  date: 2026-09-28
+
+- id: L068
+  area: solve
+  class: ruling
+  symptom: >-
+    The rebuild had no bending-moment recovery at all -- Result carried
+    strains only -- so nothing downstream could report a moment, and the
+    junction dataset was blocked on it.
+  cause: >-
+    Ported from the reference _moment_profile, which carries a v1.48 fix
+    worth knowing: M is evaluated at BOTH Gauss points, each with its OWN
+    curvature kappa(xi_g) and its OWN stored plastic state. Pairing the
+    element-mean curvature with the GP0-only plastic state gave a spurious
+    single-element moment collapse -- about 500 kNm where ~1330 kNm was
+    right -- because near a contact node the two Gauss points hold very
+    different plastic strain. Strain never showed it: strain does not read
+    the plastic state.
+  rule: >-
+    Element moment is the mean of the two self-consistent Gauss-point
+    moments, reported at the element midpoint -- the same grid the strains
+    use, so the two are comparable element for element. NOT nodal
+    extrapolation: a section moment saturates plastically, so extrapolating
+    past the Gauss points returns values above section capacity. An element
+    whose constitutive law is unrecognised RAISES rather than falling back
+    to E*I*kappa, which would be wrong where it mattered and plausible
+    everywhere.
+  detect: test_elastic_moment_is_EI_kappa_on_a_solved_arc, test_moment_and_strain_agree_through_the_curvature
+  refs: [rebuild/slay/solve/passage.py]
+  date: 2026-09-28

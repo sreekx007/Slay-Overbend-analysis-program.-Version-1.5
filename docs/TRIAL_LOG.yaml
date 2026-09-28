@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 20
+# entries: 21
 
 - id: T001
   date: 2026-09-21
@@ -486,3 +486,36 @@
     envelope, which was L066 -- a scheduling bug in the sweep, not physics.
   lesson: L066
   refs: [rebuild/slay/physics/contact.py, rebuild/tests/test_contact_surface.py, tools/slide.py]
+
+- id: T021
+  date: 2026-09-28
+  goal: >-
+    Build the junction extraction the ML dataset needs: strain and moment at
+    the component/pipe junction and at 2, 4 and 6 x OD either side of it,
+    plus the stiffness ratio.
+  action: >-
+    Bending-moment recovery added to solve.passage (fibre integration at both
+    Gauss points, J2/RO/elastic paths). slay.report.junction finds junctions
+    as SECTION STEPS in the solved model, samples by interpolation within a
+    body, and flattens to a dataset row. Wired into tools/slide.py and its
+    CSV. Run on ILS-TP at the passage envelope.
+  case: 'R=85; spacing 9; T=120 MT; 406.4x21; ILS-TP L=1.0 m; J2; mode A'
+  outcome: success
+  evidence: >-
+    I_comp/I_pipe = 2.3631 (OD 448.4 on a constant 364.4 bore -- wall 42 mm
+    against the pipe's 21). At the leading-edge junction, moment is
+    CONTINUOUS (1274.7 component vs 1265.7 kNm pipe, 0.7 pct) and strain is
+    NOT (0.1336 vs 0.5727 pct, a factor of 4.3). The pipe-side junction
+    strain 0.5727 pct IS the passage envelope. Body peak 0.1336 pct.
+    Elastic moment verified against EI/R (mean ratio within 10 pct, the
+    spread being real sag between rollers) and against the kernel's own
+    strain recovery through kappa, whose residual membrane term is constant
+    to 1.6 pct. CSV: 103 columns, 64 of them junction measurements.
+  verdict: >-
+    The governing location is the pipe immediately outboard of the leading
+    edge as it crosses SR2, not the component body -- recording the body peak
+    alone understates it 4.3x. Elastic theory predicts a 2.14x step from the
+    section moduli; the measured 4.29x is plasticity amplifying it, the pipe
+    side being well past yield while the component side stays elastic.
+  lesson: L067
+  refs: [rebuild/slay/report/junction.py, rebuild/slay/solve/passage.py, tools/slide.py]

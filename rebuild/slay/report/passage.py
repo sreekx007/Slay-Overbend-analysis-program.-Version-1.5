@@ -183,28 +183,43 @@ def station_envelope(records) -> dict:
     return out
 
 
-def to_csv(records, path, extra: dict = None) -> None:
+def to_csv(records, path, extra: dict = None, per_row=None) -> None:
     """Write the passage as one row per position.
 
     `extra` holds the case parameters -- R, spacing, tension, component --
     repeated on every row. A results file that does not say which case it is
     cannot be joined to anything later, and this dataset is meant to be.
+
+    `per_row` is one dict per record, merged in as its own columns: the
+    junction measurements, which differ position by position. THE COLUMN SET
+    IS THE UNION over every row IN THIS FILE, and missing keys are written
+    blank, so the file is rectangular even when a component enters or leaves
+    the model mid-passage. Separate files still differ from each other -- a
+    plain-pipe run genuinely has no junction columns, and the derived
+    columns (`stiffness_ratio` 1.0, `n_junctions` 0) are what make the two
+    joinable.
     """
     extra = dict(extra or {})
+    per_row = list(per_row or [{}] * len(records))
+    if len(per_row) != len(records):
+        raise ValueError(f'per_row has {len(per_row)} entries for '
+                         f'{len(records)} records')
     names = sorted({n for r in records for n in r.stations})
+    extras = sorted({k for d in per_row for k in d})
     head = ([k for k in extra]
             + [f.name for f in _fields(records[0]) if f.name != 'stations']
-            + [f'eps_{n}' for n in names])
+            + [f'eps_{n}' for n in names] + extras)
     with open(path, 'w', newline='') as fh:
         w = csv.writer(fh)
         w.writerow(head)
-        for r in records:
+        for r, px in zip(records, per_row):
             d = asdict(r)
             sta = d.pop('stations')
             w.writerow(list(extra.values())
                        + [_flat(d[f.name]) for f in _fields(r)
                           if f.name != 'stations']
-                       + [sta.get(n, '') for n in names])
+                       + [sta.get(n, '') for n in names]
+                       + [px.get(k, '') for k in extras])
 
 
 def _fields(rec):
