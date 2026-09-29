@@ -221,6 +221,22 @@ def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
                 n_positions=len(positions))
 
 
+def excluded_span(fx, s_materials, s_cut, shift, pad=1.0):
+    """(x_lo, x_hi) of the band OUTSIDE the reporting zone, in world x.
+
+    THE SIGN TRAP (L072). The zone drops the last three STINGER rollers --
+    HIGH station `s`, which the world mapping sends to the most NEGATIVE x.
+    Taking `fx(min(s))` instead of `min(fx(s))` shaded from the VESSEL end
+    and covered the half of the model that is IN the band. An extremum in
+    material coordinates is the OPPOSITE extremum in world coordinates,
+    because the mapping reverses sign.
+    """
+    xs = [fx(q) for q in s_materials]
+    if not xs:
+        return (0.0, 0.0)
+    return (min(xs) - pad, fx(s_cut - shift))
+
+
 def s_to_x(m, ms, U, shift=0.0):
     """Interpolator: material `s` -> world `x` on the SOLVED pipe.
 
@@ -832,8 +848,8 @@ def plot_passage(c, out):
     s_cut = env.zone_s_max
     p0 = live[0]['position']
     fx_env = s_to_x(m, live[0]['ms'], p0.result.U, p0.shift)
-    x_cut = fx_env(s_cut - p0.shift)
-    x_tip = min(fx_env(q) for (_i, q, _e) in p0.result.strains) - 1.0
+    x_tip, x_cut = excluded_span(
+        fx_env, [q for (_i, q, _e) in p0.result.strains], s_cut, p0.shift)
     bx.axvspan(x_tip, x_cut, color='#c9ccd1', alpha=0.40, zorder=1)
     bx.annotate('outside the reporting band\n(last 3 stinger rollers)',
                 (0.5 * (x_tip + x_cut), 0.95),

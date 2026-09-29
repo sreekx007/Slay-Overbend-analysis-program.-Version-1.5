@@ -79,3 +79,22 @@ def test_the_pipe_polyline_carries_the_shift_too(swept):
     b, _yb, _ids2 = ps.pipe_xy(m, ms, pos.result.U)
     assert (b - a).min() == pytest.approx(pos.shift, abs=1e-9)
     assert (b - a).max() == pytest.approx(pos.shift, abs=1e-9)
+
+
+def test_the_excluded_band_covers_the_stinger_end_not_the_vessel_end(swept):
+    """L072. The zone drops the last three STINGER rollers -- high station
+    `s`, which the world mapping sends to the most NEGATIVE x. Taking
+    `fx(min(s))` rather than `min(fx(s))` shaded from the vessel end and
+    covered the half of the model that is IN the band.
+    """
+    sc, m, p, pos, ms = swept
+    fx = ps.s_to_x(m, ms, pos.result.U, pos.shift)
+    s_mats = [q for (_i, q, _e) in pos.result.strains]
+    s_cut = max(t.s_arc for t in sc.stations if t.name.startswith('SR')) - 18.0
+    lo, hi = ps.excluded_span(fx, s_mats, s_cut, pos.shift)
+    assert lo < hi, 'a span, low to high'
+    xs = [fx(q) for q in s_mats]
+    assert lo <= min(xs), 'it reaches the stinger tip'
+    assert hi < 0.0, 'and stops on the stinger side of the deck, not past it'
+    # The vessel end must be OUTSIDE the shaded band -- the defect put it in.
+    assert max(xs) > hi, 'the vessel end is in the reporting band'

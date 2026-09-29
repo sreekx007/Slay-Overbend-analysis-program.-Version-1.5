@@ -1547,6 +1547,6 @@
     Take the drawn extreme in the coordinate being drawn: min over fx(s), not
     fx over min(s). The world mapping reverses sign, so an extremum in
     material coordinates is the opposite extremum in world coordinates.
-  detect: '-'
-  refs: [tools/plot_stinger.py]
+  detect: test_the_excluded_band_covers_the_stinger_end_not_the_vessel_end
+  refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
   date: 2026-09-29

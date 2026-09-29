@@ -67,6 +67,27 @@ def _rows(position, scene=None):
     return [(s + position.shift, s, e) for (_i, s, e) in position.result.strains]
 
 
+def _moment_rows(position):
+    """(s_station, s_material, |M|) per element.
+
+    MAGNITUDE, because a passage envelope is about how hard the pipe is bent
+    and sagging between rollers puts the moment through zero and out the
+    other side. Taking the signed maximum would report the largest hogging
+    moment and silently ignore a larger sagging one.
+    """
+    return [(s + position.shift, s, abs(m))
+            for (_i, s, m) in getattr(position.result, 'moments', ())]
+
+
+def band_peak_moment(position, s_max: float) -> tuple:
+    """(|M|, s_station, s_material) of the worst element inside the zone."""
+    rows = [r for r in _moment_rows(position) if r[0] < s_max]
+    if not rows:
+        return (0.0, 0.0, 0.0)
+    s_sta, s_mat, m = max(rows, key=lambda r: r[2])
+    return (m, s_sta, s_mat)
+
+
 def band_peak(position, s_max: float) -> tuple:
     """(eps, s_station, s_material) of the worst element inside the zone.
 
@@ -119,6 +140,9 @@ class PositionRecord:
     peak_strain: float         # in the zone
     peak_s_station: float      # where on the stinger
     peak_s_material: float     # which material point
+    peak_moment: float = 0.0           # N.m, |M|, in the zone
+    peak_moment_s_station: float = 0.0
+    peak_moment_s_material: float = 0.0
     s_lead: float = None       # component leading edge, station coords
     s_trail: float = None
     zone_s_max: float = 0.0
@@ -134,12 +158,15 @@ def record(position, scene, L_comp: float = 0.0,
     """Measure one solved position."""
     s_max, label = zone(scene, drop)
     eps, s_sta, s_mat = band_peak(position, s_max)
+    mom, m_sta, m_mat = band_peak_moment(position, s_max)
     lead, trail = component_span(position, L_comp)
     r = position.result
     return PositionRecord(
         index=position.index, shift=position.shift, status=r.status,
         converged=r.converged, peak_strain=eps, peak_s_station=s_sta,
-        peak_s_material=s_mat, s_lead=lead, s_trail=trail,
+        peak_s_material=s_mat, peak_moment=mom,
+        peak_moment_s_station=m_sta, peak_moment_s_material=m_mat,
+        s_lead=lead, s_trail=trail,
         zone_s_max=s_max, zone_label=label,
         n_active=int(sum(r.active)), n_slots=len(r.active),
         released=tuple(r.released), stations=station_strains(position, scene))
@@ -181,6 +208,57 @@ def station_envelope(records) -> dict:
         for name, eps in r.stations.items():
             out[name] = max(out.get(name, 0.0), eps)
     return out
+
+
+def write_case_csv(rows, path, strict: bool = True) -> dict:
+    """Write case rows against the declared schema, and the schema beside it.
+
+    THE CONTRACT IS ENFORCED, NOT DOCUMENTED. `strict` refuses to write a
+    column `report.schema` does not describe, which is the whole point: the
+    column set is open -- stations and junctions depend on the layout -- but
+    the OPENNESS is declared as patterns, so a new junction passes and a
+    misspelt one is caught. Before this, columns were the union of whatever
+    dicts were passed in and nothing could tell the two apart.
+
+    Writes `<path>` and `<path>.schema.json`, so a reader never needs this
+    source to interpret a file: units, dtypes and descriptions travel with
+    the data.
+    """
+    import json
+    from pathlib import Path
+
+    from slay.report import schema as sc
+
+    if not rows:
+        raise ValueError('no rows to write')
+    seen, cols = set(), []
+    for r in rows:
+        for k in r:
+            if k not in seen:
+                seen.add(k)
+                cols.append(k)
+    bad = sc.unknown(cols)
+    if bad and strict:
+        raise ValueError(
+            f'{len(bad)} column(s) the schema does not describe: '
+            f'{bad[:8]}{" ..." if len(bad) > 8 else ""}. Add a Field or a '
+            f'pattern to slay.report.schema, or fix the name.')
+    # Declared order first, then anything patterned, so a file is readable
+    # left to right and two files sort their shared columns the same way.
+    fixed = [c for c in sc.header() if c in seen]
+    rest = sorted(c for c in cols if c not in set(fixed))
+    order = fixed + rest
+    with open(path, 'w', newline='') as fh:
+        w = csv.DictWriter(fh, fieldnames=order, extrasaction='ignore')
+        w.writeheader()
+        for r in rows:
+            w.writerow({k: _flat(v) for k, v in r.items()})
+    meta = sc.as_dict()
+    meta['columns'] = order
+    meta['n_rows'] = len(rows)
+    meta['unknown_columns'] = bad
+    Path(str(path) + '.schema.json').write_text(json.dumps(meta, indent=1))
+    return meta
 
 
 def to_csv(records, path, extra: dict = None, per_row=None) -> None:
@@ -229,3 +307,95 @@ def _fields(rec):
 
 def _flat(v):
     return ';'.join(map(str, v)) if isinstance(v, tuple) else v
+
+
+def nearest_station(scene, s_station: float) -> tuple:
+    """(name, signed offset) of the roller nearest a STATION coordinate.
+
+    The human-readable half of a location. `s_station = 9.62` means nothing
+    to a reader; 'SR2 +0.62 m' means the leading edge has just crossed the
+    second stinger roller.
+    """
+    if not scene.stations:
+        return ('', 0.0)
+    st = min(scene.stations, key=lambda t: abs(t.s_arc - s_station))
+    return (st.name, s_station - st.s_arc)
+
+
+def _peak_over(records, value, s_sta, s_mat, scene) -> dict:
+    """The seven columns of one peak group, from per-position records.
+
+    MAX OVER POSITIONS AS WELL AS OVER THE MODEL, and the step that won is
+    carried out with it. A peak with no step cannot be checked, found again,
+    or plotted -- and the whole argument for sweeping is that the winning
+    step is not one anybody would have picked.
+    """
+    live = [r for r in records if r.converged]
+    if not live:
+        return dict(value=0.0, s_material=0.0, s_station=0.0, station='',
+                    station_offset=0.0, step=-1, shift=0.0)
+    best = max(live, key=lambda r: getattr(r, value))
+    sta, off = nearest_station(scene, getattr(best, s_sta))
+    return dict(value=getattr(best, value),
+                s_material=getattr(best, s_mat),
+                s_station=getattr(best, s_sta),
+                station=sta, station_offset=off,
+                step=best.index, shift=best.shift)
+
+
+def peaks(records, scene) -> dict:
+    """Flat columns for every peak group the schema declares.
+
+    `report.schema.peak_group` generates the seven column names; this fills
+    them. The two must agree, and `test_schema` asserts that they do rather
+    than leaving it to inspection -- which is exactly the failure the schema
+    exists to end.
+    """
+    out = {}
+    for prefix, value, s_sta, s_mat in (
+            ('peak_strain', 'peak_strain', 'peak_s_station', 'peak_s_material'),
+            ('peak_moment', 'peak_moment', 'peak_moment_s_station',
+             'peak_moment_s_material')):
+        got = _peak_over(records, value, s_sta, s_mat, scene)
+        out[prefix] = got.pop('value')
+        out.update({f'{prefix}_{k}': v for k, v in got.items()})
+    return out
+
+
+def body_peaks(records, scene, junction_rows) -> dict:
+    """The same seven columns for the peaks ON THE COMPONENT BODY.
+
+    Taken from the per-position junction rows, because which elements belong
+    to the body is a question about SECTIONS and only `report.junction` binds
+    those. Zeroed for a case with no component, so a plain-pipe row still
+    carries the columns -- a dataset whose columns depend on the row is not a
+    dataset.
+    """
+    out = {}
+    for prefix, key in (('body_peak_strain', 'body_peak_strain'),
+                        ('body_peak_moment', 'body_peak_moment')):
+        best_i, best_v, best_s = -1, 0.0, 0.0
+        for i, (rec, jr_) in enumerate(zip(records, junction_rows)):
+            if not rec.converged or not jr_:
+                continue
+            v = abs(jr_.get(key) or 0.0)
+            if v > best_v:
+                best_i, best_v, best_s = i, v, jr_.get('body_peak_s', 0.0)
+        if best_i < 0:
+            out[prefix] = 0.0
+            out.update({f'{prefix}_{k}': z for k, z in
+                        (('s_material', 0.0), ('s_station', 0.0),
+                         ('station', ''), ('station_offset', 0.0),
+                         ('step', -1), ('shift', 0.0))})
+            continue
+        rec = records[best_i]
+        s_station = best_s + rec.shift
+        sta, off = nearest_station(scene, s_station)
+        out[prefix] = best_v
+        out.update({f'{prefix}_s_material': best_s,
+                    f'{prefix}_s_station': s_station,
+                    f'{prefix}_station': sta,
+                    f'{prefix}_station_offset': off,
+                    f'{prefix}_step': rec.index,
+                    f'{prefix}_shift': rec.shift})
+    return out

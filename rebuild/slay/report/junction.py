@@ -280,6 +280,11 @@ def row(position, problem, OD: float, offsets=OFFSETS_OD) -> dict:
            'n_junctions': len(junctions(problem)),
            'body_peak_strain': e_body, 'body_peak_moment': m_body,
            'body_peak_s': s_body}
+    # These three are PER-POSITION and are consumed as such -- by the
+    # console table, and by `passage.body_peaks`, which reduces them to one
+    # case-level answer WITH its step. `case_row` therefore drops them: at
+    # case level `body_peak_strain` belongs to the peak group that carries a
+    # step, and two modules writing one column silently overwrote it.
     for p in measure(position, problem, OD, offsets):
         tag = ('j%d_%s%gOD' % (p.junction, 'm' if p.offset_OD < 0 else 'p',
                                abs(p.offset_OD)))
@@ -318,7 +323,11 @@ def case_row(rows, env_index: int) -> dict:
     live = [r for r in rows if r]
     if not live:
         return {}
-    snap = dict(rows[env_index]) if rows[env_index] else dict(live[0])
+    # See `row`: the per-position body peak is reduced by
+    # `passage.body_peaks`, which owns the case-level column and its step.
+    drop = ('body_peak_strain', 'body_peak_moment', 'body_peak_s')
+    snap = {k: v for k, v in (rows[env_index] or live[0]).items()
+            if k not in drop}
     out = dict(snap)
     for k in snap:
         if not (k.endswith('_strain') or k.endswith('_moment')):

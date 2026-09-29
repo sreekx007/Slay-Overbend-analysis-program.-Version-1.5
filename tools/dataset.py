@@ -51,6 +51,7 @@ import ils_builder                                            # noqa: E402
 
 from slay.report import junction as jr                        # noqa: E402
 from slay.report import passage as rp                         # noqa: E402
+from slay.report import schema as sch                         # noqa: E402
 
 import slide                                                  # noqa: E402
 
@@ -163,15 +164,20 @@ def _ils_tp_definition():
     return _DEF_CACHE['d']
 
 
-def run_case(case: dict) -> dict:
-    """Solve one case. Returns a flat row; never raises."""
+def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
+    """Solve one case. Returns a flat row against the schema; never raises."""
     OD, t_wall = case['pipe']
-    row = {'case_id': case['case_id'], 'family': case['family'],
-           'design': case['design'], 'R': case['R'],
+    row = {'schema_version': sch.SCHEMA_VERSION,
+           'case_id': case['case_id'], 'family': case['family'],
+           'design': case['design'], 'git_sha': git_sha,
+           'produced_at': stamp,
+           'R': case['R'],
            'spacing': case['spacing'], 'OD': OD, 't_wall': t_wall,
            'tension_mt': case['tension_mt'],
            'L_OD': case.get('L_OD', 0.0),
-           't_ratio': case.get('t_ratio', 0.0)}
+           't_ratio': case.get('t_ratio', 0.0),
+           'contact_surface': 'centreline', 'mode': 'A', 'material': 'j2',
+           'step': 2.0 * OD}
     t0 = time.time()
     try:
         ils = None
@@ -185,13 +191,14 @@ def run_case(case: dict) -> dict:
         row['n_positions'] = len(recs)
         row['n_converged'] = sum(1 for r in recs if r.converged)
         env = rp.envelope(recs)
+        # EVERY PEAK WITH ITS LOCATION AND ITS STEP -- the schema's peak
+        # groups, filled. Strain and moment peak at DIFFERENT positions in
+        # general, so each carries its own step rather than sharing one.
+        row.update(rp.peaks(recs, sc))
+        row.update(rp.body_peaks(recs, sc, junc))
         row.update(
-            envelope_strain=env.peak_strain,
-            envelope_shift=env.shift,
-            envelope_s_station=env.peak_s_station,
-            envelope_position=env.index,
             start_strain=recs[0].peak_strain if recs[0].converged else '',
-            zone_s_max=env.zone_s_max,
+            zone_s_max=env.zone_s_max, zone_label=env.zone_label,
             n_active=env.n_active, n_slots=env.n_slots)
         for name, eps in rp.station_envelope(recs).items():
             row[f'eps_{name}_env'] = eps
@@ -215,20 +222,11 @@ def run_case(case: dict) -> dict:
 
 
 def write_csv(rows, path):
-    import csv
+    """Through the schema, which refuses a column it does not describe."""
     if not rows:
         return
-    keys, seen = [], set()
-    for r in rows:
-        for k in r:
-            if k not in seen and k != 'traceback':
-                seen.add(k)
-                keys.append(k)
-    with open(path, 'w', newline='') as fh:
-        w = csv.DictWriter(fh, fieldnames=keys, extrasaction='ignore')
-        w.writeheader()
-        for r in rows:
-            w.writerow(r)
+    clean = [{k: v for k, v in r.items() if k != 'traceback'} for r in rows]
+    rp.write_case_csv(clean, path)
 
 
 def _pct(a, b):
@@ -339,6 +337,16 @@ def main() -> int:
     total = len(cases)
     print(f'{total} cases; budget {budget / 3600.0:.1f} h; writing to {out}')
 
+    import subprocess
+    try:
+        git_sha = subprocess.run(['git', 'rev-parse', '--short', 'HEAD'],
+                                 cwd=str(REPO), capture_output=True,
+                                 text=True, timeout=10).stdout.strip()
+    except Exception:                                   # noqa: BLE001
+        git_sha = ''
+    stamp = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
+    print(f'schema {sch.SCHEMA_VERSION}, git {git_sha or "?"}, {stamp}')
+
     started, plain, comp = time.time(), [], []
     budget_hit = False
     for i, case in enumerate(cases, 1):
@@ -346,7 +354,7 @@ def main() -> int:
             print(f'budget reached after {i - 1} cases')
             budget_hit = True
             break
-        row = run_case(case)
+        row = run_case(case, git_sha, stamp)
         (plain if row['family'] == 'plain' else comp).append(row)
         print(f'[{i:3d}/{total}] {row["case_id"]:5s} {row["status"]:22s} '
               f'{row.get("seconds", 0):6.1f}s', flush=True)
