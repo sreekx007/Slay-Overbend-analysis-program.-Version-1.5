@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 22
+# entries: 23
 
 - id: T001
   date: 2026-09-21
@@ -554,3 +554,38 @@
     decorative.
   lesson: '-'
   refs: [tools/dataset.py, docs/dataset/DATASET.md, docs/RESULTS.md]
+
+- id: T023
+  date: 2026-09-29
+  goal: >-
+    Review GD-SH and GD-TT against the original program: is the centreline
+    elevation/offset applied at all, and for GD-TT is it driven by the
+    COMPONENT OD?
+  action: >-
+    Compared assembly.contact_at(x) - OD/2 against
+    slay_overbend_v1_50.shroud_offset_at directly, point by point over the
+    whole profile, then traced the lift through contact_targets and over
+    every scheduled position of the passage.
+  case: 'GD-SH V=0.4064 L1=4.064 L2=1.016; GD-TT t_comp=0.065; GD-TP t_comp=0.042; R=85, spacing 9'
+  outcome: measurement
+  evidence: >-
+    GD-SH matches the ORIGINAL exactly across the full profile -- plateau
+    0.20320 = V - OD/2, linear taper to zero over L2, zero outside -- worst
+    difference 0.000000 m over 81 sample points. GD-TT body lift 0.04400,
+    implying OD_c 0.49440 = OD_p + 2(t_c - t_p) exactly, tapering to zero
+    over the transition. GD-TP 0.02100, constant to the edge with no taper,
+    which is what the original's envelope_at does. All three reach their full
+    plateau at a contact target during the passage: 0.20320 / 0.04400 /
+    0.02100, at SR2, shift 2.438 / 2.438 / 1.000. Sign checked: dn = dn_arc +
+    lift and dn > dn_arc, so the lift raises the pipe.
+  verdict: >-
+    No defect. The centreline offset IS applied for both, and for GD-TT it IS
+    driven by the component OD. Two things worth holding on to: at the
+    LEADING EDGE of a tapered component the lift is correctly ZERO, so a
+    single-position check proves nothing and the trace has to be swept; and
+    GD-SH carries NO section change (stiffness ratio 1.0, no junction), which
+    the original does too -- a shroud lifts the pipe without stiffening it,
+    so the lift is the entire component and dropping it would leave a case
+    indistinguishable from bare pipe with every number still plausible.
+  lesson: '-'
+  refs: [rebuild/tests/test_centreline_lift.py, slay_overbend_v1_50.py]
