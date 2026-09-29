@@ -44,7 +44,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SCHEMA_VERSION = '1.0.0'
+SCHEMA_VERSION = '1.1.0'
 
 # Units, spelled once so they cannot drift between fields.
 M = 'm'
@@ -158,6 +158,30 @@ DERIVED = [
     Field('stiffness_ratio', 'float', NONE, 'ratio', 'derived',
           'component second moment over pipeline second moment, off the '
           'SOLVED sections; 1.0 when nothing steps'),
+    Field('contact_lift_max', 'float', M, 'length', 'derived',
+          'deepest CENTRELINE LIFT the component applies above the '
+          'plain-pipe baseline. FOR A SHROUD THIS IS THE ENTIRE COMPONENT: '
+          'GD-SH adds no bending stiffness, so without this column its case '
+          'is indistinguishable from bare pipe. Measured 0.20320 m for '
+          'GD-SH (= V - OD/2), 0.04400 for GD-TT, 0.02100 for GD-TP'),
+    Field('contact_lift_station', 'str', NONE, 'name', 'location',
+          'roller under the deepest lift, over the whole passage'),
+    Field('contact_lift_step', 'int', IDX, 'count', 'step',
+          'position index at which that lift was reached. At the LEADING '
+          'EDGE of a tapered component the lift is correctly ZERO, so a '
+          'single position proves nothing'),
+    Field('comp_s_lead', 'float', M, 'length', 'location',
+          "component LEADING (stinger-side) edge in STATION coordinates, at "
+          "the envelope position. Without it a reader has the component's "
+          "length but not where it was"),
+    Field('comp_s_trail', 'float', M, 'length', 'location',
+          'component TRAILING (vessel-side) edge, station coordinates, at '
+          'the envelope position'),
+    Field('junction_snapshot_step', 'int', IDX, 'count', 'step',
+          'position index the junction SNAPSHOT columns were taken at (the '
+          'bare `j*` names; the `_env` ones are over all positions)'),
+    Field('junction_snapshot_shift', 'float', M, 'length', 'step',
+          'travel at that position'),
     Field('n_junctions', 'int', NONE, 'count', 'derived',
           'section steps in the model; 0 for plain pipe and for a component '
           'that shares the pipe section'),
@@ -205,6 +229,11 @@ FIXED = IDENTITY + INPUTS + DERIVED + PEAKS + STATUS
 # ---------------------------------------------------------------------------
 
 PATTERNS = [
+    Field(r's_[A-Za-z]+\d*', 'float', M, 'length', 'location',
+          'ARC POSITION of that station along the stinger. Without these a '
+          'consumer has `eps_SR2_env` but no way to place SR2, and deriving '
+          'it from `spacing` assumes a layout the file never states',
+          pattern=True),
     Field(r'eps_[A-Za-z]+\d*_env', 'float', NONE, 'strain', 'value',
           'worst strain at that station over the whole passage (MAX over '
           'positions, never a sum)', pattern=True),
@@ -234,6 +263,16 @@ PATTERNS = [
           'material coordinate of that offset probe', pattern=True),
     Field(r'j\d+_[mp]\d+(\.\d+)?OD_clamped', 'bool', NONE, 'flag', 'status',
           'clamped to the nearest available datum', pattern=True),
+    Field(r'j\d+_(at_(pipe|component|na)|[mp]\d+(\.\d+)?OD)_side', 'str',
+          NONE, 'name', 'location',
+          "which BODY the probe landed in -- 'pipe' or 'component'. Without "
+          'it a consumer cannot tell which side of a section step a probe '
+          'is on, and a profile drawn from the file connects points across '
+          'a discontinuity that strain genuinely has', pattern=True),
+    Field(r'j\d+_(at_(pipe|component|na)|[mp]\d+(\.\d+)?OD)_owner', 'str',
+          NONE, 'name', 'location',
+          'the component that owns the surface there, or `pipe`',
+          pattern=True),
 ]
 
 

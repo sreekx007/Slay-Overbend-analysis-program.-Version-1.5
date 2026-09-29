@@ -362,6 +362,37 @@ def peaks(records, scene) -> dict:
     return out
 
 
+def contact_lift(positions, problems, OD: float) -> dict:
+    """Deepest centreline lift any station saw, and where and when.
+
+    WHY IT IS A COLUMN AT ALL. For a shroud the lift IS the component: GD-SH
+    adds no bending stiffness, so a file without this cannot tell its case
+    from bare pipe, and every other number would still look plausible.
+
+    Swept, not sampled: at the LEADING EDGE of a tapered component the lift
+    is correctly ZERO -- the taper terminates flush with the pipe OD -- so
+    one position proves nothing.
+    """
+    best = (0.0, '', -1)
+    for pos, pr in zip(positions, problems):
+        if pr is None or not pos.converged:
+            continue
+        for t in pr.contacts:
+            if abs(t.lift) > best[0]:
+                best = (abs(t.lift), t.station, pos.index)
+    return {'contact_lift_max': best[0], 'contact_lift_station': best[1],
+            'contact_lift_step': best[2]}
+
+
+def station_positions(scene) -> dict:
+    """{`s_<name>`: arc position} for every station.
+
+    Without these a consumer has `eps_SR2_env` and no way to place SR2;
+    deriving it from `spacing` assumes a layout the file never states.
+    """
+    return {f's_{st.name}': st.s_arc for st in scene.stations}
+
+
 def body_peaks(records, scene, junction_rows) -> dict:
     """The same seven columns for the peaks ON THE COMPONENT BODY.
 

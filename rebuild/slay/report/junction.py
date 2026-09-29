@@ -294,6 +294,13 @@ def row(position, problem, OD: float, offsets=OFFSETS_OD) -> dict:
         out[tag + '_moment'] = p.moment
         out[tag + '_s'] = p.s
         out[tag + '_clamped'] = p.clamped
+        # WHICH BODY THE PROBE LANDED IN. `Probe` has carried these since it
+        # was written and `row` dropped them, so a consumer reading the file
+        # could not tell which side of a section step a sample was on -- and
+        # a profile drawn from it joined points across a discontinuity that
+        # strain genuinely has.
+        out[tag + '_side'] = p.side
+        out[tag + '_owner'] = p.owner
     return out
 
 

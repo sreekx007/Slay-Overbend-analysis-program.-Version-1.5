@@ -216,17 +216,22 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     positions = sweep.run(sc, ils, L_comp=L_comp, step=step,
                           clear_before=cb, clear_after=ca, mode=mode, **kw)
     records = rp.measure(positions, sc, L_comp=L_comp)
-    junc = []
+    junc, probs = [], []
     for pos in positions:
         if not pos.converged:
             junc.append({})
+            probs.append(None)
             continue
         pr = _problem_at(sc, ils, pos, L_comp, clear_before=cb, **kw)
         junc.append(jr.row(pos, pr, OD))
+        # The Problems are returned too: the contact LIFT lives on their
+        # targets, and re-posing them downstream would be a second answer to
+        # where the component was.
+        probs.append(pr)
     if verbose:
         _table(records, L_comp, time.time() - t0)
         _junction_table(records, junc)
-    return sc, L_comp, records, junc
+    return sc, L_comp, records, junc, probs
 
 
 def _warn_step(step, OD):
@@ -308,9 +313,9 @@ def verify(R=R_DEF, spacing=SPACING_DEF, tension_mt=TENSION_MT_DEF):
     The tip stations are reported but not judged -- D6 makes the terminal
     station a contact slot and the last three rollers are outside the zone.
     """
-    sc, _L, _r, _j = passage('none', R=R, spacing=spacing,
-                             tension_mt=tension_mt, elastic=True,
-                             verbose=False)
+    sc, _L, _r, _j, _p = passage('none', R=R, spacing=spacing,
+                                 tension_mt=tension_mt, elastic=True,
+                                 verbose=False)
     positions = sweep.run(sc, None, L_comp=0.0, clear_before=0.0,
                           clear_after=PLAIN_TRAVEL_OD * OD_DEF,
                           step=OD_DEF, tension=tension_mt * TON, material=None)
@@ -367,7 +372,7 @@ def main() -> int:
     for od in ods:
         if len(ods) > 1:
             print()
-        sc, L, records, junc = passage(OD=od, **kw)
+        sc, L, records, junc, _probs = passage(OD=od, **kw)
         allrec += [(od, L, r, junc[i]) for i, r in enumerate(records)]
     if csv_out:
         rows = [r for (_od, _L, r, _j) in allrec]

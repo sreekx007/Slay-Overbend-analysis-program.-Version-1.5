@@ -164,6 +164,22 @@ def _ils_tp_definition():
     return _DEF_CACHE['d']
 
 
+class _Pos:
+    """The two fields `report.passage.contact_lift` reads off a position.
+
+    A shim rather than a re-solve: the sweep's own `Position` objects are
+    not returned by `slide.passage`, and rebuilding them would be a second
+    answer to what index and convergence mean.
+    """
+
+    def __init__(self, rec):
+        self.index, self.converged = rec.index, rec.converged
+
+
+def positions_of(recs, probs):
+    return [_Pos(r) for r in recs][:len(probs)]
+
+
 def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
     """Solve one case. Returns a flat row against the schema; never raises."""
     OD, t_wall = case['pipe']
@@ -188,7 +204,7 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
             # and wall are the archetype's own, so `L_OD` and `t_ratio` are
             # read back off it rather than driving it.
             ils = slide.archetype(case['family'])
-        sc, L_comp, recs, junc = slide.passage(
+        sc, L_comp, recs, junc, probs = slide.passage(
             arch_id='none', R=case['R'], spacing=case['spacing'],
             tension_mt=case['tension_mt'], OD=OD, t_wall=t_wall,
             step=2.0 * OD, ils=ils, verbose=False)
@@ -203,6 +219,12 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         # general, so each carries its own step rather than sharing one.
         row.update(rp.peaks(recs, sc))
         row.update(rp.body_peaks(recs, sc, junc))
+        row.update(rp.contact_lift(positions_of(recs, probs), probs, OD))
+        row.update(rp.station_positions(sc))
+        row.update(junction_snapshot_step=env.index,
+                   junction_snapshot_shift=env.shift,
+                   comp_s_lead=env.s_lead if env.s_lead is not None else 0.0,
+                   comp_s_trail=env.s_trail if env.s_trail is not None else 0.0)
         row.update(
             start_strain=recs[0].peak_strain if recs[0].converged else '',
             zone_s_max=env.zone_s_max, zone_label=env.zone_label,
@@ -227,6 +249,62 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         row['traceback'] = traceback.format_exc()[-400:]
     row['seconds'] = round(time.time() - t0, 1)
     return row
+
+
+def load_done(path):
+    """Rows already in a result file, keyed by case_id.
+
+    REFUSES TO MIX SCHEMA VERSIONS. Resuming a 1.0.0 file into a 1.1.0 run
+    would produce a file that is half one contract and half another, with
+    nothing in it saying so -- the exact failure the schema exists to
+    prevent, arrived at through the back door.
+    """
+    import csv as _csv
+    path = Path(path)
+    if not path.exists():
+        return {}
+    with open(path, newline='') as fh:
+        rows = list(_csv.DictReader(fh))
+    if not rows:
+        return {}
+    was = rows[0].get('schema_version', '')
+    if was != sch.SCHEMA_VERSION:
+        raise SystemExit(
+            f'{path.name} was written against schema {was or "(none)"} and '
+            f'this run is {sch.SCHEMA_VERSION}. Resuming would mix two '
+            f'contracts in one file. Move it aside and run without '
+            f'--resume.')
+    return {r['case_id']: _typed(r) for r in rows if r.get('case_id')}
+
+
+def _typed(row: dict) -> dict:
+    """Cast a CSV row back to its DECLARED dtypes.
+
+    Everything comes out of a CSV as a string, and a resumed row then flows
+    into the same report formatter as a freshly solved one -- which formats
+    `R` with `:g` and raised on the string. Casting BY THE SCHEMA rather
+    than by guessing at the value is the point of having declared dtypes:
+    an empty cell stays empty, so a column that was legitimately blank does
+    not become 0.0.
+    """
+    out = {}
+    for k, v in row.items():
+        f = sch.describe(k)
+        if f is None or v == '' or v is None:
+            out[k] = v
+            continue
+        try:
+            if f.dtype == 'float':
+                out[k] = float(v)
+            elif f.dtype == 'int':
+                out[k] = int(float(v))
+            elif f.dtype == 'bool':
+                out[k] = v not in ('False', 'false', '0', '')
+            else:
+                out[k] = v
+        except (TypeError, ValueError):
+            out[k] = v
+    return out
 
 
 def write_csv(rows, path):
@@ -338,11 +416,25 @@ def main() -> int:
     out.mkdir(parents=True, exist_ok=True)
     budget = opt('--budget', 21600.0, float)          # 6 h, leaving margin
     limit = opt('--limit', None, int)
+    resume = '--resume' in a
 
     cases = plain_cases() + comp_cases()
     if limit:
         cases = cases[:limit]
     total = len(cases)
+
+    # RESUME. Two interruptions in one day, each costing the whole run, is
+    # what this is for: a reaped background process should cost minutes, not
+    # an hour. Completed cases are carried forward verbatim rather than
+    # re-solved, and the schema check in `load_done` refuses to continue a
+    # file written against a different contract.
+    done = {}
+    if resume:
+        for name in ('dataset_plain.csv', 'dataset_gdtp.csv'):
+            done.update(load_done(out / name))
+        if done:
+            print(f'resuming: {len(done)} case(s) already done, '
+                  f'{total - len(done)} to go')
     print(f'{total} cases; budget {budget / 3600.0:.1f} h; writing to {out}')
 
     import subprocess
@@ -358,6 +450,12 @@ def main() -> int:
     started, plain, comp = time.time(), [], []
     budget_hit = False
     for i, case in enumerate(cases, 1):
+        old = done.get(case['case_id'])
+        if old is not None:
+            (plain if old.get('family') == 'plain' else comp).append(old)
+            write_csv(plain, out / 'dataset_plain.csv')
+            write_csv(comp, out / 'dataset_gdtp.csv')
+            continue
         if time.time() - started > budget:
             print(f'budget reached after {i - 1} cases')
             budget_hit = True

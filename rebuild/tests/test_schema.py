@@ -222,3 +222,50 @@ def test_declared_columns_come_first_and_in_declared_order(tmp_path):
     head = out.read_text().splitlines()[0].split(',')
     assert head[:3] == ['schema_version', 'case_id', 'R']
     assert head[-1] == 'eps_SR2_env', 'patterned columns after the fixed ones'
+
+
+# -- 1.1.0: the five gaps found by plotting from the file alone -----------
+
+def test_the_contact_lift_is_a_column():
+    """FOR A SHROUD THE LIFT IS THE COMPONENT. GD-SH adds no bending
+    stiffness, so without this a reader cannot tell its case from bare pipe
+    and every other number still looks plausible."""
+    f = sc.describe('contact_lift_max')
+    assert f is not None and f.unit == sc.M
+    for c in ('contact_lift_station', 'contact_lift_step'):
+        assert sc.describe(c) is not None, c
+    assert sc.describe('contact_lift_step').dtype == 'int'
+
+
+def test_the_component_position_is_a_column():
+    """`L_comp` gives a length, never a location."""
+    for c in ('comp_s_lead', 'comp_s_trail'):
+        assert sc.describe(c) is not None and sc.describe(c).unit == sc.M
+
+
+def test_station_positions_are_declared():
+    """Without them a consumer has `eps_SR2_env` and no way to place SR2."""
+    for c in ('s_SR1', 's_SR7', 's_VR3'):
+        f = sc.describe(c)
+        assert f is not None and f.unit == sc.M, c
+    assert sc.describe('s_notastation!') is None
+
+
+def test_probes_declare_which_body_they_landed_in():
+    """A profile drawn from the file must not join points across a section
+    step, and without this a consumer cannot see where the step is."""
+    for c in ('j0_at_pipe_side', 'j1_m2OD_side', 'j0_p6OD_owner'):
+        assert sc.describe(c) is not None, c
+
+
+def test_the_junction_snapshot_declares_its_step():
+    """The bare `j*` columns are one position; the `_env` ones are all of
+    them. Which position was left to inference before."""
+    for c in ('junction_snapshot_step', 'junction_snapshot_shift'):
+        assert sc.describe(c) is not None, c
+
+
+def test_the_version_moved_with_the_columns():
+    """Adding columns without moving the version is how a consumer ends up
+    unable to tell two incompatible files apart."""
+    assert sc.SCHEMA_VERSION != '1.0.0'
