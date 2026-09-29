@@ -278,6 +278,30 @@ def s_to_x(m, ms, U, shift=0.0):
     return lambda q: np.interp(q, sv, xv)
 
 
+def menger_curvature(xs, ys):
+    """Discrete curvature through each consecutive triple, 1/m.
+
+    The circle through three points, `4*Area / (|a||b||c|)` -- GEOMETRIC, so
+    it owes nothing to the constitutive law and can be compared against the
+    stinger's own 1/R directly. Computing it from the moment instead would
+    only be right while the pipe is elastic, and the interesting cases are
+    not.
+    """
+    import math
+    out = [float('nan')]
+    for i in range(1, len(xs) - 1):
+        ax_, ay_ = xs[i - 1], ys[i - 1]
+        bx_, by_ = xs[i], ys[i]
+        cx_, cy_ = xs[i + 1], ys[i + 1]
+        a = math.hypot(bx_ - ax_, by_ - ay_)
+        b = math.hypot(cx_ - bx_, cy_ - by_)
+        c = math.hypot(cx_ - ax_, cy_ - ay_)
+        area2 = abs((bx_ - ax_) * (cy_ - ay_) - (by_ - ay_) * (cx_ - ax_))
+        out.append(2.0 * area2 / (a * b * c) if a * b * c > 0 else float('nan'))
+    out.append(float('nan'))
+    return out
+
+
 def normal_gap(m, ms, U, scene, shift=0.0):
     """[(world x, normal gap)] -- how far the solved pipe sits OFF the arc.
 
@@ -552,9 +576,10 @@ def plot_component(c, out):
     # where it sits or shows what happens there, never both. Panels 1 and 2
     # share x and answer "where"; panel 3 has its own window and answers
     # "what", at a scale where the junction step is legible.
-    fig, (ax, dx, bx, cx) = plt.subplots(
-        4, 1, figsize=(13.5, 15.0),
-        gridspec_kw=dict(height_ratios=[1.15, 0.85, 0.9, 0.95], hspace=0.30))
+    fig, (ax, ex, dx, bx, cx) = plt.subplots(
+        5, 1, figsize=(13.5, 18.4),
+        gridspec_kw=dict(height_ratios=[1.0, 1.15, 0.8, 0.85, 0.9],
+                         hspace=0.33))
     bx.sharex(ax)
     dx.sharex(ax)
 
@@ -624,7 +649,81 @@ def plot_component(c, out):
         f'({c["note"]}); lead at station {pos.s_lead:.3f} m',
         fontsize=10, loc='left')
 
-    # ---- panel 2: the deformed shape, where it can be seen ----------------
+    # ---- panel 2: the close-up, with the vertical EXAGGERATED and said so -
+    # TRUE SCALE CANNOT SHOW THIS. The stinger's own curvature is 1/85 per
+    # metre: over a 20 m window the pipe departs from a straight line by
+    # about 0.6 m, and the local change a component makes to it is a few
+    # centimetres on top. Drawn equal-aspect that is a couple of pixels, so
+    # the panel would be honest and useless.
+    #
+    # So the vertical is stretched and the factor is STATED on the panel,
+    # which is the ordinary engineering device -- and the curvature numbers
+    # in the title are computed from the UNDISTORTED geometry, so the
+    # quantitative answer owes nothing to the drawing. A reader can take the
+    # shape as indicative and the radii as measured.
+    win = max(10.0, 1.6 * L)
+    x_mid = fx(s_c)
+    lo_x, hi_x = x_mid - win, x_mid + win
+    ss2 = np.linspace(max(0.0, sc.path.theta(0.0)), 1.0, 2)   # placeholder
+    arc_s = np.linspace(min(t.s_arc for t in sc.stations),
+                        max(t.s_arc for t in sc.stations), 1200)
+    axy = [sc.path.position(v) for v in arc_s]
+    ex.plot([q[0] for q in axy], [q[1] for q in axy], color='#b9c2cb',
+            lw=1.2, ls='--', zorder=1, label='roller-centreline locus')
+    ex.plot(px, py, color='#1f7a8c', lw=2.6, zorder=5, label='pipe, SOLVED')
+    if seg:
+        ex.plot(sx, sy, color='#8a5a00', lw=9.0, solid_capstyle='butt',
+                zorder=6, alpha=0.9, label='component')
+    for st_ in sc.stations:
+        if not (lo_x - 2 <= st_.x <= hi_x + 2):
+            continue
+        on = active.get(st_.name, True)
+        col = ('#2f6f3e' if st_.role is StationRole.CONTACT and on
+               else '#b44d12' if st_.role is StationRole.CONTACT
+               else '#111111')
+        ex.add_patch(Circle((st_.x, st_.y), st_.radius, facecolor='none',
+                            edgecolor=col, lw=2.0, zorder=7))
+        ex.annotate(st_.name, (st_.x, st_.y), textcoords='offset points',
+                    xytext=(0, -18), ha='center', fontsize=8, color=col)
+    ex.set_xlim(lo_x, hi_x)
+    inwin = [(q, w) for q, w in zip(px, py) if lo_x <= q <= hi_x]
+    if inwin:
+        ys = [w for _q, w in inwin]
+        pad = max(0.08 * (max(ys) - min(ys)), 0.25)
+        ex.set_ylim(max(ys) + pad, min(ys) - pad)
+        exag = (hi_x - lo_x) / max(1e-9, (max(ys) - min(ys)) + 2 * pad)
+    else:
+        exag = 1.0
+    if not inwin:
+        ex.invert_yaxis()
+    ex.grid(alpha=0.2)
+    ex.set_ylabel('y (m), down')
+    ex.legend(fontsize=8, loc='lower left', framealpha=0.93)
+
+    # LOCAL RADIUS OF CURVATURE, read off the deformed pipe itself and set
+    # against the stinger's own R. This is the number the close-up exists to
+    # show: what the component does to the curvature beside it.
+    kap = menger_curvature(px, py)
+    inside, outside = [], []
+    for xq, k in zip(px, kap):
+        if k != k or k <= 0:
+            continue
+        if seg and min(sx) <= xq <= max(sx):
+            inside.append(k)
+        elif lo_x <= xq <= hi_x:
+            outside.append(k)
+    bits = [f'stinger R = {sc.path.R:.0f} m']
+    if inside:
+        bits.append(f'over the component R = {1 / max(inside):.1f} m')
+    if outside:
+        bits.append(f'beside it R = {1 / max(outside):.1f} m at its tightest')
+    ex.set_title(
+        f'CLOSE-UP -- vertical exaggerated ~{exag:.0f}x, so the rollers draw '
+        f'as ellipses; the radii below are from the UNDISTORTED geometry\n'
+        f'    tightest local radius:   ' + ';   '.join(bits),
+        fontsize=9.5, loc='left')
+
+    # ---- panel 3: the deformed shape, where it can be seen ----------------
     gaps = normal_gap(m, ms, U, sc, sh)
     gx = [q[0] for q in gaps]
     gy = [1000.0 * q[1] for q in gaps]

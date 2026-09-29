@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 24
+# entries: 25
 
 - id: T001
   date: 2026-09-21
@@ -620,3 +620,33 @@
     as strings into a numeric formatter.
   lesson: '-'
   refs: [rebuild/slay/report/schema.py, tools/plot_from_schema.py, docs/dataset/]
+
+- id: T025
+  date: 2026-09-29
+  goal: >-
+    See the LOCAL change in pipeline curvature a component makes, close up,
+    with the pipe and the nearby rollers.
+  action: >-
+    Added a close-up panel to tools/plot_stinger.py showing the solved pipe,
+    the component and the rollers in that window, with the vertical
+    exaggerated and the factor stated. Local radius taken from MENGER
+    curvature through consecutive deformed nodes -- purely geometric, so it
+    owes nothing to the constitutive law and can be set against the
+    stinger's own R directly.
+  case: 'R=85, spacing 9, 120 MT, 406.4x21, each archetype at its envelope position'
+  outcome: measurement
+  evidence: >-
+    Tightest local radius, over the component vs in the pipe beside it:
+    GD-TP (I/Ip 2.36) 67.1 m vs 47.4 m; GD-TT (I/Ip 4.37) 85.5 m vs 28.3 m;
+    GD-SH (I/Ip 1.00) 33.8 m vs 45.5 m. Stinger R is 85 m throughout.
+  verdict: >-
+    STIFFENING AND LIFTING ACT IN OPPOSITE SENSES on local curvature. A stiff
+    body stays flatter than the pipe beside it and dumps the curvature on its
+    neighbour -- GD-TT at I/Ip 4.37 rides essentially the stinger's own
+    radius (85.5 against 85) while forcing a 28.3 m bend into the adjacent
+    pipe, three times tighter than the stinger. A shroud does the reverse:
+    with no added stiffness the LIFT forces curvature into the component
+    region itself, 33.8 m against 45.5 m beside it. A reader given only
+    I_comp/I_pipe would predict the first pattern for both.
+  lesson: '-'
+  refs: [tools/plot_stinger.py, docs/diagrams/stinger_ils-sh.png]
