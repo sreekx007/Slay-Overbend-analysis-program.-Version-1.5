@@ -16,9 +16,9 @@ source paper it is labelled as such and is a TARGET, not a result.
 | Repository | `Slay-Overbend-analysis-program.-Version-1.5` |
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Commit at time of writing | `5e67a7a` (63 commits); §5 added at `2302897`+ (28 Sep) |
-| Rebuild status | T0–T5 complete; **L7 sweep and L8 passage report built and verified (28 Sep)**; T9 scoped |
-| Test suite | 425 passing at creation; **481 passing at 28 Sep**, layer linter clean |
-| Registers | `BUILD_LESSONS.yaml` 58 entries · `TRIAL_LOG.yaml` 15 entries |
+| Rebuild status | T0–T5 complete; **L7 sweep and L8 report built and verified**; output schema 1.1.0 declared and enforced (29 Sep); T9 scoped |
+| Test suite | 425 passing at creation; **522 passing at 29 Sep**, layer linter clean |
+| Registers | `BUILD_LESSONS.yaml` **72 entries** · `TRIAL_LOG.yaml` **24 entries** |
 
 ### Which program produced which result
 
@@ -403,18 +403,43 @@ largest element-to-element jump 101.3 kNm against a 30 kNm median (L068).
 
 ---
 
-## 6. The ML case matrix — 200 cases
+## 6. The ML case matrix — 200 cases, schema 1.1.0
 
-*28 Sep 2026. `tools/dataset.py`, seed 20260928. 200 cases in 1.06 h:
-85 plain pipe (`docs/dataset/dataset_plain.csv`, 43 columns) and 115 GD-TP
-(`docs/dataset/dataset_gdtp.csv`, 139 columns). Row = one case = one complete
-passage. Per-case detail in `docs/dataset/DATASET.md`.*
+*29 Sep 2026. `tools/dataset.py`, seed 20260928, 200 cases in 0.76 h.
+`docs/dataset/dataset_plain.csv` (85 rows × 89 cols) and
+`dataset_gdtp.csv` (115 × 217), both against `slay.report.schema` 1.1.0
+with **zero columns the contract does not describe**. Per-case detail in
+`docs/dataset/DATASET.md`; the contract travels beside each file as
+`<name>.csv.schema.json`.*
 
-**185 converged fully, 12 partly, 3 failed.**
+**185 converged fully, 12 partly, 3 failed** — the same tally as the 1.0.0
+run, so the added columns changed no result.
 
-### 6.1 Where the method stops working — and it is a clean boundary
+### 6.0 Reading the file
 
-| Stinger radius | Cases | Fully converged | | Roller spacing | Cases | Fully converged |
+Every column declares a dtype, a **unit**, a quantity and a role. Three
+conventions matter before any number below is read:
+
+| | |
+|---|---|
+| strain | a **fraction** — `0.0074` is 0.74%, not 0.0074% |
+| moment | **N·m** — `1309242` is 1309 kN·m |
+| `tension_mt` | metric **tonnes**; the solver works in newtons (× 9806.65) |
+
+Each peak is a group of seven columns — value, `_s_material`, `_s_station`,
+`_station`, `_station_offset`, `_step`, `_shift` — so **where** and **when**
+travel with every value. Four groups: `peak_strain`, `peak_moment`,
+`body_peak_strain`, `body_peak_moment`.
+
+**Matched metrics.** A bare `j*` column is the **snapshot** at the envelope
+position; `_env` is the worst that location saw at **any** position. The two
+must not be differenced against each other — doing so here shifted the
+junction ratio by 2.5%, an L062 in miniature. Every ratio in §6.4 pairs
+`_env` with `_env`.
+
+### 6.1 Where the method stops working — a clean boundary
+
+| Stinger radius | Cases | Converged | | Roller spacing | Cases | Converged |
 |---|---|---|---|---|---|---|
 | 60 m | 28 | **75%** | | 6.0 m | 33 | 100% |
 | 70 m | 28 | **71%** | | 7.5 m | 33 | 97% |
@@ -423,72 +448,86 @@ passage. Per-case detail in `docs/dataset/DATASET.md`.*
 | 120 m | 28 | 100% | | 12.0 m | 32 | 81% |
 | 150 m | 26 | 100% | | | | |
 
-**Every non-converged case is at R = 60 or 70 m. None at R >= 85.** The
-second factor is wide spacing. Tight radius and long unsupported span is the
-physically hardest corner, and it is where the solver gives out — a sharp,
-interpretable boundary rather than scattered failures, which is what a
-numerical defect would look like. The three outright failures (P042, T060,
-T104) exhaust cutback at position 0.
+**Every non-converged case is at R = 60 or 70 m. None at R ≥ 85** (144
+cases). The second factor is wide spacing. Tight radius with a long
+unsupported span is the physically hardest corner, and a sharp boundary is
+what a real limit looks like rather than the scatter a numerical defect
+would give. The three failures (P042, T060, T104) exhaust cutback at
+position 0.
 
-This is a limit of the current single-solve-per-position scheme, not of the
-sweep. Staging (`tools/stage_run.py`) exists and converges 120 MT where a
-single solve will not; folding it into `sweep.run` is the obvious fix and is
-listed as pending.
+It is a limit of one-solve-per-position, not of the sweep. Staging
+(`tools/stage_run.py`) converges cases a single solve will not; folding it
+into `sweep.run` is the fix and is still pending.
 
 ### 6.2 Marginal trends — plain pipe, OFAT spine
 
-| Axis | Envelope strain |
-|---|---|
-| Stinger radius 60 → 150 m | 0.701 → 0.553 → 0.409 → 0.298 → 0.241 → **0.191%** |
-| Roller spacing 6 → 12 m | 0.327 → 0.375 → 0.409 → 0.439 → **0.472%** |
-| Tension 40 → 200 MT | 0.330 → 0.378 → 0.409 → 0.440 → **0.471%** |
-| Pipe OD 168.3 → 610 mm | 0.517 → 0.388 → **0.334** → 0.352 → 0.409 → 0.497 → 0.598% |
+| Axis | `peak_strain` | `peak_moment` (kN·m) |
+|---|---|---|
+| R 60 → 150 m | 0.701 → 0.553 → 0.409 → 0.298 → 0.241 → **0.191%** | 1305 → 1262 → 1188 → 1074 → 983 → **808** |
+| Spacing 6 → 12 m | 0.327 → 0.375 → 0.409 → 0.439 → **0.472%** | — |
+| Tension 40 → 200 MT | 0.330 → 0.378 → 0.409 → 0.440 → **0.471%** | 1171 → 1189 → 1188 → 1183 → **1174** |
+| OD 168.3 → 610 mm | 0.517 → 0.388 → **0.334** → 0.352 → 0.409 → 0.497 → 0.598% | 72 → 162 → 341 → 570 → 1188 → 2379 → **4010** |
 
-Radius, spacing and tension are monotonic and unsurprising. **Pipe diameter
-is not: it is U-shaped, with a minimum near 273 mm.** A small pipe is
-flexible and sags between rollers, so its local curvature is high; a large
-one is dominated by `r/R` at the extreme fibre. The two effects trade, and
-the optimum sits in between. That is a real finding and not one that falls
-out of `eps = r/R`.
+**Pipe diameter is U-shaped in strain**, minimum near 273 mm, while moment
+rises monotonically with section modulus. A small pipe is flexible and sags
+between rollers so its local curvature is high; a large one is dominated by
+`r/R` at the extreme fibre. The two trade, and the optimum sits between.
 
-The tension trend deserves a caveat: 40 → 200 MT moves the envelope by
-0.141%, where the membrane term alone accounts for about 0.026%. Tension is
-also changing the lift-off pattern and the sag, so this column is not a pure
-membrane effect and should not be read as one.
+**The moment column settles a caveat §6 previously had to leave open.**
+Across 40 → 200 MT the moment moves 1171 → 1174 kN·m — **0.3% over a
+five-fold change in tension** — while strain rises 43%. So the tension trend
+is almost entirely membrane strain added on top of an essentially unchanged
+bending moment, not a change in how hard the pipe is bent. Before moment was
+recorded this could only be flagged as "not a pure membrane effect, do not
+read it as one"; now it is measured.
 
 ### 6.3 Marginal trends — GD-TP
 
-| Axis | Envelope strain | I_comp/I_pipe |
+| Axis | `peak_strain` | I_comp/I_pipe |
 |---|---|---|
 | Component length 1 → 10 × OD | 0.536 → 0.575 → 0.679 → **0.933%** | 2.36 throughout |
 | Component wall 1.5 → 4.0 × pipe | 0.503 → 0.575 → 0.706 → **0.812%** | 1.63 → 2.36 → 4.17 → 6.50 |
-| Stinger radius 60 → 150 m | 0.905 → 0.739 → 0.575 → 0.425 → 0.332 → **0.232%** | 2.36 throughout |
+| R 60 → 150 m | 0.905 → 0.739 → 0.575 → 0.425 → 0.332 → **0.232%** | 2.36 throughout |
 
-**Length matters independently of stiffness.** At a fixed `I` ratio of 2.36,
-going from 1×OD to 10×OD raises the envelope 74%. A longer rigid body spans
-further between rollers and forces more curvature into the pipe next to it,
-which the stiffness ratio alone does not capture — so a model given only
-`I_comp/I_pipe` would be blind to it.
+**Length matters independently of stiffness.** At a fixed I ratio of 2.36,
+1×OD → 10×OD raises the envelope **74%**. A longer rigid body spans further
+between rollers and forces more curvature into the pipe beside it, which the
+stiffness ratio alone does not capture — a model given only `I_comp/I_pipe`
+would be blind to it.
 
 ### 6.4 The junction governs, across the whole dataset
 
-Over all 107 converged GD-TP cases:
+Over all 107 converged GD-TP cases, on matched `_env` metrics:
 
 | | |
 |---|---|
-| Leading-junction pipe strain ÷ component body peak | median **4.54×**, range 1.57–27.82× |
+| `j1_at_pipe_strain_env` ÷ `body_peak_strain` | median **4.54×**, range 1.55–27.82× |
 | Cases where the leading junction IS the passage envelope | **101 / 107 (94%)** |
 | Trailing junction, `_env` ÷ snapshot | median **1.41×**, max 4.68× |
+| Station holding the strain peak | SR2 in **106 / 107**, SR3 in 1 |
 
-The single-case finding of §5.6 holds across the matrix and is stronger than
-it looked: **recording only the component body peak understates the governing
-strain by a median factor of 4.5, and by up to 28×.** The leading junction is
-the envelope in 94% of cases.
+**Recording only the component body peak understates the governing strain by
+a median factor of 4.5, and by up to 28×.** The last row justifies carrying
+both readings: the trailing junction's own worst is a median 41% above its
+value at the envelope position, so a snapshot-only dataset would teach a
+model that the trailing junction is mild. It is not — it peaks elsewhere.
 
-The last row justifies carrying both readings. The trailing junction's own
-worst is a median 41% above its value at the envelope position, and up to
-4.68× — so a snapshot-only dataset would systematically teach a model that
-the trailing junction is mild. It is not; it peaks somewhere else.
+### 6.5 What schema 1.1.0 added, and what it immediately showed
+
+| | |
+|---|---|
+| `contact_lift_max` over 107 GD-TP cases | 0.00550 → **0.08580** m, median 0.02100, **no zero rows** |
+| GD-SH (`dataset_components.csv`) | **0.20320 m** at SR2, step 4 |
+| Cases where `peak_strain_step` ≠ `peak_moment_step` | **23 / 107 (21%)** |
+
+**The contact lift is the column without which a shroud is invisible.** GD-SH
+adds no bending stiffness — stiffness ratio 1.0, no section step — so in a
+1.0.0 file its case was indistinguishable from bare pipe while every other
+number still looked plausible (T023, T024).
+
+**Strain and moment peak at different positions in 21% of cases.** A single
+"envelope position" column would have flattened that, and any dataset built
+on one would have mislabelled the moment's location in one case in five.
 
 ---
 
@@ -496,9 +535,10 @@ the trailing junction is mild. It is not; it peaks somewhere else.
 
 | Date | Action |
 |---|---|
-| 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
+| 29 Sep 2026 | **§6 rewritten** against the 200-case dataset at schema 1.1.0 (same tally: 185 ok / 12 partial / 3 failed). Adds the moment marginals, which settle the tension caveat — moment moves 0.3% over a 5× tension change while strain rises 43% — plus contact lift and the 21% of cases where strain and moment peak at different steps. §6.0 states the units and the matched-metric rule. T024. |
 | 28 Sep 2026 | **§6 added.** 200-case ML matrix run: 185 ok, 12 partial, 3 failed. Every non-convergence at R = 60/70 m. Pipe diameter is U-shaped with a minimum near 273 mm. The junction governs in 94% of GD-TP cases and exceeds the body peak by a median 4.54×. |
 | 28 Sep 2026 | **§5.6–5.7 added.** Junction extraction and bending-moment recovery. Moment continuous across a junction, strain 4.3× discontinuous; the governing strain is the pipe outboard of the leading edge, and it IS the passage envelope. L067, L068, T021. |
 | 28 Sep 2026 | **§5.5 added.** `R_eff` wired in as opt-in and measured: −0.4 to −1.4% one-directional, default unchanged. A −14.51% first reading was L066, a sweep scheduling bug, not physics. T020. |
 | 28 Sep 2026 | **§5 added.** Sequential sliding in the rebuild: the sliding verified exact (0.08% at a whole-element step), the GD-TP envelope made step-independent by solving the edge crossings, three plain-pipe diameters, and the passage decay traced to carried plastic state rather than a defect. L063–L065, T016–T019. |
+| 22 Sep 2026 | **§1.2 corrected.** The single-solve-vs-staged comparison mixed a whole-model peak with a band peak; at matched metrics the two agree within 0.3%. Recorded as L062, with L052 and L053 amended. |
 | 21 Sep 2026 | Document created. All results from the 21 Sep session recorded with the program that produced each. §2.3 (0 MT diameters) left explicitly pending rather than omitted. |
