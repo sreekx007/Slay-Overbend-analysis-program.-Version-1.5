@@ -1,15 +1,15 @@
 # SLAY Overbend — ML case matrix
 
-**7 of 200 cases run** in 0.01 h
+**68 of 200 cases run** in 0.16 h
 
 | | |
 |---|---|
 | Date | 28 September 2026 |
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Runner | `tools/dataset.py`, seed 20260928 |
-| Converged fully | 7 (100%) |
-| Converged partly | 0 (0%) |
-| Failed | 0 (0%) |
+| Converged fully | 61 (90%) |
+| Converged partly | 6 (9%) |
+| Failed | 1 (1%) |
 
 Row = one case = one complete passage. Target columns come in two readings: the bare name is the **snapshot** at the envelope position, `_env` is the worst that location saw at **any** position. Both come from the same solve.
 
@@ -17,7 +17,7 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 
 | File | Rows | Contents |
 |---|---|---|
-| `dataset_plain.csv` | 7 | plain pipe, no component |
+| `dataset_plain.csv` | 68 | plain pipe, no component |
 | `dataset_gdtp.csv` | 0 | GD-TP thick component |
 
 ## Axes
@@ -42,4 +42,79 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 | P004 | ofat | 120 | 9 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 4.4s | ok |
 | P005 | ofat | 150 | 9 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 4.2s | ok |
 | P006 | ofat | 85 | 6 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 4.9s | ok |
+| P007 | ofat | 85 | 7.5 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 5.9s | ok |
+| P008 | ofat | 85 | 10.5 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 9.4s | ok |
+| P009 | ofat | 85 | 12 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 13.6s | ok |
+| P010 | ofat | 85 | 9 | 168.3×11 | 120 | 0 | 0 | — | — | 1.000 | 7s | ok |
+| P011 | ofat | 85 | 9 | 219.1×12.7 | 120 | 0 | 0 | — | — | 1.000 | 5.6s | ok |
+| P012 | ofat | 85 | 9 | 273.1×15.9 | 120 | 0 | 0 | — | — | 1.000 | 5.7s | ok |
+| P013 | ofat | 85 | 9 | 323.9×17.5 | 120 | 0 | 0 | — | — | 1.000 | 5.5s | ok |
+| P014 | ofat | 85 | 9 | 508×25.4 | 120 | 0 | 0 | — | — | 1.000 | 10.8s | ok |
+| P015 | ofat | 85 | 9 | 610×28.6 | 120 | 0 | 0 | — | — | 1.000 | 13.6s | ok |
+| P016 | ofat | 85 | 9 | 406.4×21 | 40 | 0 | 0 | — | — | 1.000 | 13.3s | ok |
+| P017 | ofat | 85 | 9 | 406.4×21 | 80 | 0 | 0 | — | — | 1.000 | 8.6s | ok |
+| P018 | ofat | 85 | 9 | 406.4×21 | 160 | 0 | 0 | — | — | 1.000 | 8.5s | ok |
+| P019 | ofat | 85 | 9 | 406.4×21 | 200 | 0 | 0 | — | — | 1.000 | 8s | ok |
+| P020 | lhs | 120 | 12 | 273.1×15.9 | 80 | 0 | 0 | — | — | 1.000 | 7.2s | ok |
+| P021 | lhs | 105 | 6 | 323.9×17.5 | 40 | 0 | 0 | — | — | 1.000 | 3.1s | ok |
+| P022 | lhs | 70 | 10.5 | 406.4×21 | 200 | 0 | 0 | — | — | 1.000 | 10.1s | partial 1/2 |
+| P023 | lhs | 105 | 12 | 273.1×15.9 | 160 | 0 | 0 | — | — | 1.000 | 7.2s | ok |
+| P024 | lhs | 150 | 10.5 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 5.6s | ok |
+| P025 | lhs | 120 | 12 | 168.3×11 | 80 | 0 | 0 | — | — | 1.000 | 6.4s | ok |
+| P026 | lhs | 85 | 12 | 610×28.6 | 160 | 0 | 0 | — | — | 1.000 | 20.7s | ok |
+| P027 | lhs | 150 | 12 | 168.3×11 | 40 | 0 | 0 | — | — | 1.000 | 4.8s | ok |
+| P028 | lhs | 60 | 7.5 | 610×28.6 | 160 | 0 | 0 | — | — | 1.000 | 6.4s | partial 1/2 |
+| P029 | lhs | 85 | 6 | 508×25.4 | 200 | 0 | 0 | — | — | 1.000 | 6.5s | ok |
+| P030 | lhs | 150 | 12 | 610×28.6 | 80 | 0 | 0 | — | — | 1.000 | 22s | ok |
+| P031 | lhs | 85 | 6 | 610×28.6 | 120 | 0 | 0 | — | — | 1.000 | 7.1s | ok |
+| P032 | lhs | 85 | 10.5 | 508×25.4 | 40 | 0 | 0 | — | — | 1.000 | 23s | ok |
+| P033 | lhs | 105 | 6 | 168.3×11 | 200 | 0 | 0 | — | — | 1.000 | 5s | ok |
+| P034 | lhs | 60 | 9 | 323.9×17.5 | 80 | 0 | 0 | — | — | 1.000 | 9.3s | ok |
+| P035 | lhs | 70 | 9 | 508×25.4 | 80 | 0 | 0 | — | — | 1.000 | 19.1s | ok |
+| P036 | lhs | 60 | 10.5 | 610×28.6 | 200 | 0 | 0 | — | — | 1.000 | 15.9s | partial 1/2 |
+| P037 | lhs | 105 | 6 | 323.9×17.5 | 80 | 0 | 0 | — | — | 1.000 | 2.9s | ok |
+| P038 | lhs | 120 | 7.5 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 3.5s | ok |
+| P039 | lhs | 60 | 6 | 406.4×21 | 80 | 0 | 0 | — | — | 1.000 | 8.4s | ok |
+| P040 | lhs | 85 | 10.5 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 12.8s | ok |
+| P041 | lhs | 85 | 7.5 | 168.3×11 | 40 | 0 | 0 | — | — | 1.000 | 2.8s | ok |
+| P042 | lhs | 70 | 12 | 168.3×11 | 160 | 0 | 0 | — | — | — | 0.8s | FAILED |
+| P043 | lhs | 120 | 7.5 | 406.4×21 | 160 | 0 | 0 | — | — | 1.000 | 4s | ok |
+| P044 | lhs | 85 | 7.5 | 168.3×11 | 120 | 0 | 0 | — | — | 1.000 | 3.8s | ok |
+| P045 | lhs | 120 | 12 | 508×25.4 | 200 | 0 | 0 | — | — | 1.000 | 10.1s | ok |
+| P046 | lhs | 70 | 12 | 273.1×15.9 | 120 | 0 | 0 | — | — | 1.000 | 12.2s | ok |
+| P047 | lhs | 150 | 10.5 | 323.9×17.5 | 160 | 0 | 0 | — | — | 1.000 | 4.1s | ok |
+| P048 | lhs | 105 | 9 | 273.1×15.9 | 40 | 0 | 0 | — | — | 1.000 | 6.9s | ok |
+| P049 | lhs | 120 | 10.5 | 323.9×17.5 | 120 | 0 | 0 | — | — | 1.000 | 4.8s | ok |
+| P050 | lhs | 70 | 7.5 | 219.1×12.7 | 80 | 0 | 0 | — | — | 1.000 | 4s | ok |
+| P051 | lhs | 150 | 10.5 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 4.8s | ok |
+| P052 | lhs | 150 | 6 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 2.4s | ok |
+| P053 | lhs | 60 | 7.5 | 406.4×21 | 80 | 0 | 0 | — | — | 1.000 | 8.2s | ok |
+| P054 | lhs | 60 | 6 | 323.9×17.5 | 120 | 0 | 0 | — | — | 1.000 | 5.8s | ok |
+| P055 | lhs | 105 | 7.5 | 406.4×21 | 40 | 0 | 0 | — | — | 1.000 | 7.5s | ok |
+| P056 | lhs | 70 | 9 | 323.9×17.5 | 120 | 0 | 0 | — | — | 1.000 | 7.3s | ok |
+| P057 | lhs | 120 | 12 | 219.1×12.7 | 40 | 0 | 0 | — | — | 1.000 | 5.5s | ok |
+| P058 | lhs | 150 | 6 | 406.4×21 | 160 | 0 | 0 | — | — | 1.000 | 2.2s | ok |
+| P059 | lhs | 70 | 9 | 610×28.6 | 200 | 0 | 0 | — | — | 1.000 | 10.4s | partial 1/2 |
+| P060 | lhs | 105 | 6 | 219.1×12.7 | 40 | 0 | 0 | — | — | 1.000 | 2.1s | ok |
+| P061 | lhs | 70 | 12 | 323.9×17.5 | 160 | 0 | 0 | — | — | 1.000 | 10.4s | partial 1/2 |
+| P062 | lhs | 105 | 10.5 | 168.3×11 | 40 | 0 | 0 | — | — | 1.000 | 4.1s | ok |
+| P063 | lhs | 60 | 9 | 610×28.6 | 80 | 0 | 0 | — | — | 1.000 | 16.3s | partial 1/2 |
+| P064 | lhs | 150 | 7.5 | 508×25.4 | 80 | 0 | 0 | — | — | 1.000 | 3.9s | ok |
+| P065 | lhs | 70 | 9 | 323.9×17.5 | 40 | 0 | 0 | — | — | 1.000 | 9s | ok |
+| P066 | lhs | 85 | 10.5 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 9s | ok |
+| P067 | lhs | 60 | 12 | 508×25.4 | 40 | 0 | 0 | — | — | 1.000 | 36s | ok |
+
+## Cases that did not fully converge
+
+Recorded, not dropped. A dataset holding only the cases that converged is biased toward the easy corner of the parameter space and says nothing about where the method stops working.
+
+| case | R | sp | OD×WT | T | L/OD | t/t | status | reason |
+|---|---|---|---|---|---|---|---|---|
+| P022 | 70 | 10.5 | 406.4×21 | 200 | 0 | 0 | partial 1/2 | positions diverged |
+| P028 | 60 | 7.5 | 610×28.6 | 160 | 0 | 0 | partial 1/2 | positions diverged |
+| P036 | 60 | 10.5 | 610×28.6 | 200 | 0 | 0 | partial 1/2 | positions diverged |
+| P059 | 70 | 9 | 610×28.6 | 200 | 0 | 0 | partial 1/2 | positions diverged |
+| P061 | 70 | 12 | 323.9×17.5 | 160 | 0 | 0 | partial 1/2 | positions diverged |
+| P063 | 60 | 9 | 610×28.6 | 80 | 0 | 0 | partial 1/2 | positions diverged |
+| P042 | 70 | 12 | 168.3×11 | 160 | 0 | 0 | FAILED | ValueError: no converged position in this passage: 0:CUTBACK EXHAUSTED at lam=0.0000 |
 
