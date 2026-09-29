@@ -13,9 +13,12 @@ something that happens offshore, it says so.
 
 A length of pipeline leaving a lay vessel. It runs along the deck, over a
 line of rollers, and down the curved stinger into the sea. Somewhere in that
-length is a thick-walled inline component — a forged body with the same bore
-as the pipe and a heavier wall, so it is stiffer than the pipe and its
-outside surface stands proud of it.
+length is an inline component. Take it below to be a thick-walled body — a
+forged section with the same bore as the pipe and a heavier wall, so it is
+stiffer than the pipe and its outside surface stands proud of it. That is
+one of two kinds we model; the other is a shroud, which adds no stiffness
+and works purely by lifting. **Two kinds of component** near the end sets
+out the difference, and the sequence below applies to both.
 
 We want the worst strain the pipe suffers as this component goes over the
 stinger.
@@ -183,24 +186,80 @@ that far. That is a limitation to state with the results, not a finding.
 pipeline is moved forward in still water and solved statically at each
 position.
 
-## What the rebuild still needs for Step 6
+## Step 6 in the rebuild — built and verified
 
-The per-position solver is already ported: `slay/solve/passage.py` is the
-rebuild's version of the reference's `_solve_state_sliding`, and it carries
-displacement, rotation, plastic state and the contact active set from one
-solve to the next, which is what Step 6 needs.
+*This section said the sweep driver was not ported. It was written before
+22 Sep and left stale for a week; corrected 29 Sep.*
 
-**The sweep driver is not ported.** In the reference that is the outer loop
-of `run_passage_sliding` — the placement rule, the shift schedule, and the
-re-computation of where each roller bears at each position. That belongs to
-the study layer (T6 / L7), which is not built. Step 6 cannot run in the
-rebuild until it is.
+Both halves now exist. `slay/solve/passage.py` is the rebuild's version of
+the reference's `_solve_state_sliding` and carries displacement, rotation,
+plastic state and the contact active set from one solve to the next.
+`slay/study/sweep.py` is the outer loop — the placement rule, the shift
+schedule, and the re-computation of where each roller bears at each
+position.
+
+It is verified rather than merely running. On a plain **linear elastic**
+passage the strain at a given station must not change as the pipe slides,
+because the rollers impose the same geometry at every position. Stepped a
+whole element it holds to **0.03–0.08%** at SR1–SR4. That is the check that
+says the sliding is right; anything left over is discretisation.
+
+**One thing the sweep must do that is easy to miss.** The worst position of
+a passage is where a component EDGE crosses a roller, and that is not a step
+boundary. Sampling on a fixed step alone made the answer depend on the step
+over a 20% range. The schedule now always includes the edge crossings, which
+makes the envelope step-independent — 0.5731 / 0.5727 / 0.5722 / 0.5689%
+across a fourfold range of step, found in 5 positions where blind refinement
+needed 16.
+
+## Two kinds of component, and they are not the same physics
+
+*Added 29 Sep. Everything above was written for a thick-walled body; a
+second kind behaves oppositely and the sequence applies to both.*
+
+**A stiffening body (GD-TP, GD-TT).** A forged section with the same bore
+and a heavier wall. It is stiffer than the pipe, so it resists being bent
+and pushes the curvature it will not take into the pipe on either side of
+it. Its outside surface also stands proud, so it lifts the pipe slightly
+where it passes a roller.
+
+**A lifting body (GD-SH).** A shroud wrapped round the pipe. It adds **no
+bending stiffness at all** — the pipe's own section runs right through it —
+and its entire effect is that the roller now touches the shroud's outer
+surface instead of the pipe, holding the pipe *off* the arc by
+
+        lift = V − OD_pipe/2
+
+where `V` is measured from the pipe **centreline**, not from the pipe's
+outside. Using `V` itself over-elevates by half a diameter — 33% too much
+at V = 2D — and inflates every strain to match.
+
+The two act in **opposite senses** on local curvature. Measured at the
+envelope position on an 85 m stinger:
+
+| | stiffness ratio | radius over the body | radius in the pipe beside it |
+|---|---|---|---|
+| GD-TP | 2.36 | 67.1 m | 47.4 m |
+| GD-TT | 4.37 | **85.5 m** | **28.3 m** |
+| GD-SH | 1.00 | **33.8 m** | 45.5 m |
+
+A stiff body stays flatter than the pipe beside it and dumps the curvature
+on its neighbour — GD-TT at 4.37 rides essentially the stinger's own radius
+while forcing a 28.3 m bend into the adjacent pipe, three times tighter than
+the stinger itself. A shroud does the reverse: with nothing to resist
+bending, the lift forces curvature into the component region.
+
+**Why this matters for reading results.** For a stiffening body the worst
+strain is in the pipe at the junction, not on the body — measured across the
+dataset, a median 4.5× the body peak. For a shroud there is no junction at
+all, because no section steps; the lift is the whole of it, and a result
+file that does not record the lift cannot tell a shroud case from bare pipe.
 
 ## Mesh
 
-The pipe is chopped into short straight pieces. The component is **2 pieces
-long**, each about 0.5 m, which is 1.23 times the pipe diameter — the
-smallest we will go.
+The pipe is chopped into short straight pieces, 2 diameters long away from
+anything interesting. The component is **2 pieces long**, each about 0.5 m,
+which is 1.23 times the pipe diameter — the smallest we will go.
 
 Be aware of what this costs. Chopping the component finer keeps raising the
 answer: 1 piece gives 0.5715%, 2 gives 0.6118%, 3 gives 0.6458%, 5 gives
@@ -215,5 +274,7 @@ against each other rather than for quoting as the strain in a real pipe.
 
 | Date | Action |
 |---|---|
+| 29 Sep 2026 | **Corrected: Step 6 is built.** The section claiming the sweep driver was not ported had been stale since 22 Sep. Replaced with what exists and how it is verified, including the edge-crossing rule that makes the passage envelope independent of the sweep step. |
+| 29 Sep 2026 | **Added: two kinds of component.** Everything here was written for a thick-walled stiffening body. A shroud adds no stiffness and acts entirely by lifting the pipe off the rollers (`lift = V − OD/2`, `V` from the CENTRELINE), and the two act in opposite senses on local curvature — measured and tabulated. |
 | 21 Sep 2026 | **Corrected: sliding added.** An earlier version of this file stopped at the starting position and argued no sliding was needed, on the strength of a sweep that covers only 40% of a roller spacing. Sequential sliding is Step 6 and the reading moves to Step 7, taken across the whole passage. |
 | 21 Sep 2026 | Sequence written and agreed before any Series 3 run. Five steps: bend onto the rollers with every roller gripping; release the rollers and apply weight; pull the lay tension; allow yielding; read the peak excluding the last three stinger rollers. Mesh set to 2 elements across the component (0.4993 m, 1.23×OD), with the measured mesh sensitivity recorded so the ~10% shortfall against the converging trend is a stated cost rather than a surprise. |

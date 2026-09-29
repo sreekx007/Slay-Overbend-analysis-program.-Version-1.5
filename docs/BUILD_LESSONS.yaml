@@ -1550,3 +1550,51 @@
   detect: test_the_excluded_band_covers_the_stinger_end_not_the_vessel_end
   refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
   date: 2026-09-29
+
+- id: L073
+  area: plot
+  class: ruling
+  symptom: >-
+    The close-up drew the pipeline as a polyline with a thick coloured
+    segment on it. That said nothing about how deep a component was, which
+    side of the pipe it sat on, or -- for GD-SH -- that it hangs BELOW the
+    pipe rather than replacing part of it. The shroud had no outline at all.
+  cause: >-
+    One drawing rule was being used for two physically different things. A
+    body that changes the SECTION replaces the pipe wall over its span; a
+    body that only changes the CONTACT sits outside the pipe and changes
+    nothing structural.
+  rule: >-
+    Ask the assembly which kind it is and draw accordingly. section_at(x)
+    with owner != pipe means a section-changing body: draw it at its own OD
+    about the centreline. contact_at(x) with owner != pipe while section_at
+    stays pipe means a contact-only body: draw it from the pipe's own bottom
+    down to contact_at(x).y. Drawing a shroud at a section OD would invent a
+    stiffness the model does not have -- its stiffness_ratio is 1.0 and says
+    so. All offsets follow the pipe's LOCAL NORMAL, not the vertical: the
+    pipe turns 0.64 rad over the stinger, so a wall drawn by adding OD/2 to
+    y is 20 pct narrow at SR7.
+  detect: test_a_section_changing_body_is_drawn_at_its_own_OD, test_a_contact_only_body_is_NOT_drawn_at_a_section_OD, test_the_offset_is_perpendicular_not_vertical
+  refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
+  date: 2026-09-29
+
+- id: L074
+  area: plot
+  class: defect
+  symptom: >-
+    The first shroud outline had a 95 mm step where the geometry goes to
+    zero, and the drawn body was visibly the wrong shape at its taper ends.
+  cause: >-
+    The outline was sampled at the STRUCTURAL mesh nodes. At the ruled 2xOD
+    density a 6.096 m shroud spans seven nodes and its taper ends fall
+    BETWEEN them, so the drawing interpolated straight past the geometry it
+    was supposed to show.
+  rule: >-
+    A drawing grid is not the structural mesh. Interpolate the deformed
+    centreline finely and ask the assembly at every sample, so an outline
+    follows the component rather than the mesh that happens to carry it.
+    After the fix the shroud ring runs 0.0036 to 0.2032 m against a true 0
+    to 0.2032.
+  detect: test_the_outline_is_resampled_off_the_component_not_the_mesh, test_a_contact_only_body_is_NOT_drawn_at_a_section_OD
+  refs: [tools/plot_stinger.py]
+  date: 2026-09-29

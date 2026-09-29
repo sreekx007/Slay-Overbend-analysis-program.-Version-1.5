@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 25
+# entries: 26
 
 - id: T001
   date: 2026-09-21
@@ -650,3 +650,33 @@
     I_comp/I_pipe would predict the first pattern for both.
   lesson: '-'
   refs: [tools/plot_stinger.py, docs/diagrams/stinger_ils-sh.png]
+
+- id: T026
+  date: 2026-09-29
+  goal: >-
+    Draw the component and the pipeline as BODIES in the close-up, so a
+    reader can see the component's outline, which side of the pipe it is on,
+    and how deep it goes.
+  action: >-
+    body_outlines() in tools/plot_stinger.py builds closed rings from the
+    assembly: pipe wall at OD/2, bore at OD/2 - t, and the component by
+    whichever of section_at / contact_at owns it. Offsets follow the pipe's
+    local normal. Verified numerically rather than by eye, after the drawn
+    shroud looked lopsided.
+  case: 'R=85, spacing 9, 120 MT, 406.4x21; ILS-SH and ILS-TP at their envelope positions'
+  outcome: success
+  evidence: >-
+    Pipe wall drawn at 0.0210 m, exactly t. GD-TP body constant at 0.4484 m
+    = its own OD, no taper, straddling the centreline. GD-SH ring 0.0036 to
+    0.2032 m, hanging below the pipe, against a true 0 to V - OD/2 = 0.2032.
+    The shroud profile is symmetric about its centre to 0.00e+00 m over 25
+    sample points -- the apparent lean in the figure is the 9x vertical
+    exaggeration acting on a curved pipe, not the geometry.
+  verdict: >-
+    Two body types need two drawing rules because they are two different
+    physics. Sampling the outline on the structural mesh put a 95 mm step
+    where the geometry goes to zero (L074), and drawing a shroud at a
+    section OD would have invented a stiffness the model does not have
+    (L073).
+  lesson: L073
+  refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
