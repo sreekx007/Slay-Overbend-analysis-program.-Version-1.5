@@ -183,11 +183,18 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         ils = None
         if case['family'] == 'gd-tp':
             ils = build_component(OD, t_wall, case['L_OD'], case['t_ratio'])
+        elif case['family'] != 'plain':
+            # Any other family is an ARCHETYPE ID, taken as built. Its length
+            # and wall are the archetype's own, so `L_OD` and `t_ratio` are
+            # read back off it rather than driving it.
+            ils = slide.archetype(case['family'])
         sc, L_comp, recs, junc = slide.passage(
             arch_id='none', R=case['R'], spacing=case['spacing'],
             tension_mt=case['tension_mt'], OD=OD, t_wall=t_wall,
             step=2.0 * OD, ils=ils, verbose=False)
         row['L_comp'] = L_comp
+        if case['family'] not in ('plain', 'gd-tp'):
+            row['L_OD'] = L_comp / OD if OD else 0.0
         row['n_positions'] = len(recs)
         row['n_converged'] = sum(1 for r in recs if r.converged)
         env = rp.envelope(recs)
@@ -203,13 +210,14 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         for name, eps in rp.station_envelope(recs).items():
             row[f'eps_{name}_env'] = eps
         row.update(jr.case_row(junc, env.index))
-        if case['family'] == 'gd-tp' and junc and junc[env.index]:
-            d = junc[env.index]
-            row['stiffness_ratio'] = d.get('stiffness_ratio')
-            row['n_junctions'] = d.get('n_junctions')
-        else:
-            row['stiffness_ratio'] = 1.0
-            row['n_junctions'] = 0
+        # Gated on WHETHER A COMPONENT WAS SOLVED, not on the family name.
+        # Gating on `family == 'gd-tp'` hardcoded 1.0 and 0 for every other
+        # archetype: ILS-TT reported I = 1.000 with no junctions when the
+        # model it had just solved carried 6 junctions and a ratio of 4.366.
+        # The solve was right; only the row lied.
+        d = junc[env.index] if junc and junc[env.index] else {}
+        row['stiffness_ratio'] = d.get('stiffness_ratio', 1.0)
+        row['n_junctions'] = d.get('n_junctions', 0)
         row['status'] = ('ok' if row['n_converged'] == row['n_positions']
                          else f'partial {row["n_converged"]}/{row["n_positions"]}')
         row['error'] = ''
