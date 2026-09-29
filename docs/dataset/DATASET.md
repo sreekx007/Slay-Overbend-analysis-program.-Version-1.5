@@ -1,14 +1,14 @@
 # SLAY Overbend — ML case matrix
 
-**68 of 200 cases run** in 0.16 h
+**94 of 200 cases run** in 0.24 h
 
 | | |
 |---|---|
 | Date | 28 September 2026 |
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Runner | `tools/dataset.py`, seed 20260928 |
-| Converged fully | 61 (90%) |
-| Converged partly | 6 (9%) |
+| Converged fully | 87 (93%) |
+| Converged partly | 6 (6%) |
 | Failed | 1 (1%) |
 
 Row = one case = one complete passage. Target columns come in two readings: the bare name is the **snapshot** at the envelope position, `_env` is the worst that location saw at **any** position. Both come from the same solve.
@@ -17,8 +17,8 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 
 | File | Rows | Contents |
 |---|---|---|
-| `dataset_plain.csv` | 68 | plain pipe, no component |
-| `dataset_gdtp.csv` | 0 | GD-TP thick component |
+| `dataset_plain.csv` | 85 | plain pipe, no component |
+| `dataset_gdtp.csv` | 9 | GD-TP thick component |
 
 ## Axes
 
@@ -103,6 +103,37 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 | P065 | lhs | 70 | 9 | 323.9×17.5 | 40 | 0 | 0 | — | — | 1.000 | 9s | ok |
 | P066 | lhs | 85 | 10.5 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 9s | ok |
 | P067 | lhs | 60 | 12 | 508×25.4 | 40 | 0 | 0 | — | — | 1.000 | 36s | ok |
+| P068 | lhs | 120 | 9 | 610×28.6 | 120 | 0 | 0 | — | — | 1.000 | 10.3s | ok |
+| P069 | lhs | 70 | 6 | 508×25.4 | 160 | 0 | 0 | — | — | 1.000 | 7s | ok |
+| P070 | lhs | 150 | 7.5 | 273.1×15.9 | 200 | 0 | 0 | — | — | 1.000 | 3.2s | ok |
+| P071 | lhs | 85 | 9 | 219.1×12.7 | 120 | 0 | 0 | — | — | 1.000 | 6.9s | ok |
+| P072 | lhs | 85 | 10.5 | 508×25.4 | 160 | 0 | 0 | — | — | 1.000 | 14.3s | ok |
+| P073 | lhs | 105 | 10.5 | 273.1×15.9 | 40 | 0 | 0 | — | — | 1.000 | 10.8s | ok |
+| P074 | lhs | 105 | 9 | 273.1×15.9 | 120 | 0 | 0 | — | — | 1.000 | 4.8s | ok |
+| P075 | lhs | 60 | 6 | 168.3×11 | 120 | 0 | 0 | — | — | 1.000 | 4.5s | ok |
+| P076 | lhs | 105 | 9 | 168.3×11 | 120 | 0 | 0 | — | — | 1.000 | 4.9s | ok |
+| P077 | lhs | 120 | 9 | 219.1×12.7 | 200 | 0 | 0 | — | — | 1.000 | 5.3s | ok |
+| P078 | lhs | 120 | 10.5 | 406.4×21 | 160 | 0 | 0 | — | — | 1.000 | 6s | ok |
+| P079 | lhs | 85 | 7.5 | 508×25.4 | 80 | 0 | 0 | — | — | 1.000 | 11.3s | ok |
+| P080 | lhs | 60 | 12 | 406.4×21 | 40 | 0 | 0 | — | — | 1.000 | 27.1s | ok |
+| P081 | lhs | 60 | 6 | 273.1×15.9 | 80 | 0 | 0 | — | — | 1.000 | 4s | ok |
+| P082 | lhs | 70 | 9 | 273.1×15.9 | 120 | 0 | 0 | — | — | 1.000 | 6.6s | ok |
+| P083 | lhs | 120 | 7.5 | 610×28.6 | 160 | 0 | 0 | — | — | 1.000 | 6.1s | ok |
+| P084 | lhs | 150 | 7.5 | 168.3×11 | 160 | 0 | 0 | — | — | 1.000 | 3.4s | ok |
+
+## GD-TP — every case
+
+| case | design | R | sp | OD×WT | T | L/OD | t/t | envelope | at shift | I ratio | s | status |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| T000 | ofat | 85 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 21.7s | ok |
+| T001 | ofat | 60 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 24.1s | ok |
+| T002 | ofat | 70 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 23.5s | ok |
+| T003 | ofat | 105 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 16.8s | ok |
+| T004 | ofat | 120 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 13.9s | ok |
+| T005 | ofat | 150 | 9 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 10.4s | ok |
+| T006 | ofat | 85 | 6 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 10s | ok |
+| T007 | ofat | 85 | 7.5 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 17.5s | ok |
+| T008 | ofat | 85 | 10.5 | 406.4×21 | 120 | 2.5 | 2 | — | — | 2.363 | 25.4s | ok |
 
 ## Cases that did not fully converge
 
