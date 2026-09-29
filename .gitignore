@@ -1,2 +1,10 @@
 __pycache__/
 *.pyc
+
+# Profile artifacts are GENERATED and large -- 7.7 MB for two cases, and a
+# geometry table grows with positions x samples. They are reproducible from
+# their case definition (`tools/emit_profile.py`), so the recipe is version
+# controlled and the output is not. The CASE dataset under docs/dataset IS
+# committed: one row per passage is small and is the thing worth diffing.
+docs/profiles/*.csv
+docs/profiles/*.schema.json

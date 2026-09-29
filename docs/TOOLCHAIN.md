@@ -115,10 +115,23 @@ rig is a bare beam by design. Building that view is an open gap.
 | Tool | What it does |
 |---|---|
 | `draw_layout.py` | the Scene to scale as SVG — roller stations, arc, deck. Deliberately draws **no pipe** (tracker item 27). |
-| `plot_stinger.py` | the **solved** pipe on the stinger. Every coordinate a solved displacement. Peak strain marked; one-sided rollers arrowed. |
+| `emit_profile.py` | **generator.** Solves a passage and writes it down as a profile artifact (three CSVs + sidecars). Draws nothing. |
+| `plot_from_schema.py` | **reader.** Draws case rows, or `--profile <stem>` for the five-panel stinger figure. Imports nothing from `slay`. |
+| `plot_stinger.py` | the older combined tool: solves *and* draws. Superseded for figures by the pair above (G13); kept for its solve helpers, which `emit_profile.py` uses. |
 
-Neither draws a component. That gap is why the GD-TP placement mismatch
-went unnoticed.
+**Generating and drawing are separate programs (G13).** A figure that
+re-runs the analysis cannot be checked against the run it claims to show,
+cannot be pointed at an older result, and has no way to fail loudly. The
+split is:
+
+```
+emit_profile.py  --archetype ILS-SH            # solve -> docs/profiles/<case_id>.*.csv
+plot_from_schema.py --profile docs/profiles/<case_id>    # read -> figure
+```
+
+A quantity a figure needs and no contract carries is a **missing column**,
+added to `slay.report.profile_schema` — never a solver call added to the
+plotter.
 
 ### Analysis
 

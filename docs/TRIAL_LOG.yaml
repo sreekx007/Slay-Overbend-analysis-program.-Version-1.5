@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 26
+# entries: 27
 
 - id: T001
   date: 2026-09-21
@@ -680,3 +680,44 @@
     (L073).
   lesson: L073
   refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
+
+- id: T027
+  date: 2026-09-29
+  goal: >-
+    Split generating a result from drawing it, so a figure reads an artifact
+    instead of re-running the analysis. Asked why plotting two cases took so
+    long and why it did not follow the agreed schema route, the answer was
+    that it did not -- and that the schema route could not have worked, since
+    the case-row contract deliberately excludes profiles and no per-position
+    artifact existed.
+  action: >-
+    Declared a second contract, slay.report.profile_schema 1.0.0 -- three
+    tables, one per grain: geometry (per sample per position), sections (per
+    element per position), stations (per roller, fixed). Added Field.per so
+    the grain is machine-readable, and slay.report.profile to build and write
+    the tables with the grain ENFORCED. tools/emit_profile.py solves and
+    writes; tools/plot_from_schema.py --profile draws all five panels and
+    imports nothing from slay. Made the split guardrail G13.
+  case: 'R=85, spacing 9, 120 MT, 406.4x21; ILS-TP (7 positions) and ILS-SH (13 positions)'
+  outcome: success
+  evidence: >-
+    Peak strain read from the artifact equals the solver envelope EXACTLY:
+    0.572688 pct vs 0.572688, diff 0.000e+00. Geometry agrees with the solved
+    nodes to 3.303e-04 m at 1200 samples and 9.209e-05 m at 4800 -- a 3.6x
+    reduction for a 4x refinement, so it is resampling residual and not a
+    mis-recorded value. ILS-TP wrote 8400 geometry + 896 section + 12 station
+    rows, ILS-SH 15600 + 1729 + 12. The figure finds 2 junctions for ILS-TP
+    and 0 for ILS-SH from the FILE, and takes the stiffener and shroud
+    drawing paths accordingly. 562 passed (was 528), layer linter clean at 34
+    modules.
+  verdict: >-
+    A figure that re-runs the analysis cannot be checked against the run it
+    claims to show, cannot be pointed at an older result, and has no way to
+    fail loudly -- it draws whatever it just computed. Split, a wrong figure
+    is either a wrong file, which profile.write's own checks refuse, or a
+    wrong plotter, which a reader can see. The first draw from the artifact
+    had two panels mirrored and the rollers hidden under a fill (L077), both
+    of which look entirely plausible -- which is the argument for the checks
+    being in the writer rather than in the eye.
+  lesson: L075
+  refs: [rebuild/slay/report/profile_schema.py, rebuild/slay/report/profile.py, tools/emit_profile.py, tools/plot_from_schema.py, docs/SLAY_BUILD_INSTRUCTION.md]

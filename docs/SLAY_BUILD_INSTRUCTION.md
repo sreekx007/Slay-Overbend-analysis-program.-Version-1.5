@@ -61,7 +61,24 @@ flowchart LR
     PR --> RS[Result]
     RS --> ST[Study]
     ST --> RP[Report]
+    RP --> CR[case row]
+    RP --> PF[profile]
+    CR --> FIG[figure]
+    PF --> FIG
 ```
+
+The chain does not end at Report. **Report emits two artifacts, and a figure
+consumes one of them — never the layers behind it** (G13):
+
+| Artifact | Contract | Grain | What it answers |
+|---|---|---|---|
+| **case row** | `slay.report.schema` | one row per passage | every peak with its location and step, per-station envelopes, junction probes. Rows across cases are a dataset. |
+| **profile** | `slay.report.profile_schema` | three tables for one case — geometry per sample per position, sections per element per position, stations | the shape: where the pipe sits, what it is made of there, and the strain along it. |
+
+A profile is deliberately NOT columns on a case row: it is thousands of
+numbers per position, and a dataset row that carried them would be unusable
+as a dataset. They are separate artifacts with separate versions, joined by
+`case_id`.
 
 ### 2.2 Layers
 
@@ -156,6 +173,7 @@ Each rule below exists because it was violated once and cost real work.
 | G10 | **Mesh density is 2×OD.** | Matches the paper's own basis. Refining to 1×OD moved *away* from apples-to-apples and was reverted. Do not "improve" it without changing the comparison basis too. |
 | G11 | **No sweep/position loop below L7.** | Rule 1. Checked explicitly in each L1–L5 card's workflow audit. |
 | G12 | **All constants from `config.py`.** | No literal may appear in a module that `config.py` already supplies. |
+| G13 | **A figure reads an artifact; it never generates one.** Anything that draws must take its numbers from a file written to a declared schema — `slay.report.schema` for case rows, `slay.report.profile_schema` for profiles — and must import nothing from `slay`. Generating and drawing are separate programs: `tools/emit_profile.py` solves and writes, `tools/plot_from_schema.py` reads and draws. A quantity a figure needs and the contract does not carry is a **missing column**, to be added to the schema — never a solver call added to the plotter. | Asked for a stinger figure on 29 Sep, the only route was a plotter that rebuilt the Scene and re-swept the whole passage, and the scalars quoted beside it were re-solved a third time when they were already in `dataset_components.csv`. A figure that re-runs the analysis cannot be checked against the run it claims to show, cannot be pointed at last week's result, and has no way to fail loudly — it draws whatever it just computed. Split, a wrong figure is either a wrong file (which `profile.write`'s own checks refuse) or a wrong plotter (which a reader can see), and the two can be told apart. |
 
 ---
 

@@ -16,14 +16,25 @@ the axis label is built from what it finds. Nothing here knows that
 `peak_moment` is N.m or that strain is a fraction; if the schema is wrong or
 silent, the plot says so rather than guessing.
 
-WHAT IT CANNOT DRAW, and this is the useful finding rather than a limitation
-to apologise for. A case row is one line per passage: it carries every PEAK
-with its location and step, per-station envelopes, and the junction probes.
-It does NOT carry a profile -- strain against position along the pipe -- so
-no trace can be drawn from it. That is by design: a profile is thousands of
-numbers per position and belongs in a per-position artifact, not in a
-dataset row. It is stated here so nobody concludes the schema is broken when
-a trace does not appear.
+TWO KINDS OF FILE, because there are two kinds of question.
+
+  A CASE ROW (`slay.report.schema`) is one line per passage: every PEAK with
+  its location and step, per-station envelopes, the junction probes. It does
+  NOT carry a profile, by design -- a profile is thousands of numbers per
+  position and has no business in a dataset row. Default mode reads these.
+
+  A PROFILE (`slay.report.profile_schema`) is three tables for ONE case:
+  geometry per sample per position, sections per element per position, and
+  the rollers. `--profile <stem>` reads these and draws the five-panel
+  stinger figure.
+
+    python3 tools/plot_from_schema.py --profile docs/profiles/<case_id>
+
+THAT SECOND MODE IS WHY THE CONTRACT EXISTS. Before it, the only way to draw
+the pipe on the stinger was a tool that re-solved the passage on every run --
+a figure that cannot be checked, cannot be pointed at last week's result, and
+has no way to fail loudly. Now a wrong figure is either a wrong file, which
+the writer's own checks refuse, or a wrong plotter, which a reader can see.
 """
 
 from __future__ import annotations
@@ -280,7 +291,369 @@ def plot_case(row, schema, ax_j, ax_s):
                             ec='#c1121f', lw=0.8, alpha=0.93))
 
 
+# ---------------------------------------------------------------------------
+# the PROFILE artifact -- the five-panel figure, from three CSVs and nothing
+# ---------------------------------------------------------------------------
+#
+# WHAT CHANGED, AND WHY IT MATTERS. Until the profile artifact existed, this
+# figure could only be drawn by a program that re-solved the passage. Every
+# coordinate below now comes off a file: the pipe from `geometry.x/y`, the
+# rollers from `stations`, the strain staircase from `sections`, the body
+# outlines from `OD_section` and `y_contact`. Nothing here knows what a
+# stinger is.
+#
+# The ONE thing this code computes rather than reads is the offset of a
+# polyline along its own normal, used to turn a centreline into a wall. That
+# is pure geometry on numbers the file gives it -- no physics, no scene, no
+# convention that could be got wrong silently.
+
+TABLES = ('geometry', 'sections', 'stations')
+
+
+def load_profile(stem):
+    """{table: (rows, schema)} for a profile artifact written at `stem`."""
+    stem = Path(stem)
+    out = {}
+    for t in TABLES:
+        p = Path(f'{stem}.{t}.csv')
+        if not p.exists():
+            raise SystemExit(
+                f'no {t} table at {p}. A profile is three tables; emit one '
+                f'with `python3 tools/emit_profile.py`.')
+        out[t] = load(p)
+    v = {out[t][1].get('profile_schema_version') for t in TABLES}
+    if len(v) > 1:
+        raise SystemExit(f'the three tables disagree on schema version: {v}')
+    return out
+
+
+def at_step(rows, step):
+    return [r for r in rows if int(float(r['step'])) == step]
+
+
+def col(rows, name, cast=float):
+    return [cast(r[name]) for r in rows]
+
+
+def truth(v):
+    return str(v).strip().lower() in ('true', '1', 'yes')
+
+
+def offset_polyline(px, py, dist):
+    """Offset a polyline along its LOCAL NORMAL, which here points DOWN.
+
+    NOT a vertical offset. The pipe is bent to a 33-85 m radius and its
+    tangent turns through 0.64 rad over the stinger, so a wall drawn by
+    adding OD/2 to `y` would be up to 20% too narrow at the last roller and
+    perpendicular to the pipe nowhere on the arc. `dist` may be a scalar or
+    one value per point, which is what lets a tapered body be drawn.
+
+    Node order runs in -x (x = -(s + shift)), so the tangent on the deck is
+    (-1, 0) and the normal (t_y, -t_x) comes out (0, +1) -- down, the side
+    the rollers are on.
+    """
+    import numpy as np
+    px, py = np.asarray(px, float), np.asarray(py, float)
+    d = (np.full(len(px), float(dist)) if np.isscalar(dist)
+         else np.asarray(dist, float))
+    tx, ty = np.gradient(px), np.gradient(py)
+    n = np.hypot(tx, ty)
+    n[n == 0] = 1.0
+    tx, ty = tx / n, ty / n
+    return px + d * ty, py - d * tx
+
+
+def ring(px, py, d_lo, d_hi):
+    """A closed band between two offsets of the same centreline."""
+    import numpy as np
+    ax, ay = offset_polyline(px, py, d_lo)
+    bx, by = offset_polyline(px, py, d_hi)
+    return (np.concatenate([ax, bx[::-1]]), np.concatenate([ay, by[::-1]]))
+
+
+def owner_span(rows, key):
+    """(lo, hi) row indices where `key` is not 'pipe', or None.
+
+    This is how the figure finds the component WITHOUT being told where it
+    is: the assembly's own answer, sampled into the file.
+    """
+    idx = [k for k, r in enumerate(rows) if r[key] not in ('pipe', '')]
+    return (min(idx), max(idx)) if idx else None
+
+
+def junction_x(rows):
+    """World x of every section step, read off the sampled section owner.
+
+    A junction is where `OD_section` changes -- the schema says so, and it
+    says why the strain trace must break there rather than be drawn through.
+    """
+    out = []
+    for a, b in zip(rows, rows[1:]):
+        if abs(float(a['OD_section']) - float(b['OD_section'])) > 1e-9:
+            out.append(0.5 * (float(a['x']) + float(b['x'])))
+    return out
+
+
+def strain_runs(rows):
+    """[[(x, strain), ...], ...] -- one staircase run per section.
+
+    BROKEN AT EVERY JUNCTION, and that is not decoration. Strain steps
+    across a section change (the same moment on two section moduli), so a
+    line drawn through it asserts a gradient the model does not have. Each
+    element is drawn over its OWN EXTENT rather than as a point at its
+    midpoint: joining midpoints interpolates, and leaves a half-element gap
+    against the junction that reads as missing data instead of as the step.
+    """
+    rows = sorted(rows, key=lambda r: float(r['s_material_0']))
+    runs, cur, last = [], [], None
+    for r in rows:
+        od = float(r['OD_section'])
+        if last is not None and abs(od - last) > 1e-9:
+            runs.append(cur)
+            cur = []
+        e = float(r['strain'])
+        cur += [(float(r['x_0']), e), (float(r['x_1']), e)]
+        last = od
+    if cur:
+        runs.append(cur)
+    return runs
+
+
+def plot_profile(prof, out, step=None):
+    """The five-panel figure, drawn from the three tables and nothing else."""
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.patches import Circle
+
+    geo_all, geo_s = prof['geometry']
+    sec_all, sec_s = prof['sections']
+    sta, sta_s = prof['stations']
+
+    c = geo_all[0]
+    if step is None:
+        step = int(float(c['envelope_step']))
+    g = sorted(at_step(geo_all, step), key=lambda r: int(r['sample']))
+    sc = at_step(sec_all, step)
+    if not g or not sc:
+        raise SystemExit(f'step {step} is not in this profile')
+
+    OD, tw = float(c['OD']), float(c['t_wall'])
+    shift = float(g[0]['shift'])
+    px, py = np.array(col(g, 'x')), np.array(col(g, 'y'))
+    fig, (ax, ex, dx, bx, cx) = plt.subplots(
+        5, 1, figsize=(13.5, 18.4),
+        gridspec_kw=dict(height_ratios=[1.0, 1.15, 0.8, 0.85, 0.9],
+                         hspace=0.33))
+    bx.sharex(ax)
+    dx.sharex(ax)
+
+    # ---- panel 1: the whole stinger ---------------------------------------
+    ax.plot(col(g, 'arc_x'), col(g, 'arc_y'), color='#b9c2cb', lw=1.0,
+            ls='--', zorder=1)
+    for r in sta:
+        one = truth(r['one_sided'])
+        colr = ('#2f6f3e' if r['role'] == 'CONTACT'
+                else '#111111' if r['role'] == 'FIXED' else '#6b4ea8')
+        ax.add_patch(Circle((float(r['x']), float(r['y'])),
+                            float(r['radius']), facecolor='none',
+                            edgecolor=colr, lw=1.6, zorder=4))
+        ax.annotate(r['station'], (float(r['x']), float(r['y'])),
+                    textcoords='offset points', xytext=(0, -14), ha='center',
+                    fontsize=7, color=colr)
+        if one:
+            ax.annotate('', xy=(float(r['x']), float(r['y']) - 1.6),
+                        xytext=(float(r['x']), float(r['y']) - 0.35),
+                        arrowprops=dict(arrowstyle='-|>', lw=1.1, color=colr,
+                                        shrinkA=0, shrinkB=0), zorder=4)
+    ax.plot(px, py, color='#1f7a8c', lw=2.2, zorder=5)
+
+    sp_sec = owner_span(g, 'section_owner')
+    sp_con = owner_span(g, 'contact_owner')
+    sp = sp_sec or sp_con
+    if sp:
+        a, b = sp
+        ax.plot(px[a:b + 1], py[a:b + 1], color='#8a5a00', lw=6.5,
+                solid_capstyle='butt', zorder=6, alpha=0.9)
+    jx = junction_x(g)
+    for panel in (ax, bx, cx):
+        if sp:
+            panel.axvspan(px[sp[1]], px[sp[0]], color='#f2e3c4', alpha=0.55,
+                          zorder=0)
+        for xj in jx:
+            panel.axvline(xj, color='#c1121f', lw=1.1, ls=(0, (4, 2)),
+                          alpha=0.8, zorder=2)
+    ax.set_aspect('equal')
+    ax.invert_yaxis()
+    ax.grid(alpha=0.2)
+    ax.set_ylabel('y (m), down')
+    ax.set_title(
+        f'{c["family"]} on the stinger  --  R = {float(c["R"]):.0f} m, '
+        f'spacing {float(c["spacing"]):.0f} m, '
+        f'{float(c["tension_mt"]):.0f} MT, L = {float(c["L_comp"]):.3f} m '
+        f'({float(c["L_comp"]) / OD:.2g} x OD), '
+        f'I_comp/I_pipe = {float(c["stiffness_ratio"]):.3f}\n'
+        f'step {step} of {c["n_positions"]}, shift {shift:.3f} m'
+        f'{"  <- envelope" if step == int(float(c["envelope_step"])) else ""}',
+        fontsize=10, loc='left')
+
+    # ---- panel 2: the close-up, 2D bodies ---------------------------------
+    # TRUE SCALE CANNOT SHOW THIS. The stinger's curvature is 1/85 per metre,
+    # so over a 20 m window the pipe departs from a straight line by ~0.6 m
+    # and a component changes that by a few centimetres. Equal-aspect, that
+    # is a couple of pixels: honest and useless. The vertical is stretched
+    # and the factor is STATED, so nobody reads a radius off the picture.
+    # THE WINDOW IS SET IN METRES, not in samples. A component may be 1 m or
+    # 15 m long, and a window of "so many samples either side" gives the
+    # short one a 3 m view with no roller in it -- the local curvature change
+    # is only legible against the rollers that cause it.
+    if sp:
+        a, b = sp
+        half = max(1.0 * float(c['spacing']), 2.0 * abs(px[b] - px[a]))
+        mid = 0.5 * (px[a] + px[b])
+        keep = [k for k in range(len(g)) if abs(px[k] - mid) <= half]
+        lo, hi = (min(keep), max(keep)) if keep else (0, len(g) - 1)
+    else:
+        lo, hi = 0, len(g) - 1
+    qx, qy = px[lo:hi + 1], py[lo:hi + 1]
+    ex.fill(*ring(qx, qy, -OD / 2.0, OD / 2.0), facecolor='#dff1f5',
+            edgecolor='#1f7a8c', lw=1.0, zorder=3, label='pipeline wall')
+    ex.fill(*ring(qx, qy, -(OD / 2.0 - tw), OD / 2.0 - tw),
+            facecolor='white', edgecolor='#9fc8d3', lw=0.7, zorder=4,
+            label='bore')
+    ex.plot(qx, qy, color='#1f7a8c', lw=0.9, ls='--', zorder=5,
+            label='pipe centreline, SOLVED')
+    ex.plot(col(g, 'arc_x')[lo:hi + 1], col(g, 'arc_y')[lo:hi + 1],
+            color='#b9c2cb', lw=1.0, ls='--', zorder=1,
+            label='roller-centreline locus')
+
+    if sp_sec:                       # a body that REPLACES the pipe section
+        a, b = sp_sec
+        half = np.array(col(g, 'OD_section')[a:b + 1]) / 2.0
+        ex.fill(*ring(px[a:b + 1], py[a:b + 1], -half, half),
+                facecolor='#e0b062', edgecolor='#8a5a00', lw=1.2, zorder=6,
+                alpha=0.95, label='component (thicker section)')
+    if sp_con and not sp_sec:        # a SHROUD: contact only, no section
+        a, b = sp_con
+        deep = np.array(col(g, 'y_contact')[a:b + 1])
+        ex.fill(*ring(px[a:b + 1], py[a:b + 1],
+                      np.full(len(deep), OD / 2.0), deep),
+                facecolor='#e0b062', edgecolor='#8a5a00', lw=1.2, zorder=6,
+                alpha=0.95, label='shroud (contact surface only)')
+    # ABOVE the wall fill (zorder 3-6), or the roller is drawn and then
+    # painted over -- which looked exactly like "no roller in this window".
+    for r in sta:
+        rx, ry = float(r['x']), float(r['y'])
+        if qx.min() <= rx <= qx.max():
+            ex.add_patch(Circle((rx, ry), float(r['radius']),
+                                facecolor='none', edgecolor='#2f6f3e',
+                                lw=1.4, zorder=8))
+            ex.annotate(r['station'], (rx, ry), textcoords='offset points',
+                        xytext=(0, 9), ha='center', fontsize=7,
+                        color='#2f6f3e', zorder=8)
+    # ASCENDING, like every other panel. Reversed here, the close-up read as
+    # a mirror image of the figure above it and still looked plausible --
+    # the same class of error as getting the world sign backwards.
+    ex.set_xlim(qx.min(), qx.max())
+    ymid = 0.5 * (qy.min() + qy.max())
+    span = max(qy.max() - qy.min(), 1e-6)
+    ex.set_ylim(ymid + 0.62 * span + OD, ymid - 0.62 * span - OD)
+    ex.set_aspect('auto')
+    ex.set_title('CLOSE-UP -- the vertical is EXAGGERATED, so the rollers '
+                 'draw as ellipses and no radius may be read off this panel',
+                 fontsize=9.5, loc='left')
+    ex.set_ylabel('y (m), down')
+    ex.grid(alpha=0.18)
+    ex.legend(fontsize=7.5, ncol=3, loc='lower right', framealpha=0.9)
+
+    # ---- panel 3: off the arc ---------------------------------------------
+    dx.plot(px, np.array(col(g, 'off_arc')) * 1e3, color='#1f7a8c', lw=1.6)
+    dx.axhline(0.0, color='#9aa5b1', lw=0.9, ls='--')
+    if sp_con:
+        lift = max(col(g, 'y_contact')) - OD / 2.0
+        if lift > 1e-6:
+            dx.axhline(lift * 1e3, color='#8a5a00', lw=0.9, ls=':')
+            dx.annotate(f'contact lift at a roller: {lift * 1e3:.1f} mm',
+                        (px.min(), lift * 1e3), textcoords='offset points',
+                        xytext=(8, -12), fontsize=8, color='#8a5a00',
+                        ha='left')
+    for r in sta:
+        dx.axvline(float(r['x']), color='#cfd8dc', lw=0.7, zorder=0)
+    dx.set_ylabel('off the arc (mm)')
+    dx.set_title('THE DEFORMED SHAPE, measured normal to the '
+                 'roller-centreline locus -- zero means sitting on the '
+                 'rollers, positive means held off them',
+                 fontsize=9.5, loc='left')
+    dx.grid(alpha=0.2)
+
+    # ---- panels 4 and 5: the strain staircase -----------------------------
+    out_band = [r for r in sc if not truth(r['in_band'])]
+    for panel, zoom in ((bx, False), (cx, True)):
+        for run in strain_runs(sc):
+            panel.plot([q[0] for q in run], [100 * q[1] for q in run],
+                       color='#1f7a8c', lw=1.5, solid_joinstyle='miter')
+        if out_band:
+            xs = [float(r['x_0']) for r in out_band] + \
+                 [float(r['x_1']) for r in out_band]
+            panel.axvspan(min(xs), max(xs), color='#d7dde3', alpha=0.5,
+                          zorder=0)
+        panel.set_ylabel('extreme-fibre strain (%)')
+        panel.grid(alpha=0.2)
+    peak = max(float(r['strain']) for r in sc if truth(r['in_band']))
+    bx.axhline(100 * peak, color='#c1121f', lw=0.8, ls=':')
+    bx.annotate(f'peak in band, this step: {100 * peak:.4f}%',
+                (px.min(), 100 * peak), textcoords='offset points',
+                xytext=(8, -12), fontsize=8, color='#c1121f', ha='left')
+    bx.set_title('strain, the whole model', fontsize=9.5, loc='left')
+    if sp:
+        a, b = sp
+        w = max(3.0, 1.6 * abs(px[b] - px[a]))
+        x_lo, x_hi = min(px[a], px[b]) - w, max(px[a], px[b]) + w
+        cx.set_xlim(x_lo, x_hi)              # ascending, like every panel
+        inw = [float(r['strain']) for r in sc
+               if x_lo <= float(r['x_0']) <= x_hi]
+        if inw:
+            cx.set_ylim(0, 100 * max(inw) * 1.22)
+    cx.set_title(
+        'zoom on the component -- '
+        + ('the junction STEP, at a scale where it can be read'
+           if jx else
+           'no section step, so no strain discontinuity: the rise is the '
+           'LIFT bending the pipe, not a change of section'),
+        fontsize=9.5, loc='left')
+    cx.set_xlabel('x (m)  --  +x toward the vessel, so the stinger is on '
+                  'the LEFT (starboard view, no flip)')
+
+    v = geo_s.get('profile_schema_version', '?')
+    fig.suptitle(
+        f'Drawn from the PROFILE ARTIFACT of case {c["case_id"]} and its '
+        f'schema alone -- no solver, no Scene, nothing imported from slay.\n'
+        f'profile schema {v}   {len(geo_all)} geometry rows, '
+        f'{len(sec_all)} section rows, {len(sta)} stations', fontsize=11)
+    fig.tight_layout(rect=(0, 0, 1, 0.975))
+    fig.savefig(out, dpi=140)
+    return dict(step=step, shift=shift, peak=peak, junctions=len(jx),
+                fig=fig, panels=dict(stinger=ax, closeup=ex, off_arc=dx,
+                                     strain=bx, zoom=cx))
+
+
 def main() -> int:
+    if '--profile' in sys.argv:
+        stem = sys.argv[sys.argv.index('--profile') + 1]
+        out = (sys.argv[sys.argv.index('--out') + 1] if '--out' in sys.argv
+               else str(REPO / 'docs' / 'diagrams'
+                        / f'{Path(stem).name}_profile.png'))
+        step = (int(sys.argv[sys.argv.index('--step') + 1])
+                if '--step' in sys.argv else None)
+        prof = load_profile(stem)
+        r = plot_profile(prof, out, step=step)
+        print(f'wrote {out}')
+        print(f'  step {r["step"]}  shift {r["shift"]:.3f} m  '
+              f'peak in band {100 * r["peak"]:.4f}%  '
+              f'junctions {r["junctions"]}')
+        return 0
+
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     src = args[0] if args else str(REPO / 'docs' / 'dataset'
                                    / 'dataset_components.csv')

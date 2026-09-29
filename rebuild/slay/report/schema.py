@@ -66,6 +66,14 @@ class Field:
                         # 'location' | 'step' | 'status'
     about: str
     pattern: bool = False
+    per: str = 'case'   # the GRAIN the value belongs to: 'case' (constant
+                        # through the file), 'position' (constant within one
+                        # passage step), 'sample' (varies row to row). A
+                        # long-format file is only checkable if the grain is
+                        # declared -- `profile.write` asserts every 'case'
+                        # column is in fact constant, which is how a writer
+                        # that leaks a per-row value into a case column is
+                        # caught by the file rather than by a reader's eye.
 
     @property
     def rx(self):
@@ -359,7 +367,7 @@ def as_dict() -> dict:
     def row(f):
         return dict(name=f.name, dtype=f.dtype, unit=f.unit,
                     quantity=f.quantity, role=f.role, about=f.about,
-                    pattern=f.pattern)
+                    pattern=f.pattern, per=f.per)
     return dict(schema_version=SCHEMA_VERSION,
                 fields=[row(f) for f in FIXED],
                 patterns=[row(f) for f in PATTERNS])

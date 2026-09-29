@@ -1598,3 +1598,75 @@
   detect: test_the_outline_is_resampled_off_the_component_not_the_mesh, test_a_contact_only_body_is_NOT_drawn_at_a_section_OD
   refs: [tools/plot_stinger.py]
   date: 2026-09-29
+
+- id: L075
+  area: process
+  class: ruling
+  symptom: >-
+    Asked for two stinger figures, the route taken was the GENERATING plotter:
+    it rebuilt the Scene and re-swept the whole passage for each figure, and
+    then the scalars quoted beside them were solved a THIRD time. Every one of
+    those scalars -- both envelopes, both shifts, both stiffness ratios, both
+    junction counts -- was already sitting in dataset_components.csv. The user
+    asked why it had taken so long and whether we were not supposed to be
+    plotting from a fixed schema. We were.
+  cause: >-
+    Two causes, and only one was carelessness. The reflex reached for the tool
+    that could already draw the figure. But the schema plotter could not have
+    drawn it either: the case-row contract deliberately excludes profiles, and
+    no per-position artifact existed. A rule that says "plot from the schema"
+    with no schema for what is being plotted is not a rule anyone can follow.
+  rule: >-
+    G13. A figure reads an artifact and never generates one. Generating and
+    drawing are separate programs -- tools/emit_profile.py solves and writes,
+    tools/plot_from_schema.py reads and draws, importing nothing from slay. A
+    quantity a figure needs and no contract carries is a MISSING COLUMN to be
+    added to a schema, never a solver call added to a plotter. Where a rule
+    cannot be followed, fix the gap rather than the person.
+  detect: test_the_plotter_imports_nothing_from_slay, test_the_five_panel_figure_draws_from_the_files_alone
+  refs: [docs/SLAY_BUILD_INSTRUCTION.md, tools/plot_from_schema.py, tools/emit_profile.py, rebuild/slay/report/profile_schema.py]
+  date: 2026-09-29
+
+- id: L076
+  area: measure
+  class: ruling
+  symptom: >-
+    Designing the profile artifact, the obvious move was one big table. It
+    does not work: geometry belongs to samples along the pipe, strain belongs
+    to ELEMENTS and is piecewise constant over their extents, and a roller
+    belongs to neither and does not move when the pipe does. One table forces
+    either a discriminator column -- three tables pretending to be one -- or
+    duplicating a node's coordinates onto every element that touches it.
+  cause: >-
+    Treating "a profile" as a single grain when it is three.
+  rule: >-
+    One table per grain, one sidecar per table, one version across all three,
+    joined by case_id. Declare the grain on every field (Field.per: case,
+    position, sample) and make it CHECKABLE: profile.write refuses a file
+    whose per=case column is not constant, or whose per=position column moves
+    within a step. Both failures would otherwise parse cleanly and draw a
+    plausible figure of the wrong thing.
+  detect: test_write_refuses_a_case_column_that_moves, test_write_refuses_a_position_column_that_moves_within_a_step, test_grains_are_what_they_claim
+  refs: [rebuild/slay/report/profile_schema.py, rebuild/slay/report/profile.py]
+  date: 2026-09-29
+
+- id: L077
+  area: plot
+  class: defect
+  symptom: >-
+    The first figure drawn from the artifact had panels 2 and 5 running
+    right-to-left while panels 1, 3 and 4 ran left-to-right, and no roller
+    appeared in the close-up at all.
+  cause: >-
+    set_xlim(max, min) reversed two panels, and the rollers were drawn at
+    zorder 2, under the pipe-wall fill at zorder 3. Both looked entirely
+    plausible: a mirrored close-up of a curve is still a curve, and "no roller
+    in this window" is a thing that can legitimately happen.
+  rule: >-
+    Every panel on a shared quantity runs the same direction, and anything
+    drawn ON the pipe goes ABOVE the fills that represent it. A mirrored axis
+    is the same class of error as getting the world sign backwards (L070) --
+    it produces a picture that cannot be told from the right one by eye.
+  detect: test_every_panel_runs_the_same_way_along_x, test_the_rollers_are_drawn_above_the_pipe_fills
+  refs: [tools/plot_from_schema.py, rebuild/tests/test_plot_from_profile.py]
+  date: 2026-09-29
