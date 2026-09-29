@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 23
+# entries: 24
 
 - id: T001
   date: 2026-09-21
@@ -589,3 +589,34 @@
     indistinguishable from bare pipe with every number still plausible.
   lesson: '-'
   refs: [rebuild/tests/test_centreline_lift.py, slay_overbend_v1_50.py]
+
+- id: T024
+  date: 2026-09-29
+  goal: >-
+    Close the five schema gaps found by plotting from the result file alone,
+    and regenerate the whole matrix against the new contract.
+  action: >-
+    SCHEMA_VERSION 1.1.0 adding contact_lift_max/_station/_step,
+    comp_s_lead/_trail, s_<station>, j*_side/_owner and
+    junction_snapshot_step/_shift. --resume added to the runner first, with a
+    refusal to continue a file written against a different schema version and
+    a cast of resumed rows back to their declared dtypes. 200 cases re-run.
+  case: 'R 60-150; spacing 6-12; OD 168.3-610; T 40-200 MT; L 1-10 xOD; t 1.5-4 x pipe'
+  outcome: success
+  evidence: >-
+    200 cases in 0.76 h: 185 ok, 12 partial, 3 failed -- the same tally as the
+    1.0.0 run, so the added columns changed no result. plain 85 rows x 89
+    cols, gdtp 115 rows x 217 cols, both schema 1.1.0 with zero undescribed
+    columns. contact_lift_max over 107 converged GD-TP cases: min 0.00550,
+    median 0.02100, max 0.08580, and NO zero-lift rows. GD-SH now reads
+    0.20320 m at SR2 step 4 where before it was indistinguishable from bare
+    pipe.
+  verdict: >-
+    The schema-only plotter can now do what it could not: break a junction
+    trace at the body boundary, because `side` is in the file, and report a
+    shroud as a component rather than as an empty panel. Two defects were
+    surfaced by the exercise rather than by any test -- the stiffness ratio
+    hardcoded to 1.0 for every archetype but GD-TP, and resumed rows arriving
+    as strings into a numeric formatter.
+  lesson: '-'
+  refs: [rebuild/slay/report/schema.py, tools/plot_from_schema.py, docs/dataset/]

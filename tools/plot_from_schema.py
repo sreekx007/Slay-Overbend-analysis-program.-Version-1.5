@@ -125,7 +125,7 @@ def peak_groups(schema, row):
     return out
 
 
-_PROBE = re.compile(r'^(j\d+)_(.+?)_(strain|moment|s)$')
+_PROBE = re.compile(r'^(j\d+)_(.+?)_(strain|moment|s|side)$')
 
 
 def junction_probes(row):
@@ -141,14 +141,35 @@ def junction_probes(row):
         if not mt or col.endswith('_env'):
             continue
         j, tag, kind = mt.groups()
-        acc.setdefault(j, {}).setdefault(tag, {})[kind] = num(row, col)
+        v = row.get(col) if kind == 'side' else num(row, col)
+        acc.setdefault(j, {}).setdefault(tag, {})[kind] = v
     out = {}
     for j, tags in acc.items():
-        pts = [(d['s'], d.get('strain'), d.get('moment'), tag)
+        pts = [(d['s'], d.get('strain'), d.get('moment'), tag,
+                d.get('side') or '')
                for tag, d in tags.items() if d.get('s') is not None]
         if pts:
             out[j] = sorted(pts)
     return out
+
+
+def by_body(pts):
+    """Split a junction's probes into runs of one BODY.
+
+    Strain STEPS at a section change, so a line drawn through it asserts a
+    gradient the model does not have. Before schema 1.1.0 the file carried
+    no `side`, so this could not be done from the file at all and the first
+    version of this plot joined points across the discontinuity.
+    """
+    runs, cur = [], []
+    for p in pts:
+        if cur and p[4] != cur[-1][4]:
+            runs.append(cur)
+            cur = []
+        cur.append(p)
+    if cur:
+        runs.append(cur)
+    return runs
 
 
 def station_envelopes(row):
@@ -175,19 +196,24 @@ def plot_case(row, schema, ax_j, ax_s):
     # -- junction profiles, in the units the schema declares ---------------
     if probes:
         ax2 = ax_j.twinx()
+        done = set()
         for k, (j, pts) in enumerate(sorted(probes.items())):
-            s = [p[0] for p in pts]
-            e = [p[1] for p in pts]
-            m = [p[2] for p in pts]
-            ls = '-' if k == 0 else '--'
-            if any(v is not None for v in e):
-                ax_j.plot(s, [100.0 * v if v is not None else None for v in e],
-                          ls, marker='o', ms=4, color='#1f7a8c',
-                          label=f'{j} strain')
-            if any(v is not None for v in m):
-                ax2.plot(s, [v / 1e3 if v is not None else None for v in m],
-                         ls, marker='s', ms=3.5, color='#8a5a00', alpha=0.8,
-                         label=f'{j} moment')
+            ls = '-' if k % 2 == 0 else '--'
+            for run in by_body(pts):
+                s = [p[0] for p in run]
+                e = [p[1] for p in run]
+                m = [p[2] for p in run]
+                lab_e = f'{j} strain' if j not in done else None
+                lab_m = f'{j} moment' if j not in done else None
+                done.add(j)
+                if any(v is not None for v in e):
+                    ax_j.plot(s, [100.0 * v if v is not None else None
+                                  for v in e], ls, marker='o', ms=4,
+                              color='#1f7a8c', label=lab_e)
+                if any(v is not None for v in m):
+                    ax2.plot(s, [v / 1e3 if v is not None else None
+                                 for v in m], ls, marker='s', ms=3.5,
+                             color='#8a5a00', alpha=0.8, label=lab_m)
         ax_j.set_ylabel(axis_label(schema, 'peak_strain') + '  [shown as %]')
         ax2.set_ylabel(axis_label(schema, 'peak_moment') + '  [shown as kN.m]')
         ax_j.set_xlabel('material coordinate s (' +
@@ -200,10 +226,21 @@ def plot_case(row, schema, ax_j, ax_s):
                        f'{row.get("n_junctions", "?")} junctions)',
                        fontsize=9.5, loc='left')
     else:
-        ax_j.text(0.5, 0.5, f'{cid}  {fam}\nno junctions in this case\n'
+        # NO SECTION STEP does not mean no component. A shroud lifts the pipe
+        # without stiffening it, so the LIFT is the whole of it -- and before
+        # schema 1.1.0 this file said nothing about that, leaving the case
+        # indistinguishable from bare pipe.
+        lift = num(row, 'contact_lift_max')
+        u = unit_of(schema, 'contact_lift_max')
+        extra = ('' if lift is None else
+                 f'\n\ncontact_lift_max = {lift:.5f} {u}'
+                 f'\nat {row.get("contact_lift_station", "?")}, '
+                 f'step {row.get("contact_lift_step", "?")}'
+                 f'\n\nthe body lifts the pipe without stiffening it:\n'
+                 f'that lift IS the component')
+        ax_j.text(0.5, 0.5, f'{cid}  {fam}\nno section step '
                             f'(stiffness ratio '
-                            f'{row.get("stiffness_ratio", "?")[:6]} -- the '
-                            f'body steps no section)',
+                            f'{row.get("stiffness_ratio", "?")[:6]}){extra}',
                   ha='center', va='center', fontsize=10, color='#5a6068',
                   transform=ax_j.transAxes)
         ax_j.set_xticks([])
