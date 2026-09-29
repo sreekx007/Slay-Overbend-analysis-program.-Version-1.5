@@ -82,6 +82,20 @@ JUNC_COL = '#c1121f'
 COMP_FILL = '#f2e3c4'
 
 
+def _rel(path):
+    """Path relative to the repo when it is inside it, else as given.
+
+    `relative_to` RAISES on a path outside the repo or on a relative one, so
+    a `--out` the caller typed relatively crashed the tool AFTER it had
+    already written the figure -- the worst kind of failure, since it looks
+    like nothing was produced.
+    """
+    try:
+        return Path(path).resolve().relative_to(REPO)
+    except ValueError:
+        return path
+
+
 def world(s, y, us, uy):
     """Model (s, y) + displacement -> world (x, y). See the module docstring."""
     return -(s + us), y + uy
@@ -262,6 +276,33 @@ def s_to_x(m, ms, U, shift=0.0):
     xv = np.array([world(at[i].s + shift, at[i].y,
                          U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in ids])
     return lambda q: np.interp(q, sv, xv)
+
+
+def normal_gap(m, ms, U, scene, shift=0.0):
+    """[(world x, normal gap)] -- how far the solved pipe sits OFF the arc.
+
+    THE ONLY WAY A SHROUD IS VISIBLE. GD-SH lifts the pipe 203 mm and adds
+    no stiffness, so on a panel spanning 20 m of stinger drop its entire
+    effect is a third of a pixel. Measured against the roller-centreline
+    locus instead, the lift is the whole signal.
+
+    The gap is taken along the path NORMAL at the station the material has
+    reached, not vertically: on the arc the two differ by cos(theta), which
+    at SR7 is 20%. Both vectors are WORLD here -- `scene.path` speaks world
+    and so does `world()` -- so the dot product needs no frame conversion,
+    which is the one thing to be careful of (L048).
+    """
+    at = {n.index: n for n in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    out = []
+    for i in ids:
+        s_sta = at[i].s + shift
+        px, py = world(s_sta, at[i].y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])
+        ax, ay = scene.path.position(s_sta)
+        nx, ny = scene.path.normal(s_sta)
+        out.append((px, (px - ax) * nx + (py - ay) * ny))
+    return out
 
 
 def pipe_xy(m, ms, U, shift=0.0):
@@ -483,7 +524,7 @@ def plot(cases, out):
                  'uplift.', fontsize=11)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {Path(out).relative_to(REPO)}')
+    print(f'\nwrote {_rel(out)}')
 
 
 def plot_component(c, out):
@@ -511,10 +552,11 @@ def plot_component(c, out):
     # where it sits or shows what happens there, never both. Panels 1 and 2
     # share x and answer "where"; panel 3 has its own window and answers
     # "what", at a scale where the junction step is legible.
-    fig, (ax, bx, cx) = plt.subplots(
-        3, 1, figsize=(13.5, 12.4),
-        gridspec_kw=dict(height_ratios=[1.25, 1.0, 1.0], hspace=0.28))
+    fig, (ax, dx, bx, cx) = plt.subplots(
+        4, 1, figsize=(13.5, 15.0),
+        gridspec_kw=dict(height_ratios=[1.15, 0.85, 0.9, 0.95], hspace=0.30))
     bx.sharex(ax)
+    dx.sharex(ax)
 
     # ---- panel 1: geometry ------------------------------------------------
     ss = np.linspace(min(t.s_arc for t in sc.stations),
@@ -582,7 +624,30 @@ def plot_component(c, out):
         f'({c["note"]}); lead at station {pos.s_lead:.3f} m',
         fontsize=10, loc='left')
 
-    # ---- panel 2: strain, on the same axis --------------------------------
+    # ---- panel 2: the deformed shape, where it can be seen ----------------
+    gaps = normal_gap(m, ms, U, sc, sh)
+    gx = [q[0] for q in gaps]
+    gy = [1000.0 * q[1] for q in gaps]
+    dx.plot(gx, gy, color='#1f7a8c', lw=1.8, zorder=5)
+    dx.axhline(0.0, color='#b9c2cb', lw=1.0, ls='--', zorder=2)
+    for st_ in sc.stations:
+        if st_.role is StationRole.CONTACT:
+            dx.axvline(st_.x, color='#2f6f3e', lw=0.8, alpha=0.35, zorder=1)
+    lift_mm = 1000.0 * max(
+        (t.lift for t in p.contacts), default=0.0)
+    if lift_mm > 1.0:
+        dx.axhline(lift_mm, color='#8a5a00', lw=1.0, ls=':', zorder=3)
+        dx.annotate(f'contact lift at a roller: {lift_mm:.1f} mm',
+                    (0.012, lift_mm), xycoords=('axes fraction', 'data'),
+                    ha='left', va='bottom', fontsize=8.5, color='#8a5a00',
+                    zorder=6)
+    dx.set_ylabel('off the arc (mm)')
+    dx.grid(alpha=0.2)
+    dx.set_title('THE DEFORMED SHAPE, measured normal to the roller-centreline '
+                 'locus -- zero means sitting on the rollers, positive means '
+                 'held off them', fontsize=9.5, loc='left')
+
+    # ---- panel 3: strain, on the same axis --------------------------------
     # THE TRACE IS BROKEN AT EVERY JUNCTION, and that is not decoration.
     # Strain STEPS across a section change -- the same moment on two section
     # moduli -- so a line drawn through it asserts a gradient the model does
@@ -677,8 +742,11 @@ def plot_component(c, out):
     cx.set_xlabel('x (m)   --   +x toward the vessel, so the stinger is on '
                   'the LEFT (starboard view, no flip)')
     cx.grid(alpha=0.2)
-    cx.set_title('zoom on the component -- the junction step, at a scale '
-                 'where it can be read', fontsize=9.5, loc='left')
+    cx.set_title(('zoom on the component -- the junction step, at a scale '
+                  'where it can be read') if juncs else
+                 ('zoom on the component -- no section step, so no strain '
+                  'discontinuity: the rise is the LIFT bending the pipe, '
+                  'not a change of section'), fontsize=9.5, loc='left')
     lead = [q for q in probes
             if q.offset_OD == 0.0 and q.side == 'pipe'
             and abs(q.s - max(j.s for j in juncs)) < 1e-6]
@@ -697,7 +765,7 @@ def plot_component(c, out):
     bx.set_ylabel('extreme-fibre strain (%)')
     bx.grid(alpha=0.2)
     bx.set_ylim(bottom=0.0)
-    bx.set_title('the whole model', fontsize=9.5, loc='left')
+    bx.set_title('strain, the whole model', fontsize=9.5, loc='left')
 
     handles = [plt.Line2D([], [], color='#1f7a8c', lw=2.2,
                           label='pipe / strain, SOLVED'),
@@ -719,15 +787,22 @@ def plot_component(c, out):
     bx.legend(handles=handles, fontsize=7.5, ncol=2, loc='upper right',
               framealpha=0.94)
 
+    # THE SUBTITLE MUST MATCH THE CASE. A shroud has no section step, so
+    # telling the reader the trace steps at a junction describes a figure
+    # that is not on the page -- and for GD-SH the lift is the whole story.
+    tail = ('Moment is continuous across a junction and strain is not -- so '
+            'the trace STEPS there, and the component body sits in a trough '
+            'rather than on a peak.') if juncs else (
+        f'This body steps NO section (I_comp/I_pipe = {ratio:.3f}): its whole '
+        f'effect is to hold the pipe {1000 * max((t.lift for t in p.contacts), default=0.0):.0f} mm '
+        f'off the rollers, which is what panel 2 shows.')
     fig.suptitle(
         'Component on the stinger, at the passage envelope. Every pipe and '
         'strain coordinate is a SOLVED value placed by MATERIAL position on '
-        'the deformed pipe.\nMoment is continuous across a junction and '
-        'strain is not -- so the trace STEPS there, and the component body '
-        'sits in a trough rather than on a peak.', fontsize=11)
+        'the deformed pipe.\n' + tail, fontsize=11)
     fig.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.055)
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {Path(out).relative_to(REPO)}')
+    print(f'\nwrote {_rel(out)}')
 
 
 def plot_passage(c, out):
@@ -931,7 +1006,7 @@ def plot_passage(c, out):
         'is discontinuous there.', fontsize=11)
     fig.subplots_adjust(left=0.065, right=0.895, top=0.925, bottom=0.05)
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {Path(out).relative_to(REPO)}')
+    print(f'\nwrote {_rel(out)}')
 
 
 def report_component(c):
