@@ -1,0 +1,793 @@
+{
+ "schema_version": "1.1.0",
+ "fields": [
+  {
+   "name": "schema_version",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "version of THIS contract; a reader that does not know it should say so rather than guess",
+   "pattern": false
+  },
+  {
+   "name": "case_id",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "unique per case",
+   "pattern": false
+  },
+  {
+   "name": "family",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "'plain' or the component archetype",
+   "pattern": false
+  },
+  {
+   "name": "design",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "'ofat' (one axis varied from the baseline) or 'lhs' (joint sample); the two answer different questions and must not be pooled without saying so",
+   "pattern": false
+  },
+  {
+   "name": "git_sha",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "commit the run was produced at",
+   "pattern": false
+  },
+  {
+   "name": "produced_at",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "identifier",
+   "about": "UTC timestamp, ISO 8601",
+   "pattern": false
+  },
+  {
+   "name": "R",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "stinger radius, to the ROLLER CENTRELINE",
+   "pattern": false
+  },
+  {
+   "name": "spacing",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "roller spacing",
+   "pattern": false
+  },
+  {
+   "name": "OD",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "pipeline outside diameter",
+   "pattern": false
+  },
+  {
+   "name": "t_wall",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "pipeline wall thickness",
+   "pattern": false
+  },
+  {
+   "name": "tension_mt",
+   "dtype": "float",
+   "unit": "MT",
+   "quantity": "force",
+   "role": "input",
+   "about": "lay tension in METRIC TONNES; the solver works in newtons (x 9806.65)",
+   "pattern": false
+  },
+  {
+   "name": "L_comp",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "component length; 0 for plain pipe",
+   "pattern": false
+  },
+  {
+   "name": "L_OD",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "ratio",
+   "role": "input",
+   "about": "component length in pipe diameters",
+   "pattern": false
+  },
+  {
+   "name": "t_ratio",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "ratio",
+   "role": "input",
+   "about": "component wall over pipe wall",
+   "pattern": false
+  },
+  {
+   "name": "contact_surface",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "input",
+   "about": "'centreline' (pipe centreline driven onto the R arc) or 'bottom' (R + r_roller + OD/2); they differ by about 1%",
+   "pattern": false
+  },
+  {
+   "name": "mode",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "input",
+   "about": "'A' carries state between positions (the real path, and the only mode that accumulates plasticity); 'B' solves each from virgin",
+   "pattern": false
+  },
+  {
+   "name": "material",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "input",
+   "about": "'j2', 'ro' or 'elastic'",
+   "pattern": false
+  },
+  {
+   "name": "step",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "input",
+   "about": "sweep step: the travel between sampled positions. Edge crossings are solved regardless of it, so the envelope does not depend on it (a whole-element step alone was 16% low)",
+   "pattern": false
+  },
+  {
+   "name": "stiffness_ratio",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "ratio",
+   "role": "derived",
+   "about": "component second moment over pipeline second moment, off the SOLVED sections; 1.0 when nothing steps",
+   "pattern": false
+  },
+  {
+   "name": "contact_lift_max",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "derived",
+   "about": "deepest CENTRELINE LIFT the component applies above the plain-pipe baseline. FOR A SHROUD THIS IS THE ENTIRE COMPONENT: GD-SH adds no bending stiffness, so without this column its case is indistinguishable from bare pipe. Measured 0.20320 m for GD-SH (= V - OD/2), 0.04400 for GD-TT, 0.02100 for GD-TP",
+   "pattern": false
+  },
+  {
+   "name": "contact_lift_station",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "roller under the deepest lift, over the whole passage",
+   "pattern": false
+  },
+  {
+   "name": "contact_lift_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "position index at which that lift was reached. At the LEADING EDGE of a tapered component the lift is correctly ZERO, so a single position proves nothing",
+   "pattern": false
+  },
+  {
+   "name": "comp_s_lead",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "component LEADING (stinger-side) edge in STATION coordinates, at the envelope position. Without it a reader has the component's length but not where it was",
+   "pattern": false
+  },
+  {
+   "name": "comp_s_trail",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "component TRAILING (vessel-side) edge, station coordinates, at the envelope position",
+   "pattern": false
+  },
+  {
+   "name": "junction_snapshot_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "position index the junction SNAPSHOT columns were taken at (the bare `j*` names; the `_env` ones are over all positions)",
+   "pattern": false
+  },
+  {
+   "name": "junction_snapshot_shift",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "step",
+   "about": "travel at that position",
+   "pattern": false
+  },
+  {
+   "name": "n_junctions",
+   "dtype": "int",
+   "unit": "-",
+   "quantity": "count",
+   "role": "derived",
+   "about": "section steps in the model; 0 for plain pipe and for a component that shares the pipe section",
+   "pattern": false
+  },
+  {
+   "name": "n_positions",
+   "dtype": "int",
+   "unit": "-",
+   "quantity": "count",
+   "role": "derived",
+   "about": "positions the passage scheduled",
+   "pattern": false
+  },
+  {
+   "name": "n_converged",
+   "dtype": "int",
+   "unit": "-",
+   "quantity": "count",
+   "role": "derived",
+   "about": "positions that converged",
+   "pattern": false
+  },
+  {
+   "name": "zone_s_max",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "derived",
+   "about": "reporting band cut, in STATION coordinates; everything at or beyond it is excluded (the D6 tip artefact)",
+   "pattern": false
+  },
+  {
+   "name": "zone_label",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "derived",
+   "about": "which stations the band drops",
+   "pattern": false
+  },
+  {
+   "name": "start_strain",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "peak strain at the START position -- what a single-position solve would have reported",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "peak extreme-fibre strain in the reporting band (a FRACTION: 0.0074 is 0.74%), worst over the whole passage",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_s_material",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of peak extreme-fibre strain in the reporting band (a FRACTION: 0.0074 is 0.74%) -- labels a point on the PIPE and travels with it",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_s_station",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "station coordinate of peak extreme-fibre strain in the reporting band (a FRACTION: 0.0074 is 0.74%) -- where on the STINGER, and the coordinate to compare across positions",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_station",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "nearest roller to peak extreme-fibre strain in the reporting band (a FRACTION: 0.0074 is 0.74%)",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_station_offset",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "signed distance from that roller, + toward the stinger",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "passage position index at which peak extreme-fibre strain in the reporting band (a FRACTION: 0.0074 is 0.74%) occurred",
+   "pattern": false
+  },
+  {
+   "name": "peak_strain_shift",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "step",
+   "about": "travel along the passage at that position",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment",
+   "dtype": "float",
+   "unit": "N.m",
+   "quantity": "moment",
+   "role": "value",
+   "about": "peak bending moment magnitude in the reporting band, worst over the whole passage",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_s_material",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of peak bending moment magnitude in the reporting band -- labels a point on the PIPE and travels with it",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_s_station",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "station coordinate of peak bending moment magnitude in the reporting band -- where on the STINGER, and the coordinate to compare across positions",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_station",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "nearest roller to peak bending moment magnitude in the reporting band",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_station_offset",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "signed distance from that roller, + toward the stinger",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "passage position index at which peak bending moment magnitude in the reporting band occurred",
+   "pattern": false
+  },
+  {
+   "name": "peak_moment_shift",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "step",
+   "about": "travel along the passage at that position",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "peak strain ON THE COMPONENT BODY, worst over the whole passage",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_s_material",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of peak strain ON THE COMPONENT BODY -- labels a point on the PIPE and travels with it",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_s_station",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "station coordinate of peak strain ON THE COMPONENT BODY -- where on the STINGER, and the coordinate to compare across positions",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_station",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "nearest roller to peak strain ON THE COMPONENT BODY",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_station_offset",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "signed distance from that roller, + toward the stinger",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "passage position index at which peak strain ON THE COMPONENT BODY occurred",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_strain_shift",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "step",
+   "about": "travel along the passage at that position",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment",
+   "dtype": "float",
+   "unit": "N.m",
+   "quantity": "moment",
+   "role": "value",
+   "about": "peak bending moment magnitude on the component body, worst over the whole passage",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_s_material",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of peak bending moment magnitude on the component body -- labels a point on the PIPE and travels with it",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_s_station",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "station coordinate of peak bending moment magnitude on the component body -- where on the STINGER, and the coordinate to compare across positions",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_station",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "nearest roller to peak bending moment magnitude on the component body",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_station_offset",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "signed distance from that roller, + toward the stinger",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_step",
+   "dtype": "int",
+   "unit": "index",
+   "quantity": "count",
+   "role": "step",
+   "about": "passage position index at which peak bending moment magnitude on the component body occurred",
+   "pattern": false
+  },
+  {
+   "name": "body_peak_moment_shift",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "step",
+   "about": "travel along the passage at that position",
+   "pattern": false
+  },
+  {
+   "name": "status",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "status",
+   "about": "'ok', 'partial n/m', or 'FAILED'; a case that did not fully converge is RECORDED, never dropped",
+   "pattern": false
+  },
+  {
+   "name": "error",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "status",
+   "about": "reason, when it failed",
+   "pattern": false
+  },
+  {
+   "name": "seconds",
+   "dtype": "float",
+   "unit": "s",
+   "quantity": "time",
+   "role": "status",
+   "about": "wall-clock solve time",
+   "pattern": false
+  },
+  {
+   "name": "n_active",
+   "dtype": "int",
+   "unit": "-",
+   "quantity": "count",
+   "role": "status",
+   "about": "contact slots active at the envelope position",
+   "pattern": false
+  },
+  {
+   "name": "n_slots",
+   "dtype": "int",
+   "unit": "-",
+   "quantity": "count",
+   "role": "status",
+   "about": "contact slots in all",
+   "pattern": false
+  }
+ ],
+ "patterns": [
+  {
+   "name": "s_[A-Za-z]+\\d*",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "ARC POSITION of that station along the stinger. Without these a consumer has `eps_SR2_env` but no way to place SR2, and deriving it from `spacing` assumes a layout the file never states",
+   "pattern": true
+  },
+  {
+   "name": "eps_[A-Za-z]+\\d*_env",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "worst strain at that station over the whole passage (MAX over positions, never a sum)",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_at_(pipe|component|na)_strain(_env)?",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "strain at a junction, on the named side; bare name is the SNAPSHOT at the envelope position, `_env` the worst at any position",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_at_(pipe|component|na)_moment(_env)?",
+   "dtype": "float",
+   "unit": "N.m",
+   "quantity": "moment",
+   "role": "value",
+   "about": "bending moment at a junction, on the named side",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_at_(pipe|component|na)_s",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of that junction probe",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_at_(pipe|component|na)_clamped",
+   "dtype": "bool",
+   "unit": "-",
+   "quantity": "flag",
+   "role": "status",
+   "about": "the section run ended before the requested point, so this is the nearest available datum rather than the requested one",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_[mp]\\d+(\\.\\d+)?OD_strain(_env)?",
+   "dtype": "float",
+   "unit": "-",
+   "quantity": "strain",
+   "role": "value",
+   "about": "strain at an offset from a junction, in pipe diameters; `m` is toward the vessel, `p` toward the stinger",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_[mp]\\d+(\\.\\d+)?OD_moment(_env)?",
+   "dtype": "float",
+   "unit": "N.m",
+   "quantity": "moment",
+   "role": "value",
+   "about": "bending moment at an offset from a junction",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_[mp]\\d+(\\.\\d+)?OD_s",
+   "dtype": "float",
+   "unit": "m",
+   "quantity": "length",
+   "role": "location",
+   "about": "material coordinate of that offset probe",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_[mp]\\d+(\\.\\d+)?OD_clamped",
+   "dtype": "bool",
+   "unit": "-",
+   "quantity": "flag",
+   "role": "status",
+   "about": "clamped to the nearest available datum",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_(at_(pipe|component|na)|[mp]\\d+(\\.\\d+)?OD)_side",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "which BODY the probe landed in -- 'pipe' or 'component'. Without it a consumer cannot tell which side of a section step a probe is on, and a profile drawn from the file connects points across a discontinuity that strain genuinely has",
+   "pattern": true
+  },
+  {
+   "name": "j\\d+_(at_(pipe|component|na)|[mp]\\d+(\\.\\d+)?OD)_owner",
+   "dtype": "str",
+   "unit": "-",
+   "quantity": "name",
+   "role": "location",
+   "about": "the component that owns the surface there, or `pipe`",
+   "pattern": true
+  }
+ ],
+ "columns": [
+  "schema_version",
+  "case_id",
+  "family",
+  "design",
+  "git_sha",
+  "produced_at",
+  "R",
+  "spacing",
+  "OD",
+  "t_wall",
+  "tension_mt",
+  "L_comp",
+  "L_OD",
+  "t_ratio",
+  "contact_surface",
+  "mode",
+  "material",
+  "step",
+  "stiffness_ratio",
+  "contact_lift_max",
+  "contact_lift_station",
+  "contact_lift_step",
+  "comp_s_lead",
+  "comp_s_trail",
+  "junction_snapshot_step",
+  "junction_snapshot_shift",
+  "n_junctions",
+  "n_positions",
+  "n_converged",
+  "zone_s_max",
+  "zone_label",
+  "start_strain",
+  "peak_strain",
+  "peak_strain_s_material",
+  "peak_strain_s_station",
+  "peak_strain_station",
+  "peak_strain_station_offset",
+  "peak_strain_step",
+  "peak_strain_shift",
+  "peak_moment",
+  "peak_moment_s_material",
+  "peak_moment_s_station",
+  "peak_moment_station",
+  "peak_moment_station_offset",
+  "peak_moment_step",
+  "peak_moment_shift",
+  "body_peak_strain",
+  "body_peak_strain_s_material",
+  "body_peak_strain_s_station",
+  "body_peak_strain_station",
+  "body_peak_strain_station_offset",
+  "body_peak_strain_step",
+  "body_peak_strain_shift",
+  "body_peak_moment",
+  "body_peak_moment_s_material",
+  "body_peak_moment_s_station",
+  "body_peak_moment_station",
+  "body_peak_moment_station_offset",
+  "body_peak_moment_step",
+  "body_peak_moment_shift",
+  "status",
+  "error",
+  "seconds",
+  "n_active",
+  "n_slots",
+  "eps_SR1_env",
+  "eps_SR2_env",
+  "eps_SR3_env",
+  "eps_SR4_env",
+  "eps_SR5_env",
+  "eps_SR6_env",
+  "eps_SR7_env",
+  "eps_VR1_env",
+  "eps_VR2_env",
+  "eps_VR3_env",
+  "eps_VR4_env",
+  "eps_VR5_env",
+  "s_SR1",
+  "s_SR2",
+  "s_SR3",
+  "s_SR4",
+  "s_SR5",
+  "s_SR6",
+  "s_SR7",
+  "s_VR1",
+  "s_VR2",
+  "s_VR3",
+  "s_VR4",
+  "s_VR5"
+ ],
+ "n_rows": 26,
+ "unknown_columns": []
+}
