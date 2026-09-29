@@ -134,6 +134,46 @@ def build_component_ils(arch_id='ILS-TP', OD=None, t_wall=None,
     return ils_builder.build_ils(spec)
 
 
+def passage_cases(arch_id='ILS-TP', R=85.0, spacing=9.0,
+                  tension_mt=TENSION_MT, L_OD=None, t_ratio=None, step=None):
+    """EVERY solved position of the passage, not just the envelope.
+
+    One sweep, one list. The component's whole traverse is the thing being
+    looked at, so re-solving per position would be both slow and a chance
+    for two figures to disagree about what was run.
+    """
+    from slay.report import passage as rp
+    from slay.study import sweep
+
+    ils = build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
+    OD = ils.assembly.pipe.OD_pipe
+    L = ils.extent[1] - ils.extent[0]
+    step = 2.0 * OD if step is None else step
+    sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L)
+    s_centre = sweep.start_centre(sc, L)
+    positions = sweep.run(sc, ils, L_comp=L, step=step,
+                          tension=tension_mt * TON, material=material('j2'))
+    recs = rp.measure(positions, sc, L_comp=L)
+    env = rp.envelope(recs)
+    lo, hi = sweep.buffer_span(sc)
+    m = build_model(sc, ils, s_centre=s_centre,
+                    extra_stations=sweep._required_stations(sc))
+    out = []
+    for pos in positions:
+        if not pos.converged:
+            out.append(None)
+            continue
+        pr = build_problem(m, sc, shift=pos.shift, assembly=ils.assembly,
+                           ils=ils, s_centre=s_centre,
+                           tension=tension_mt * TON, material=material('j2'),
+                           vertical_at=(lo,), elastic_spans=((lo, hi),))
+        ms, _mdl, _ix = mesh_of_problem(pr)
+        out.append(dict(problem=pr, ms=ms, position=pos))
+    return dict(scene=sc, model=m, steps=out, records=recs, envelope=env,
+                s_centre=s_centre, L_comp=L, OD=OD, arch_id=arch_id,
+                tension_mt=tension_mt)
+
+
 def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
                    tension_mt=TENSION_MT, shift=None, L_OD=None,
                    t_ratio=None, step=None):
@@ -181,32 +221,45 @@ def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
                 n_positions=len(positions))
 
 
-def s_to_x(m, ms, U):
+def s_to_x(m, ms, U, shift=0.0):
     """Interpolator: material `s` -> world `x` on the SOLVED pipe.
 
-    Needed because strains are reported at MATERIAL element midpoints while
-    the figure is drawn in world coordinates, and the pipe slides metres over
-    the rollers. Placing a strain mark at its undeformed `s` would put it
-    beside the pipe rather than on it.
+    THE SHIFT BELONGS HERE, and leaving it out drew the pipe a whole `shift`
+    short of the rollers it is sitting on. The solver never applies the
+    rigid-body translation of a pipeline advancing down the stinger, and it
+    is right not to: sliding a pipe along its own axis produces no strain, so
+    nothing in the model drives it. The shape and the strain are therefore
+    correct without it. But the PICTURE is in world coordinates, where that
+    translation is exactly what puts the material under its roller.
+
+    Measured before the fix, at shift = 1.000 m: SR2 sits at x = -8.983 and
+    the material it constrains was drawn at -7.998, every station off by the
+    shift. The component then appeared a metre short of the roller it had
+    already reached.
+
+        x_world = -(s + shift + u_s)
     """
     at = {n.index: n for n in m.nodes}
     ids = sorted({i for e in m.elements if e.owner == 'pipeline'
                   for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
     sv = np.array([at[i].s for i in ids])
-    xv = np.array([world(at[i].s, at[i].y,
+    xv = np.array([world(at[i].s + shift, at[i].y,
                          U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in ids])
     return lambda q: np.interp(q, sv, xv)
 
 
-def pipe_xy(m, ms, U):
-    """World polyline of the DEFORMED pipe, in node order along the header."""
+def pipe_xy(m, ms, U, shift=0.0):
+    """World polyline of the DEFORMED pipe, in node order along the header.
+
+    `shift` is the passage translation the solver omits -- see `s_to_x`.
+    """
     at = {n.index: n for n in m.nodes}
     ids = sorted({i for e in m.elements if e.owner == 'pipeline'
                   for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
     xs, ys = [], []
     for i in ids:
         n = at[i]
-        x, y = world(n.s, n.y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])
+        x, y = world(n.s + shift, n.y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])
         xs.append(x); ys.append(y)
     return np.array(xs), np.array(ys), ids
 
@@ -434,7 +487,8 @@ def plot_component(c, out):
     sc, m, p, r = c['scene'], c['model'], c['problem'], c['result']
     ms, U, OD = c['ms'], c['result'].U, c['OD']
     L, s_c, pos = c['L_comp'], c['s_centre'], c['position']
-    fx = s_to_x(m, ms, U)
+    sh = pos.shift
+    fx = s_to_x(m, ms, U, sh)
 
     # THREE PANELS, because one cannot do this job. The component is about a
     # metre on a hundred-metre stinger, so a single shared axis either shows
@@ -470,7 +524,7 @@ def plot_component(c, out):
                         arrowprops=dict(arrowstyle='-|>', lw=1.1, color=col,
                                         shrinkA=0, shrinkB=0), zorder=4)
 
-    px, py, _ids = pipe_xy(m, ms, U)
+    px, py, _ids = pipe_xy(m, ms, U, sh)
     ax.plot(px, py, color='#1f7a8c', lw=2.2, zorder=5)
 
     # THE COMPONENT, drawn from the SOLVED pipe over its own material span --
@@ -481,10 +535,10 @@ def plot_component(c, out):
                   for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
     seg = [i for i in ids if s_lo - 1e-9 <= at[i].s <= s_hi + 1e-9]
     if seg:
-        sx = [world(at[i].s, at[i].y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0]
-              for i in seg]
-        sy = [world(at[i].s, at[i].y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])[1]
-              for i in seg]
+        sx = [world(at[i].s + sh, at[i].y,
+                    U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in seg]
+        sy = [world(at[i].s + sh, at[i].y,
+                    U[dof(ms, i, 0)], U[dof(ms, i, 1)])[1] for i in seg]
         ax.plot(sx, sy, color='#8a5a00', lw=6.5, solid_capstyle='butt',
                 zorder=6, alpha=0.9)
 
@@ -519,15 +573,25 @@ def plot_component(c, out):
     # not have, and would read as a smooth ramp into the component. It is the
     # same refusal `report.junction` makes when it declines to interpolate
     # across the step; the figure must not do what the extraction forbids.
+    # STRAIN IS PIECEWISE CONSTANT PER ELEMENT, so each element is drawn over
+    # its OWN EXTENT rather than as a point at its midpoint. Joining midpoints
+    # already interpolates -- and it left a half-element GAP between the last
+    # element of a run and the junction, which read as missing data rather
+    # than as a step. Drawn over extents, adjacent runs meet exactly at the
+    # junction and the only gap left is the vertical jump, which is the
+    # discontinuity itself.
     secs = {q.index: q for q in p.sections}
     s_of = {i: sv for (i, sv, _y) in p.nodes}
+    ends = {idx: sorted((s_of[n1], s_of[n2]))
+            for (idx, n1, n2, _o, _l) in p.elements}
     runs, cur, last_od = [], [], None
     for (idx, q, e) in sorted(r.strains, key=lambda t: t[1]):
         od = secs[idx].OD if idx in secs else last_od
         if last_od is not None and od is not None and abs(od - last_od) > 1e-9:
             runs.append(cur)
             cur = []
-        cur.append((q, e))
+        lo_s, hi_s = ends.get(idx, (q, q))
+        cur.append((lo_s, hi_s, e))
         last_od = od
     if cur:
         runs.append(cur)
@@ -542,13 +606,16 @@ def plot_component(c, out):
     # the tallest thing on the plot and reads as the answer. It is exactly
     # what the reporting band exists to remove.
     s_cut = env.zone_s_max
-    x_cut = fx(s_cut - pos.shift)
+    x_cut = fx(s_cut - sh)
     for panel in (bx, cx):
         for run in runs:
-            if len(run) < 2:
+            if not run:
                 continue
-            panel.plot(fx(np.array([q for q, _e in run])),
-                       100.0 * np.array([e for _q, e in run]),
+            qs, es = [], []
+            for lo_s, hi_s, e in run:
+                qs += [lo_s, hi_s]
+                es += [e, e]
+            panel.plot(fx(np.array(qs)), 100.0 * np.array(es),
                        color='#1f7a8c', lw=1.7, zorder=5)
         panel.axhline(100 * env.peak_strain, color='#c1121f', lw=0.8,
                       ls=':', alpha=0.75)
@@ -647,6 +714,210 @@ def plot_component(c, out):
     print(f'\nwrote {Path(out).relative_to(REPO)}')
 
 
+def plot_passage(c, out):
+    """Every step of the sweep, on one figure, plus a zoom that follows the
+    component across its whole traverse.
+
+    COLOUR IS THE POSITION, and the envelope is drawn heavier than the rest.
+    The question the figure answers is where in the passage the worst case
+    falls -- so every step has to be visible at once, and the one that wins
+    has to be findable without counting.
+    """
+    import matplotlib
+    matplotlib.use('Agg')
+    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle
+
+    from slay.report import junction as jr
+
+    sc, m, L, s_c = c['scene'], c['model'], c['L_comp'], c['s_centre']
+    OD, steps, env = c['OD'], c['steps'], c['envelope']
+    live = [st for st in steps if st]
+
+    fig, (ax, bx, cx) = plt.subplots(
+        3, 1, figsize=(14.0, 13.0),
+        gridspec_kw=dict(height_ratios=[1.2, 1.0, 1.15], hspace=0.30))
+    spans = []
+    cmap = plt.get_cmap('viridis')
+    n = max(1, len(live) - 1)
+    col = {st['position'].index: cmap(0.08 + 0.84 * i / n)
+           for i, st in enumerate(live)}
+
+    # ---- panel 1: the stinger, with the component at every position -------
+    ss = np.linspace(min(t.s_arc for t in sc.stations),
+                     max(t.s_arc for t in sc.stations), 400)
+    lx, ly = zip(*(sc.path.position(v) for v in ss))
+    ax.plot(lx, ly, color='#b9c2cb', lw=1.0, ls='--', zorder=1)
+    for st_ in sc.stations:
+        c_ = ('#111111' if st_.role is StationRole.FIXED
+              else '#2f6f3e' if st_.role is StationRole.CONTACT else OFFSET_COL)
+        ax.add_patch(Circle((st_.x, st_.y), st_.radius, facecolor='none',
+                            edgecolor=c_, lw=1.4, zorder=4))
+        ax.annotate(st_.name, (st_.x, st_.y), textcoords='offset points',
+                    xytext=(0, -13), ha='center', fontsize=7, color=c_)
+
+    at = {nd.index: nd for nd in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    seg = [i for i in ids if s_c - L / 2 - 1e-9 <= at[i].s <= s_c + L / 2 + 1e-9]
+    for st in live:
+        pos, ms = st['position'], st['ms']
+        U, sh = pos.result.U, pos.shift
+        px, py, _ = pipe_xy(m, ms, U, sh)
+        is_env = pos.index == env.index
+        ax.plot(px, py, color=col[pos.index], lw=2.2 if is_env else 0.8,
+                alpha=1.0 if is_env else 0.45, zorder=6 if is_env else 3)
+        if seg:
+            sx = [world(at[i].s + sh, at[i].y,
+                        U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in seg]
+            sy = [world(at[i].s + sh, at[i].y,
+                        U[dof(ms, i, 0)], U[dof(ms, i, 1)])[1] for i in seg]
+            ax.plot(sx, sy, color=col[pos.index], lw=7.0,
+                    solid_capstyle='butt', zorder=7, alpha=0.95)
+    ax.set_aspect('equal')
+    ax.invert_yaxis()
+    ax.grid(alpha=0.2)
+    ax.set_ylabel('y (m), down')
+    ax.set_title(
+        f'{c["arch_id"]}  --  R = {sc.path.R:.0f} m, spacing '
+        f'{sc.spacing:.0f} m, {c["tension_mt"]:.0f} MT, L = {L:.3f} m '
+        f'({L / OD:.2g} x OD)\nall {len(live)} solved positions; the thick '
+        f'band is the component, the heavy pipe is the envelope position',
+        fontsize=10, loc='left')
+
+    # ---- panels 2 and 3: strain at every position -------------------------
+    for st in live:
+        pos, pr, ms = st['position'], st['problem'], st['ms']
+        fx = s_to_x(m, ms, pos.result.U, pos.shift)
+        secs = {q.index: q for q in pr.sections}
+        s_of = {i: sv for (i, sv, _y) in pr.nodes}
+        ends = {idx: sorted((s_of[n1], s_of[n2]))
+                for (idx, n1, n2, _o, _l) in pr.elements}
+        runs, cur, last_od = [], [], None
+        for (idx, q, e) in sorted(pos.result.strains, key=lambda t: t[1]):
+            od = secs[idx].OD if idx in secs else last_od
+            if last_od is not None and od is not None \
+                    and abs(od - last_od) > 1e-9:
+                runs.append(cur)
+                cur = []
+            lo_s, hi_s = ends.get(idx, (q, q))
+            cur.append((lo_s, hi_s, e))
+            last_od = od
+        if cur:
+            runs.append(cur)
+        is_env = pos.index == env.index
+        for panel in (bx, cx):
+            for run in runs:
+                if not run:
+                    continue
+                qs, es = [], []
+                for lo_s, hi_s, e in run:
+                    qs += [lo_s, hi_s]
+                    es += [e, e]
+                panel.plot(fx(np.array(qs)), 100.0 * np.array(es),
+                           color=col[pos.index], lw=2.0 if is_env else 0.9,
+                           alpha=1.0 if is_env else 0.55,
+                           zorder=7 if is_env else 4)
+        # The component's span at this position is recorded for the ladder
+        # drawn under the zoom axis. Nine translucent axvspans stacked on top
+        # of each other made the panel unreadable and hid the traces they
+        # were meant to locate.
+        spans.append((pos.index, fx(s_c + L / 2), fx(s_c - L / 2),
+                      pos.shift))
+
+    # THE EXCLUDED BAND IS THE STINGER END. The zone drops the last three
+    # stinger rollers, which are HIGH `s` and therefore the most NEGATIVE
+    # world x. Shading from `min(s)` instead covered the entire vessel side --
+    # the opposite half of the model, and the half that is in the band.
+    s_cut = env.zone_s_max
+    p0 = live[0]['position']
+    fx_env = s_to_x(m, live[0]['ms'], p0.result.U, p0.shift)
+    x_cut = fx_env(s_cut - p0.shift)
+    x_tip = min(fx_env(q) for (_i, q, _e) in p0.result.strains) - 1.0
+    bx.axvspan(x_tip, x_cut, color='#c9ccd1', alpha=0.40, zorder=1)
+    bx.annotate('outside the reporting band\n(last 3 stinger rollers)',
+                (0.5 * (x_tip + x_cut), 0.95),
+                xycoords=('data', 'axes fraction'), ha='center', va='top',
+                fontsize=7.5, color='#5a6068', zorder=6)
+    bx.axhline(100 * env.peak_strain, color='#c1121f', lw=0.8, ls=':',
+               alpha=0.8)
+    bx.set_ylabel('extreme-fibre strain (%)')
+    bx.set_ylim(bottom=0.0)
+    bx.grid(alpha=0.2)
+    bx.set_title('the whole model, every position (grey = outside the '
+                 'reporting band)', fontsize=9.5, loc='left')
+
+    # zoom: the component's WHOLE TRAVERSE, not one position's neighbourhood
+    first, last = live[0], live[-1]
+    fx_a = s_to_x(m, first['ms'], first['position'].result.U,
+                  first['position'].shift)
+    fx_b = s_to_x(m, last['ms'], last['position'].result.U,
+                  last['position'].shift)
+    pad = max(4.0 * OD, 0.6 * L)
+    cx.set_xlim(fx_b(s_c + L / 2) - pad, fx_a(s_c - L / 2) + pad)
+    lo_x, hi_x = cx.get_xlim()
+    vals = []
+    for st in live:
+        fx = s_to_x(m, st['ms'], st['position'].result.U, st['position'].shift)
+        for (_i, q, e) in st['position'].result.strains:
+            if lo_x <= fx(q) <= hi_x:
+                vals.append(100 * e)
+    top = 1.12 * max(vals) if vals else 1.0
+    lad_hi, lad_lo = -0.02 * top, -0.26 * top
+    cx.set_ylim(lad_lo - 0.02 * top, top)
+    cx.axhline(0.0, color='#555b61', lw=0.8, alpha=0.6)
+    # THE TRAVERSE LADDER: one rung per position, showing where the component
+    # sat. Read down the rungs and the component walks across the rollers.
+    for k, (idx, xa, xb, sh) in enumerate(spans):
+        y = lad_hi - (lad_hi - lad_lo) * (k + 0.5) / max(1, len(spans))
+        heavy = idx == env.index
+        cx.plot([xa, xb], [y, y], color=col[idx], lw=5.0 if heavy else 3.2,
+                solid_capstyle='butt', alpha=1.0 if heavy else 0.75,
+                zorder=6)
+        if heavy:
+            cx.annotate(f'envelope, shift {sh:.3f} m', (0.5 * (xa + xb), y),
+                        textcoords='offset points', xytext=(0, -11),
+                        ha='center', va='top', fontsize=7.5,
+                        color='#8d0801', zorder=8)
+    cx.annotate('component position, by step', (0.004, 0.13),
+                xycoords='axes fraction', ha='left', va='center',
+                fontsize=8, color='#5a6068')
+    cx.axhline(100 * env.peak_strain, color='#c1121f', lw=0.8, ls=':',
+               alpha=0.8)
+    for st_ in sc.stations:
+        if lo_x <= st_.x <= hi_x:
+            cx.axvline(st_.x, color='#2f6f3e', lw=1.0, alpha=0.5)
+            cx.annotate(st_.name, (st_.x, 0.97), xycoords=('data', 'axes fraction'),
+                        ha='center', va='top', fontsize=8, color='#2f6f3e')
+    cx.set_ylabel('extreme-fibre strain (%)')
+    cx.set_xlabel('x (m)   --   +x toward the vessel, so the stinger is on '
+                  'the LEFT (starboard view, no flip)')
+    cx.grid(alpha=0.2)
+    cx.set_title('zoom: the component across its whole traverse -- the '
+                 'ladder below the axis is where it sat at each step',
+                 fontsize=9.5, loc='left')
+
+    sm = plt.cm.ScalarMappable(
+        cmap=cmap, norm=plt.Normalize(0.0, live[-1]['position'].shift))
+    sm.set_array([])
+    cax = fig.add_axes((0.915, 0.08, 0.013, 0.42))
+    cbar = fig.colorbar(sm, cax=cax)
+    cbar.set_label('travel along the passage (m)', fontsize=8.5)
+    cbar.ax.tick_params(labelsize=7.5)
+
+    fig.suptitle(
+        f'{c["arch_id"]} through the whole passage. Envelope '
+        f'{100 * env.peak_strain:.4f}% at position {env.index} '
+        f'(shift {env.shift:.3f} m); the start position reads '
+        f'{100 * c["records"][0].peak_strain:.4f}%.\n'
+        'Every coordinate is a SOLVED value placed by material position on '
+        'the deformed pipe; traces break at each section step because strain '
+        'is discontinuous there.', fontsize=11)
+    fig.subplots_adjust(left=0.065, right=0.895, top=0.925, bottom=0.05)
+    fig.savefig(out, dpi=140)
+    print(f'\nwrote {Path(out).relative_to(REPO)}')
+
+
 def report_component(c):
     from slay.report import junction as jr
     p, pos = c['problem'], c['position']
@@ -685,6 +956,22 @@ def main() -> int:
     if '--archetype' in sys.argv:
         aid = sys.argv[sys.argv.index('--archetype') + 1]
         tension = arg('--tension', float, TENSION_MT)
+        if '--all-steps' in sys.argv:
+            if '--out' not in sys.argv:
+                out = (REPO / 'docs' / 'diagrams'
+                       / f'passage_{aid.lower()}.png')
+            print(f'\n=== {aid}, every step of the passage '
+                  f'(R = {R:.0f} m) ===')
+            c = passage_cases(aid, R=R, spacing=arg('--spacing', float, 9.0),
+                              tension_mt=tension, L_OD=arg('--L-OD'),
+                              t_ratio=arg('--t-ratio'), step=arg('--step'))
+            for st, rec in zip(c['steps'], c['records']):
+                mark = ' <- envelope' if rec.index == c['envelope'].index else ''
+                print(f'  pos {rec.index:2d}  shift {rec.shift:7.3f} m  '
+                      f'{rec.status:>10}  peak {100 * rec.peak_strain:7.4f}%  '
+                      f'lead {rec.s_lead:7.3f}{mark}')
+            plot_passage(c, out)
+            return 0
         if '--out' not in sys.argv:
             out = REPO / 'docs' / 'diagrams' / f'stinger_{aid.lower()}.png'
         print(f'\n=== {aid} on the stinger (R = {R:.0f} m) ===')

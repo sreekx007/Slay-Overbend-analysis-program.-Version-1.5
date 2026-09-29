@@ -1482,3 +1482,71 @@
   detect: '-'
   refs: [tools/plot_stinger.py, rebuild/slay/report/junction.py]
   date: 2026-09-28
+
+- id: L070
+  area: plot
+  class: defect
+  symptom: >-
+    In the component-on-stinger figure the component was drawn a full metre
+    short of the roller it was sitting on. Read off the plot, the peak strain
+    appeared to occur BEFORE the component reached SR2. Spotted by eye, from
+    the figure, not by any check.
+  cause: >-
+    The world mapping was x = -(s + u_s), with no shift term. The solver
+    never applies the rigid-body translation of a pipeline advancing down the
+    stinger, and it is RIGHT not to: sliding a pipe along its own axis
+    produces no strain, so nothing in the model drives it, and the shape and
+    strain are correct without it. But the picture is in world coordinates,
+    where that translation is exactly what puts the material under its
+    roller. Measured at shift = 1.000 m: SR2 sits at x = -8.983 and the
+    material it constrains was drawn at -7.998 -- every station off by the
+    shift, to three decimal places.
+  rule: >-
+    A figure of a swept position maps material to world as
+    x = -(s + shift + u_s). The shift is a property of the PICTURE, not of
+    the solution, and its absence is invisible in every residual and every
+    strain check -- only the drawing shows it. After the fix the leading edge
+    draws at -8.998 against SR2 at -8.983, the 15 mm residual being the
+    pipe's own tangential displacement.
+  detect: test_the_drawn_material_sits_under_its_own_roller, test_omitting_the_shift_is_what_breaks_it, test_the_pipe_polyline_carries_the_shift_too
+  refs: [tools/plot_stinger.py, rebuild/tests/test_plot_placement.py]
+  date: 2026-09-29
+
+- id: L071
+  area: plot
+  class: ruling
+  symptom: >-
+    Joining element strains at their MIDPOINTS left a half-element gap
+    between the last element of a section run and the junction, so the
+    discontinuity read as missing data rather than as a step.
+  cause: >-
+    Strain is piecewise constant per element, so a line through midpoints is
+    already an interpolation, and it cannot reach the element boundary where
+    the section changes.
+  rule: >-
+    Draw each element over its OWN EXTENT -- a staircase, not a polyline
+    through midpoints. Adjacent runs then meet exactly at the junction and
+    the only gap left is the vertical jump, which IS the discontinuity.
+  detect: '-'
+  refs: [tools/plot_stinger.py]
+  date: 2026-09-29
+
+- id: L072
+  area: plot
+  class: defect
+  symptom: >-
+    On the all-steps passage figure the "outside the reporting band" shading
+    covered the entire VESSEL side of the model -- the half that is IN the
+    band -- and left the excluded stinger tip unshaded.
+  cause: >-
+    The span was drawn from fx(min(s_material)) to the cut. Minimum MATERIAL
+    s is the vessel end, which maps to the most POSITIVE world x, so the
+    shading ran the wrong way across the model. The zone drops the last three
+    STINGER rollers: high s, and therefore the most NEGATIVE x.
+  rule: >-
+    Take the drawn extreme in the coordinate being drawn: min over fx(s), not
+    fx over min(s). The world mapping reverses sign, so an extremum in
+    material coordinates is the opposite extremum in world coordinates.
+  detect: '-'
+  refs: [tools/plot_stinger.py]
+  date: 2026-09-29
