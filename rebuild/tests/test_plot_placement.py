@@ -98,3 +98,94 @@ def test_the_excluded_band_covers_the_stinger_end_not_the_vessel_end(swept):
     assert hi < 0.0, 'and stops on the stinger side of the deck, not past it'
     # The vessel end must be OUTSIDE the shaded band -- the defect put it in.
     assert max(xs) > hi, 'the vessel end is in the reporting band'
+
+
+# -- drawing the bodies ----------------------------------------------------
+
+def test_the_offset_is_perpendicular_not_vertical():
+    """The pipe turns through 0.64 rad over the stinger, so a wall drawn by
+    adding OD/2 to `y` would be up to 20% narrow at SR7 and perpendicular to
+    the pipe nowhere on the arc."""
+    import math
+    t = [i * 0.1 for i in range(40)]
+    px = [q for q in t]
+    py = [q for q in t]                       # a 45 degree line
+    ox, oy = ps.offset_polyline(px, py, 1.0)
+    mid = len(t) // 2
+    dx, dy = ox[mid] - px[mid], oy[mid] - py[mid]
+    assert math.hypot(dx, dy) == pytest.approx(1.0, abs=1e-6), \
+        'the offset distance is the distance asked for'
+    assert dx * 1.0 + dy * 1.0 == pytest.approx(0.0, abs=1e-6), \
+        'and it is perpendicular to the line, not vertical'
+
+
+def test_the_offset_points_toward_the_rollers():
+    """Node order runs in -x, so the normal must come out +y (down), the
+    side the rollers are on. The opposite sign would hang every component
+    above the pipe."""
+    px = [-q for q in range(20)]
+    py = [0.0] * 20
+    _ox, oy = ps.offset_polyline(px, py, 0.2)
+    assert oy[5] > 0.0
+
+
+_RING_CACHE = {}
+
+
+def _rings(aid):
+    """Cached: `component_case` solves a WHOLE PASSAGE, and five tests asking
+    for it separately added about two minutes to the suite for no extra
+    coverage."""
+    if aid not in _RING_CACHE:
+        c = ps.component_case(aid)
+        _RING_CACHE[aid] = (c, ps.body_outlines(
+            c['model'], c['ms'], c['result'].U, c['ils'], c['s_centre'],
+            c['OD'], c['position'].shift))
+    return _RING_CACHE[aid]
+
+
+def _thickness(ring):
+    import numpy as np
+    rx, ry = ring
+    n = len(rx) // 2
+    return np.hypot(rx[n:][::-1] - rx[:n], ry[n:][::-1] - ry[:n])
+
+
+def test_the_pipe_is_drawn_with_its_own_wall_thickness():
+    _c, r = _rings('ILS-TP')
+    t = _thickness((r['pipe'][0], r['pipe'][1]))
+    bore = _thickness(r['bore'])
+    assert t.min() == pytest.approx(0.4064, abs=1e-6)
+    assert (t - bore).min() / 2.0 == pytest.approx(0.021, abs=1e-6)
+
+
+def test_a_section_changing_body_is_drawn_at_its_own_OD():
+    """GD-TP replaces the pipe wall over its span, so it is drawn at
+    `section_at(x).OD` and is CONSTANT -- a plain thick pipe does not
+    taper."""
+    _c, r = _rings('ILS-TP')
+    assert r['body'] is not None and r['shroud'] is None
+    t = _thickness(r['body'])
+    assert t.min() == pytest.approx(0.4484, abs=1e-4)
+    assert t.max() == pytest.approx(t.min(), abs=1e-6), 'constant, no taper'
+
+
+def test_a_contact_only_body_is_NOT_drawn_at_a_section_OD():
+    """THE DISTINCTION THIS ENCODES. `section_at` returns the PIPE section
+    right through a shroud, because a shroud adds no bending stiffness.
+    Drawing it at a section OD would invent a stiffness the model does not
+    have -- and its `stiffness_ratio` is 1.0, which says so."""
+    _c, r = _rings('ILS-SH')
+    assert r['shroud'] is not None and r['body'] is None
+    t = _thickness(r['shroud'])
+    assert t.max() == pytest.approx(0.2032, abs=1e-3), 'V - OD/2 at the plateau'
+    assert t.min() < 0.01, 'and it goes to zero at the taper ends'
+
+
+def test_the_outline_is_resampled_off_the_component_not_the_mesh():
+    """At the ruled 2xOD density a 6 m shroud spans seven NODES and its
+    taper ends fall between them, which drew a 95 mm step where the geometry
+    goes to zero."""
+    _c, r = _rings('ILS-SH')
+    assert len(r['shroud'][0]) // 2 > 40, 'far more points than mesh nodes'
+

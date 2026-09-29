@@ -230,7 +230,7 @@ def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
     ms, _mdl, _ix = mesh_of_problem(p)
     slots = ctc.slots_from_targets(p.contacts, ms)
     return dict(scene=sc, model=m, problem=p, result=pos.result, ms=ms,
-                slots=slots, s_centre=s_centre, L_comp=L, OD=OD,
+                slots=slots, s_centre=s_centre, L_comp=L, OD=OD, ils=ils,
                 position=pos, records=recs, envelope=env, note=note,
                 n_positions=len(positions))
 
@@ -276,6 +276,122 @@ def s_to_x(m, ms, U, shift=0.0):
     xv = np.array([world(at[i].s + shift, at[i].y,
                          U[dof(ms, i, 0)], U[dof(ms, i, 1)])[0] for i in ids])
     return lambda q: np.interp(q, sv, xv)
+
+
+def offset_polyline(px, py, dist):
+    """Offset a polyline by `dist` along its LOCAL NORMAL, which on this
+    path points DOWN (+y, toward the rollers).
+
+    NOT a vertical offset. The pipe is bent to a 33-85 m radius and over the
+    stinger its tangent turns through 0.64 rad, so a wall drawn by adding
+    OD/2 to `y` would be up to 20% too narrow at SR7 and would not be
+    perpendicular to the pipe anywhere on the arc. `dist` may be a scalar or
+    a per-point sequence, which is what lets a tapered body be drawn.
+
+    The normal is the tangent rotated to (t_y, -t_x): node order runs in
+    -x (s increases toward the stinger while x = -(s + shift)), so on the
+    deck t = (-1, 0) and the normal comes out (0, +1) -- down, the side the
+    rollers are on.
+    """
+    import numpy as _np
+    px, py = _np.asarray(px, float), _np.asarray(py, float)
+    d = _np.full(len(px), float(dist)) if _np.isscalar(dist) \
+        else _np.asarray(dist, float)
+    tx = _np.gradient(px)
+    ty = _np.gradient(py)
+    n = _np.hypot(tx, ty)
+    n[n == 0] = 1.0
+    tx, ty = tx / n, ty / n
+    return px + d * ty, py - d * tx
+
+
+def body_outlines(m, ms, U, ils, s_centre, OD, shift=0.0):
+    """Closed outlines for the pipe wall, its bore, and the component.
+
+    DRAWN FROM THE ASSEMBLY, never invented here. Two different rules,
+    because the two kinds of body are different things:
+
+      A body that changes the SECTION (GD-TP, GD-TT) is drawn at its own
+      `section_at(x).OD` about the centreline -- it replaces the pipe wall
+      over its span.
+
+      A body that only changes the CONTACT (GD-SH) is drawn from the pipe's
+      own bottom down to `contact_at(x).y`. `section_at` returns the pipe
+      section right through a shroud, because a shroud adds no bending
+      stiffness; drawing it at a section OD would invent a stiffness the
+      model does not have.
+
+    Returns {'pipe': (x, y), 'bore': (x, y), 'body': (x, y) or None,
+             'shroud': (x, y) or None}, each a CLOSED ring ready for `fill`.
+    """
+    import numpy as _np
+    at = {n.index: n for n in m.nodes}
+    ids = sorted({i for e in m.elements if e.owner == 'pipeline'
+                  for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
+    s_nodes, x_nodes, y_nodes = [], [], []
+    for i in ids:
+        s_mat = at[i].s
+        wx, wy = world(s_mat + shift, at[i].y,
+                       U[dof(ms, i, 0)], U[dof(ms, i, 1)])
+        s_nodes.append(s_mat)
+        x_nodes.append(wx)
+        y_nodes.append(wy)
+
+    # RESAMPLED, because the STRUCTURAL mesh is not a drawing grid. At the
+    # ruled 2xOD density a 6 m shroud spans seven nodes, its taper ends fall
+    # BETWEEN them, and the outline came out with a 95 mm step where the
+    # geometry goes to zero -- a drawn shape the component does not have.
+    # The centreline is interpolated finely and the assembly is asked at
+    # every sample, so the outline follows the component rather than the
+    # mesh that happens to carry it.
+    s_dense = _np.linspace(min(s_nodes), max(s_nodes), 2000)
+    px = list(_np.interp(s_dense, s_nodes, x_nodes))
+    py = list(_np.interp(s_dense, s_nodes, y_nodes))
+    xloc = [s_centre - q for q in s_dense]
+
+    def ring(d_lo, d_hi):
+        ax_, ay_ = offset_polyline(px, py, d_lo)
+        bx_, by_ = offset_polyline(px, py, d_hi)
+        return (_np.concatenate([ax_, bx_[::-1]]),
+                _np.concatenate([ay_, by_[::-1]]))
+
+    out = {'pipe': ring(-OD / 2.0, OD / 2.0), 'body': None, 'shroud': None}
+    t_wall = None
+    sec_od, con_y, in_sec, in_con = [], [], [], []
+    for xq in xloc:
+        sec = ils.assembly.section_at(xq) if ils is not None else None
+        con = ils.assembly.contact_at(xq) if ils is not None else None
+        sec_od.append(getattr(sec, 'OD', OD) if sec else OD)
+        if t_wall is None and sec is not None:
+            t_wall = getattr(sec, 't', None)
+        con_y.append(getattr(con, 'y', OD / 2.0) if con else OD / 2.0)
+        in_sec.append(bool(sec) and getattr(sec, 'owner', 'pipe') != 'pipe')
+        in_con.append(bool(con) and getattr(con, 'owner', 'pipe') != 'pipe')
+    tw = t_wall if t_wall else 0.021
+    out['bore'] = ring(-(OD / 2.0 - tw), OD / 2.0 - tw)
+
+    def span(mask):
+        idx = [k for k, v in enumerate(mask) if v]
+        return (min(idx), max(idx)) if idx else None
+
+    sp = span(in_sec)
+    if sp:
+        a, b = sp
+        half = _np.array(sec_od[a:b + 1]) / 2.0
+        lo_x, lo_y = offset_polyline(px[a:b + 1], py[a:b + 1], -half)
+        hi_x, hi_y = offset_polyline(px[a:b + 1], py[a:b + 1], half)
+        out['body'] = (_np.concatenate([lo_x, hi_x[::-1]]),
+                       _np.concatenate([lo_y, hi_y[::-1]]))
+    sp = span([c and not t for c, t in zip(in_con, in_sec)])
+    if sp:
+        a, b = sp
+        deep = _np.array(con_y[a:b + 1])
+        lo_x, lo_y = offset_polyline(px[a:b + 1], py[a:b + 1],
+                                     _np.full(len(deep), OD / 2.0))
+        hi_x, hi_y = offset_polyline(px[a:b + 1], py[a:b + 1], deep)
+        out['shroud'] = (_np.concatenate([lo_x, hi_x[::-1]]),
+                         _np.concatenate([lo_y, hi_y[::-1]]))
+    return out
 
 
 def menger_curvature(xs, ys):
@@ -551,6 +667,11 @@ def plot(cases, out):
     print(f'\nwrote {_rel(out)}')
 
 
+def ils_of(c):
+    """The assembly a component case was built from, or None for plain pipe."""
+    return c.get('ils')
+
+
 def plot_component(c, out):
     """Two panels on one axis: the solved geometry, and the strain trace.
 
@@ -670,10 +791,25 @@ def plot_component(c, out):
     axy = [sc.path.position(v) for v in arc_s]
     ex.plot([q[0] for q in axy], [q[1] for q in axy], color='#b9c2cb',
             lw=1.2, ls='--', zorder=1, label='roller-centreline locus')
-    ex.plot(px, py, color='#1f7a8c', lw=2.6, zorder=5, label='pipe, SOLVED')
-    if seg:
-        ex.plot(sx, sy, color='#8a5a00', lw=9.0, solid_capstyle='butt',
-                zorder=6, alpha=0.9, label='component')
+    # THE PIPE AS A BODY, and the component as its own OUTLINE, both offset
+    # along the pipe's local normal from the assembly's own geometry -- not
+    # a line with a thick stripe on it, which said nothing about how deep
+    # the component was or which side of the pipe it sat on.
+    rings = body_outlines(m, ms, U, ils_of(c), s_c, OD, sh)
+    ex.fill(rings['pipe'][0], rings['pipe'][1], facecolor='#cfe3ea',
+            edgecolor='#1f7a8c', lw=1.3, zorder=4, label='pipeline wall')
+    ex.fill(rings['bore'][0], rings['bore'][1], facecolor='white',
+            edgecolor='#7fa9b8', lw=0.7, zorder=5, label='bore')
+    if rings['body'] is not None:
+        ex.fill(rings['body'][0], rings['body'][1], facecolor='#e8cf9a',
+                edgecolor='#8a5a00', lw=1.6, zorder=6, alpha=0.95,
+                label='component (thicker section)')
+    if rings['shroud'] is not None:
+        ex.fill(rings['shroud'][0], rings['shroud'][1], facecolor='#e8cf9a',
+                edgecolor='#8a5a00', lw=1.6, zorder=6, alpha=0.95,
+                label='shroud (contact surface only)')
+    ex.plot(px, py, color='#1f7a8c', lw=0.9, ls=(0, (5, 3)), zorder=7,
+            label='pipe centreline, SOLVED')
     for st_ in sc.stations:
         if not (lo_x - 2 <= st_.x <= hi_x + 2):
             continue
@@ -698,7 +834,7 @@ def plot_component(c, out):
         ex.invert_yaxis()
     ex.grid(alpha=0.2)
     ex.set_ylabel('y (m), down')
-    ex.legend(fontsize=8, loc='lower left', framealpha=0.93)
+    ex.legend(fontsize=7.5, loc='upper right', ncol=2, framealpha=0.94)
 
     # LOCAL RADIUS OF CURVATURE, read off the deformed pipe itself and set
     # against the stinger's own R. This is the number the close-up exists to
