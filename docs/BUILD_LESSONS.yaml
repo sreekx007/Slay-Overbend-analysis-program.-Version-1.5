@@ -1670,3 +1670,53 @@
   detect: test_every_panel_runs_the_same_way_along_x, test_the_rollers_are_drawn_above_the_pipe_fills
   refs: [tools/plot_from_schema.py, rebuild/tests/test_plot_from_profile.py]
   date: 2026-09-29
+
+- id: L078
+  area: measure
+  class: ruling
+  symptom: >-
+    body_peak_strain was 0.0 for every GD-SH case, with step -1 and a blank
+    station, for the family whose pipe carries the HIGHEST strain in the
+    dataset. It parsed, it plotted, and it was wrong in the one direction
+    nobody checks: a zero reads as nothing happening.
+  cause: >-
+    report.passage.body_peaks asks the junction rows which elements are on
+    the body, because for a section-changing component that IS a question
+    about sections. A shroud steps no section, so the answer was "none". The
+    whole point-probe apparatus -- junction, +/- 2/4/6 x OD -- has nothing to
+    probe AT on a body whose effect is spread over its length.
+  rule: >-
+    A body that steps no section needs a reporting unit that is a REGION, not
+    a point. Five of them, after the reference: the catenary-side taper and
+    beyond, the deep section in thirds from the catenary side, then the
+    vessel-side taper and beyond. The body peak for such a body is taken over
+    its FOOTPRINT, tapers included. GD-SH then reports 0.6868 pct instead of
+    0.0.
+  detect: test_the_peak_lands_in_X2, test_case_columns_are_all_declared, test_a_section_changing_body_has_no_regions
+  refs: [rebuild/slay/report/regions.py, rebuild/tests/test_regions.py, tools/dataset.py]
+  date: 2026-09-30
+
+- id: L079
+  area: measure
+  class: finding
+  symptom: >-
+    The region ratios did not match the reference at first look. X3/X2 came
+    out 0.784 against its stated 65-75 pct band, and it was tempting to
+    report that as a disagreement.
+  cause: >-
+    Mesh, not physics. At the ruled 2xOD density (G10) a third of the deep
+    section is 1.354 m and an element is 0.813 m, so X2 and X3 hold TWO
+    elements each and X4 holds ONE. A ratio between regions of one and two
+    elements is reporting the mesh.
+  rule: >-
+    A region scheme must carry its element count. Refined 2xOD -> 1xOD ->
+    0.5xOD the ratio runs 0.784 -> 0.749 -> 0.744, converging INSIDE the
+    reference band, and X4/X2 holds at about 0.70 throughout. Record
+    n_elements per region and say so where it is thin, rather than quoting a
+    ratio the mesh chose. Separately, refinement moves the model peak off X2
+    onto the catenary-side taper inside X1 (frac_of_x2 1.022 at 0.5xOD),
+    which is why each region peak also records whether it landed on the
+    shroud footprint -- X1 lumps a taper together with plain pipe.
+  detect: test_case_columns_are_all_declared
+  refs: [rebuild/slay/report/regions.py, docs/TRIAL_LOG.yaml]
+  date: 2026-09-30

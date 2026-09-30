@@ -196,7 +196,8 @@ def _sections(steps=(0, 1), n=3, **over):
                      s_station_1=float(k + 1) + 1.5 * st,
                      x_0=-float(k), x_1=-float(k + 1),
                      strain=0.001 * (k + 1), moment=1.0e5 * (k + 1),
-                     OD_section=0.4064, section_owner='pipe', in_band=True)
+                     OD_section=0.4064, section_owner='pipe', region='',
+                     in_band=True)
             r.update(over)
             rows.append(r)
     return rows

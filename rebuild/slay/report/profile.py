@@ -36,6 +36,7 @@ import numpy as np
 
 from slay.report import junction as jr
 from slay.report import profile_schema as ps
+from slay.report import regions as rg
 from slay.scene.rollers import StationRole
 from slay.solve.kernel import dof
 
@@ -84,7 +85,7 @@ def _pipe_nodes(model, ms, U, shift):
 # ---------------------------------------------------------------------------
 
 def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
-                  converged, context, n=N_SAMPLES) -> list:
+                  converged, context, n=N_SAMPLES, geom=None) -> list:
     """One row per sample, for ONE position.
 
     The assembly is queried at every sample rather than at every node, which
@@ -124,6 +125,7 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
                        else OD / 2.0),
             section_owner=(getattr(sec, 'owner', 'pipe') if sec else 'pipe'),
             contact_owner=(getattr(con, 'owner', 'pipe') if con else 'pipe'),
+            region=rg.classify(float(s_mat), geom),
         )
         rows.append(row)
     return rows
@@ -149,7 +151,7 @@ def s_to_x(model, ms, U, shift):
 
 
 def section_rows(problem, result, shift, step, converged, zone_s_max,
-                 context, fx=None) -> list:
+                 context, fx=None, geom=None) -> list:
     """One row per element, for ONE position.
 
     BOTH ENDS, not a midpoint. Strain is piecewise constant per element, so
@@ -181,6 +183,7 @@ def section_rows(problem, result, shift, step, converged, zone_s_max,
             strain=float(eps), moment=float(moments.get(idx, 0.0)),
             OD_section=float(getattr(sec, 'OD', 0.0)) if sec else 0.0,
             section_owner=(getattr(sec, 'owner', 'pipe') if sec else 'pipe'),
+            region=rg.region_of_element(float(lo), float(hi), geom),
             in_band=bool(float(hi) + shift < zone_s_max),
         )
         rows.append(row)
@@ -291,14 +294,18 @@ def write(stem, scene, positions, model_of, ils, s_centre, OD, context,
     quietly become a second place that does it.
     """
     stem = Path(stem)
+    # Measured ONCE, off the assembly, and shared by both tables. A region
+    # boundary is a fixed point on the steel, so it must not be re-derived
+    # per position -- the two tables would then disagree about where X2 is.
+    geom = rg.offset_geometry(ils, s_centre, OD)
     geo, sec = [], []
     for step, pos in enumerate(positions):
         model, ms, U, problem = model_of(pos)
         conv = bool(getattr(pos, 'converged', True))
         geo += geometry_rows(scene, model, ms, U, ils, s_centre, OD,
-                             pos.shift, step, conv, context, n=n)
+                             pos.shift, step, conv, context, n=n, geom=geom)
         sec += section_rows(problem, pos.result, pos.shift, step, conv,
-                            zone_s_max, context,
+                            zone_s_max, context, geom=geom,
                             fx=s_to_x(model, ms, U, pos.shift))
     out = {}
     for table, rows in (('geometry', geo), ('sections', sec),
@@ -310,7 +317,7 @@ def write(stem, scene, positions, model_of, ils, s_centre, OD, context,
 
 def case_context(case_id, family, scene, problem, OD, t_wall, tension_mt,
                  L_comp, s_centre, zone_s_max, n_positions,
-                 envelope_step) -> dict:
+                 envelope_step, region_scheme='') -> dict:
     """The per-case columns, built once so the three tables cannot disagree.
 
     `stiffness_ratio` and `n_junctions` come off the SOLVED problem rather
@@ -328,4 +335,5 @@ def case_context(case_id, family, scene, problem, OD, t_wall, tension_mt,
         stiffness_ratio=float(jr.stiffness_ratio(problem)),
         n_junctions=int(len(jr.junctions(problem))),
         envelope_step=int(envelope_step),
+        region_scheme=str(region_scheme),
     )

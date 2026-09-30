@@ -169,7 +169,14 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
             contact_surface='centreline', ils=None, verbose=True):
-    """Run one passage. Returns (scene, L_comp, records, junction rows).
+    """Run one passage.
+
+    Returns `(scene, L_comp, records, junction rows, problems, positions)`.
+    The raw `positions` are handed back as well as the measured `records`
+    because element-level strain lives on `position.result` and a record
+    carries only the peaks -- the region scheme (`slay.report.regions`)
+    needs the elements, and re-solving to get them would be a second answer
+    to what was already computed.
 
     `ils` overrides `arch_id` with an already-built assembly, which is how
     the dataset runner varies component length and wall: those are fields of
@@ -231,7 +238,7 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     if verbose:
         _table(records, L_comp, time.time() - t0)
         _junction_table(records, junc)
-    return sc, L_comp, records, junc, probs
+    return sc, L_comp, records, junc, probs, positions
 
 
 def _warn_step(step, OD):
@@ -313,7 +320,7 @@ def verify(R=R_DEF, spacing=SPACING_DEF, tension_mt=TENSION_MT_DEF):
     The tip stations are reported but not judged -- D6 makes the terminal
     station a contact slot and the last three rollers are outside the zone.
     """
-    sc, _L, _r, _j, _p = passage('none', R=R, spacing=spacing,
+    sc, _L, _r, _j, _p, _ps = passage('none', R=R, spacing=spacing,
                                  tension_mt=tension_mt, elastic=True,
                                  verbose=False)
     positions = sweep.run(sc, None, L_comp=0.0, clear_before=0.0,
@@ -372,7 +379,7 @@ def main() -> int:
     for od in ods:
         if len(ods) > 1:
             print()
-        sc, L, records, junc, _probs = passage(OD=od, **kw)
+        sc, L, records, junc, _probs, _pos = passage(OD=od, **kw)
         allrec += [(od, L, r, junc[i]) for i, r in enumerate(records)]
     if csv_out:
         rows = [r for (_od, _L, r, _j) in allrec]

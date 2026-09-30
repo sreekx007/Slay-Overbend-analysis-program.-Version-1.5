@@ -1,0 +1,356 @@
+"""slay.report.regions -- the five strain regions of an offset (shroud) body. L8.
+
+WHY A SHROUD NEEDS REGIONS AT ALL. A section-changing body (GD-TP, GD-TT)
+announces itself: the section steps, so there is a JUNCTION, and `report.
+junction` reports at it and at fixed offsets either side. A shroud steps
+nothing -- its `stiffness_ratio` is 1.000 and it has zero junctions -- so
+that whole reporting machinery returns an empty table for it, and
+`body_peak_strain` comes out 0.0 for the case whose pipe is the most highly
+strained in the dataset. There is nothing to probe AT, because the thing a
+shroud does is spread over its whole length.
+
+So the reporting unit is a REGION, not a point. This module implements the
+scheme of the reference paper (Series 4, Type B1, Table XXIX), which divides
+the pipe into five:
+
+    catenary side  <--                                  --> vessel side
+
+    |   X1   |    X2    |    X3    |    X4    |   X5   |
+    | taper  | deep 1/3 | deep 1/3 | deep 1/3 | taper  |
+    | +beyond|  catenary|  midspan |  vessel  | +beyond|
+
+  X1  taper on the CATENARY side and the pipe beyond it -- governed by the
+      plain-pipe catenary rather than by the shroud
+  X2  catenary-side third of the deep section -- THE PEAK, in every case the
+      paper ran and in ours; this is the region that governs design
+  X3  midspan third -- intermediate, the paper puts it at 65-75% of X2
+  X4  vessel-side third -- the lowest of the three, and the one that
+      plateaus once V exceeds about 1.5 D
+  X5  taper on the VESSEL side and the pipe beyond it
+
+WHICH END IS WHICH, since getting it backwards would silently swap the
+governing region with the quietest one. The model solves in `s` increasing
+toward the stinger, and the catenary hangs off the stinger tip, so the
+CATENARY side is HIGH `s`. The ILS-local frame runs the other way
+(`s = s_centre - x_local`), so the catenary side is NEGATIVE local x. This
+is not asserted from the frame algebra alone: measured on ILS-SH at its
+envelope position, the peak sits at `s_material` 6.833, which is local
+x = -1.881 -- inside the catenary-side third, exactly where the paper says
+the peak is. `test_the_peak_lands_in_X2` keeps that honest.
+
+MEASURED FROM THE CONTACT PROFILE, NOT FROM THE SPEC. `L1`, `L2` and `V` are
+in the archetype definition and it would be shorter to read them from there.
+This module asks the assembly instead -- where the contact surface is deep,
+where it tapers, how deep it gets -- because `ils_builder` is the single
+author of what a component IS (G7) and a region scheme derived from the spec
+would describe the component we asked for rather than the one we solved.
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+
+# The deep section is where the lift is at its maximum. A tolerance is needed
+# because the profile is sampled, not symbolic; 0.1 mm is far below any
+# geometry we model and far above float noise.
+FLAT_TOL = 1.0e-4
+
+N_SAMPLES = 4000
+
+REGIONS = ('X1', 'X2', 'X3', 'X4', 'X5')
+
+ABOUT = {
+    'X1': 'taper on the CATENARY side, and the pipe beyond the shroud -- '
+          'governed by the plain-pipe catenary, not by the shroud',
+    'X2': 'deep section, CATENARY-side third -- the peak strain location, '
+          'and the region that governs design',
+    'X3': 'deep section, midspan third -- intermediate strain',
+    'X4': 'deep section, VESSEL-side third -- the lowest of the three; '
+          'plateaus once V exceeds about 1.5 x OD',
+    'X5': 'taper on the VESSEL side, and the pipe beyond the shroud',
+}
+
+
+@dataclass(frozen=True)
+class OffsetGeometry:
+    """Where the deep section and the tapers are, in MATERIAL coordinates.
+
+    Material, not station: the regions travel with the pipe, so a region
+    boundary is a fixed point on the steel and the same `s_material` names it
+    at every position of the passage. In station coordinates every boundary
+    would move with the shift, and a per-region peak taken over the passage
+    would be comparing different pieces of pipe at different steps.
+    """
+    s_cat_end: float        # shroud end, catenary side (highest s)
+    s_deep_cat: float       # deep section starts, catenary side
+    s_deep_ves: float       # deep section ends, vessel side
+    s_ves_end: float        # shroud end, vessel side (lowest s)
+    V: float                # offset depth below the pipe CENTRELINE
+    lift_max: float         # V - OD/2: what the pipe is actually held off by
+    OD: float
+    owner: str
+
+    @property
+    def L1(self) -> float:
+        """Deep section length."""
+        return self.s_deep_cat - self.s_deep_ves
+
+    @property
+    def L2_cat(self) -> float:
+        return self.s_cat_end - self.s_deep_cat
+
+    @property
+    def L2_ves(self) -> float:
+        return self.s_deep_ves - self.s_ves_end
+
+    @property
+    def L_total(self) -> float:
+        return self.s_cat_end - self.s_ves_end
+
+    @property
+    def symmetric(self) -> bool:
+        return abs(self.L2_cat - self.L2_ves) < FLAT_TOL
+
+
+def offset_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
+    """Measure the offset body's shape, or None if there is not one.
+
+    Returns None for plain pipe and for a section-changing component: a body
+    that steps the section is reported at its junctions, and giving it
+    regions too would put the same strain in two schemes and invite them to
+    disagree.
+    """
+    if ils is None:
+        return None
+    lo_x, hi_x = ils.extent
+    OD = ils.assembly.pipe.OD_pipe if OD is None else OD
+    half = OD / 2.0
+
+    xs = [lo_x + (hi_x - lo_x) * k / (n - 1) for k in range(n)]
+    lift, owner = [], None
+    section_steps = False
+    for x in xs:
+        con = ils.assembly.contact_at(x)
+        sec = ils.assembly.section_at(x)
+        if sec is not None and getattr(sec, 'owner', 'pipe') != 'pipe':
+            section_steps = True
+        y = getattr(con, 'y', half) if con else half
+        own = getattr(con, 'owner', 'pipe') if con else 'pipe'
+        lift.append(y - half)
+        if own != 'pipe' and owner is None:
+            owner = own
+    if section_steps or owner is None:
+        return None
+    lift_max = max(lift)
+    if lift_max <= FLAT_TOL:
+        return None
+
+    on = [k for k, v in enumerate(lift) if v > FLAT_TOL]
+    deep = [k for k, v in enumerate(lift) if v >= lift_max - FLAT_TOL]
+    if not on or not deep:
+        return None
+
+    def s_of(k):
+        return s_centre - xs[k]
+
+    # s = s_centre - x, so the LOWEST index (most negative x) is the HIGHEST
+    # s -- the catenary side. Reversing these two lines swaps the governing
+    # region with the quietest one and nothing else changes.
+    return OffsetGeometry(
+        s_cat_end=s_of(min(on)), s_deep_cat=s_of(min(deep)),
+        s_deep_ves=s_of(max(deep)), s_ves_end=s_of(max(on)),
+        V=lift_max + half, lift_max=lift_max, OD=OD, owner=owner)
+
+
+def bounds(geom):
+    """[(name, s_lo, s_hi)] in catenary-to-vessel order, a PARTITION.
+
+    The two outer regions are unbounded -- X1 runs from the deep section out
+    to the stinger tip and X5 back to the vessel -- so every element of the
+    model belongs to exactly one region and none belongs to two. A scheme
+    that only covered the shroud would leave the pipe on either side of it
+    unreported, which is the half of the answer the paper calls "governed by
+    the plain-pipe catenary".
+    """
+    if geom is None:
+        return []
+    third = geom.L1 / 3.0
+    return [
+        ('X1', geom.s_deep_cat, float('inf')),
+        ('X2', geom.s_deep_cat - third, geom.s_deep_cat),
+        ('X3', geom.s_deep_cat - 2.0 * third, geom.s_deep_cat - third),
+        ('X4', geom.s_deep_ves, geom.s_deep_cat - 2.0 * third),
+        ('X5', float('-inf'), geom.s_deep_ves),
+    ]
+
+
+def classify(s_material, geom) -> str:
+    """Which region a material point is in. '' when the case has no regions.
+
+    Half-open [lo, hi) downward from X1, so a point exactly on a boundary
+    lands in the region nearer the vessel and never in both.
+    """
+    if geom is None:
+        return ''
+    for name, lo, hi in bounds(geom):
+        if lo <= s_material < hi:
+            return name
+    return 'X5'     # only reachable at -inf; keeps the function total
+
+
+def region_of_element(s0, s1, geom) -> str:
+    """The region an ELEMENT belongs to, by its midpoint.
+
+    An element that straddles a boundary is assigned whole rather than split:
+    strain is piecewise constant per element, so splitting would invent two
+    values where the model has one. At the ruled 2xOD mesh an element is
+    0.81 m against a 1.35 m third of the deep section, so at most one element
+    per boundary is ambiguous -- recorded rather than hidden.
+    """
+    return classify(0.5 * (s0 + s1), geom)
+
+
+def region_peaks(positions, problem, geom, zone_s_max, shift_of=None) -> dict:
+    """{region: {...}} -- the worst strain and moment in each region, over the
+    WHOLE passage, with where and when.
+
+    MAX OVER POSITIONS, never a sum (G3), and taken in MATERIAL coordinates
+    so a region is the same piece of steel at every step.
+    """
+    if geom is None:
+        return {}
+    s_of = {i: sv for (i, sv, _y) in problem.nodes}
+    ends = {idx: sorted((s_of[n1], s_of[n2]))
+            for (idx, n1, n2, _o, _l) in problem.elements}
+
+    out = {name: dict(peak_strain=0.0, peak_moment=0.0, s_material=0.0,
+                      s_station=0.0, step=-1, shift=0.0, n_elements=0,
+                      s_lo=lo, s_hi=hi)
+           for name, lo, hi in bounds(geom)}
+    # Element counts come off the GEOMETRY, once. Counting them inside the
+    # position loop would count an element as often as it is inside the
+    # band, which varies with the shift and is not a property of the region.
+    for (lo, hi) in ends.values():
+        name = region_of_element(lo, hi, geom)
+        if name:
+            out[name]['n_elements'] += 1
+
+    for step, pos in enumerate(positions):
+        shift = pos.shift if shift_of is None else shift_of(pos)
+        moments = {i: m for (i, _s, m) in getattr(pos.result, 'moments', ())}
+        for (idx, _s_mid, eps) in getattr(pos.result, 'strains', ()):
+            lo, hi = ends.get(idx, (0.0, 0.0))
+            if hi + shift >= zone_s_max:        # outside the reporting band
+                continue
+            name = region_of_element(lo, hi, geom)
+            if not name:
+                continue
+            r = out[name]
+            if abs(eps) > r['peak_strain']:
+                r.update(peak_strain=abs(eps), s_material=0.5 * (lo + hi),
+                         s_station=0.5 * (lo + hi) + shift, step=step,
+                         shift=shift)
+            m = abs(moments.get(idx, 0.0))
+            if m > r['peak_moment']:
+                r['peak_moment'] = m
+    x2 = out.get('X2', {}).get('peak_strain', 0.0)
+    for r in out.values():
+        r['frac_of_x2'] = (r['peak_strain'] / x2) if x2 > 0 else 0.0
+        # X1 and X5 each lump together a TAPER and the plain pipe beyond it.
+        # The reference calls both "governed by the plain-pipe catenary",
+        # and at its own 2xOD mesh that holds. Refined, it does not: the
+        # peak migrates onto the catenary-side taper, 0.395 m outboard of
+        # the deep section, where the lift gradient is steepest. Without
+        # this column a reader has X1's peak and no way to tell which of the
+        # two things it happened on.
+        r['peak_on_shroud'] = bool(
+            geom.s_ves_end <= r['s_material'] <= geom.s_cat_end
+            and r['step'] >= 0)
+    return out
+
+
+def body_peaks(positions, problem, geom, scene, zone_s_max) -> dict:
+    """The `body_peak_*` groups for an OFFSET body. {} when there is none.
+
+    THE DEFECT THIS FIXES. `report.passage.body_peaks` asks the junction
+    rows which elements are on the body, because for a section-changing
+    component that is a question about SECTIONS. A shroud steps no section,
+    so the answer is "none", and `body_peak_strain` came out 0.0 with
+    `step: -1` and a blank station -- for the case whose pipe carries the
+    highest strain in the dataset. It parsed, it plotted, and it was wrong
+    in the one direction nobody checks: a zero reads as "nothing happening
+    here".
+
+    For an offset body the body is its FOOTPRINT: everything the shroud
+    covers, tapers included. Measured that way GD-SH reports 0.6868% rather
+    than 0.0.
+    """
+    if geom is None:
+        return {}
+    s_of = {i: sv for (i, sv, _y) in problem.nodes}
+    ends = {idx: sorted((s_of[n1], s_of[n2]))
+            for (idx, n1, n2, _o, _l) in problem.elements}
+    on_body = {idx for idx, (lo, hi) in ends.items()
+               if geom.s_ves_end <= 0.5 * (lo + hi) <= geom.s_cat_end}
+
+    from slay.report.passage import nearest_station
+
+    out = {}
+    for prefix, attr in (('body_peak_strain', 'strains'),
+                         ('body_peak_moment', 'moments')):
+        best = (0.0, 0.0, -1, 0.0)          # value, s_material, step, shift
+        for step, pos in enumerate(positions):
+            if not getattr(pos, 'converged', True):
+                continue
+            for (idx, _s_mid, v) in getattr(pos.result, attr, ()):
+                if idx not in on_body:
+                    continue
+                lo, hi = ends[idx]
+                if hi + pos.shift >= zone_s_max:
+                    continue
+                if abs(v) > best[0]:
+                    best = (abs(v), 0.5 * (lo + hi), step, pos.shift)
+        val, s_mat, step, shift = best
+        s_sta = s_mat + shift
+        sta, off = nearest_station(scene, s_sta) if step >= 0 else ('', 0.0)
+        out[prefix] = val
+        out.update({f'{prefix}_s_material': s_mat,
+                    f'{prefix}_s_station': s_sta if step >= 0 else 0.0,
+                    f'{prefix}_station': sta,
+                    f'{prefix}_station_offset': off,
+                    f'{prefix}_step': step,
+                    f'{prefix}_shift': shift})
+    return out
+
+
+def case_columns(geom, peaks) -> dict:
+    """The flat columns a case row carries, per `slay.report.schema`.
+
+    Empty when the case has no offset body, so a dataset mixing families
+    simply leaves them blank rather than writing zeros that would pool into
+    an average as though they were measurements.
+    """
+    if geom is None:
+        return {}
+    out = dict(region_scheme='X1-X5/offset', offset_L1=geom.L1,
+               offset_L2=0.5 * (geom.L2_cat + geom.L2_ves),
+               offset_L2_cat=geom.L2_cat, offset_L2_ves=geom.L2_ves,
+               offset_V=geom.V, offset_owner=geom.owner)
+    for name, r in peaks.items():
+        k = name.lower()
+        out[f'{k}_peak_strain'] = r['peak_strain']
+        out[f'{k}_peak_strain_s_material'] = r['s_material']
+        out[f'{k}_peak_strain_s_station'] = r['s_station']
+        out[f'{k}_peak_strain_step'] = r['step']
+        out[f'{k}_peak_strain_shift'] = r['shift']
+        out[f'{k}_peak_moment'] = r['peak_moment']
+        out[f'{k}_frac_of_x2'] = r['frac_of_x2']
+        out[f'{k}_peak_on_shroud'] = r['peak_on_shroud']
+        # X1 and X5 are unbounded on their outer side. Written EMPTY rather
+        # than as `inf`: a blank is a value a reader will not average, and
+        # `inf` in a float column is exactly the sort of thing that survives
+        # into a mean and turns a summary into nan.
+        out[f'{k}_s_lo'] = '' if r['s_lo'] == float('-inf') else r['s_lo']
+        out[f'{k}_s_hi'] = '' if r['s_hi'] == float('inf') else r['s_hi']
+        out[f'{k}_n_elements'] = r['n_elements']
+    return out

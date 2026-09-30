@@ -62,13 +62,23 @@ S_LO, S_HI = 16.0, 22.0        # the component's material span
 ZONE = 34.0
 
 
+def _region(s):
+    """The five-region scheme over the synthetic shroud, catenary side high."""
+    third = (S_HI - S_LO) / 3.0
+    if s >= S_HI: return 'X1'
+    if s >= S_HI - third: return 'X2'
+    if s >= S_HI - 2 * third: return 'X3'
+    if s >= S_LO: return 'X4'
+    return 'X5'
+
+
 def _ctx():
     return dict(profile_schema_version=ps.PROFILE_SCHEMA_VERSION,
                 case_id='synthetic', table='', family='ILS-XX',
                 R=R, spacing=9.0, OD=OD, t_wall=T_WALL, tension_mt=120.0,
                 L_comp=S_HI - S_LO, s_centre=19.0, zone_s_max=ZONE,
                 n_positions=2, stiffness_ratio=2.0, n_junctions=2,
-                envelope_step=1)
+                envelope_step=1, region_scheme='X1-X5/offset')
 
 
 def _arc(s):
@@ -100,7 +110,8 @@ def _geometry(step, shift, shroud=False):
                             else OD / 2.0),
                  section_owner=('comp' if (inside and not shroud)
                                 else 'pipe'),
-                 contact_owner=('comp' if (inside and shroud) else 'pipe'))
+                 contact_owner=('comp' if (inside and shroud) else 'pipe'),
+                 region=(_region(s) if shroud else ''))
         rows.append(r)
     return rows
 
@@ -125,6 +136,7 @@ def _sections(step, shift, shroud=False):
                  OD_section=(0.49 if (inside and not shroud) else OD),
                  section_owner=('comp' if (inside and not shroud)
                                 else 'pipe'),
+                 region=(_region(0.5 * (a + b)) if shroud else ''),
                  in_band=bool(b + shift < ZONE))
         rows.append(r)
     return rows

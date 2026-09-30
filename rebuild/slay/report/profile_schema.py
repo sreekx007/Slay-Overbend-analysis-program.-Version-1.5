@@ -61,7 +61,11 @@ import re
 
 from slay.report.schema import IDX, M, NM, NONE, Field
 
-PROFILE_SCHEMA_VERSION = '1.0.0'
+PROFILE_SCHEMA_VERSION = '1.1.0'
+# 1.1.0  `region` on the geometry and sections tables, and `region_scheme`
+#        in the case context: the five-region scheme for an offset body
+#        (`slay.report.regions`). Empty for a case that has no offset body.
+# 1.0.0  first contract.
 
 TABLE_SUFFIX = {
     'geometry': '.geometry.csv',
@@ -130,6 +134,11 @@ CONTEXT = [
     Field('n_junctions', 'int', NONE, 'count', 'derived',
           'section steps in the model; 0 for plain pipe AND for a shroud, '
           'which shares the pipe section', per='case'),
+    Field('region_scheme', 'str', NONE, 'name', 'derived',
+          "which region scheme the `region` column follows, or empty when "
+          "the case has none. 'X1-X5/offset' divides the pipe into the "
+          'catenary-side taper and beyond, the deep section in thirds, and '
+          'the vessel-side taper and beyond', per='case'),
     Field('envelope_step', 'int', IDX, 'count', 'derived',
           'position index of the passage envelope -- the worst position, and '
           'the one a single-figure plot should default to', per='case'),
@@ -213,6 +222,12 @@ GEOMETRY = _identity('geometry') + CONTEXT + POSITION + [
           '`pipe` while `section_owner` still is, the body is a SHROUD and '
           'is drawn from the pipe bottom down to `y_contact` (L073)',
           per='sample'),
+    Field('region', 'str', NONE, 'name', 'location',
+          "the offset body's strain region at this material point -- X1..X5 "
+          'from the catenary side, or EMPTY when the case has no offset '
+          'body. A shroud steps no section and so has no junction to probe; '
+          'the region is its reporting unit. Fixed on the steel, so the same '
+          'region names the same pipe at every position', per='sample'),
 ]
 
 
@@ -259,6 +274,12 @@ SECTIONS = _identity('sections') + POSITION + [
           'BREAK there rather than be drawn through', per='sample'),
     Field('section_owner', 'str', NONE, 'name', 'location',
           "'pipe' or the component id", per='sample'),
+    Field('region', 'str', NONE, 'name', 'location',
+          "the offset body's strain region this element belongs to, by its "
+          'MIDPOINT -- X1..X5 from the catenary side, or empty. An element '
+          'straddling a boundary is assigned whole, because strain is '
+          'piecewise constant per element and splitting it would invent two '
+          'values where the model has one', per='sample'),
     Field('in_band', 'bool', NONE, 'flag', 'status',
           'this element is inside the reporting band (s_station < '
           'zone_s_max). Elements outside are WRITTEN, so a figure can shade '

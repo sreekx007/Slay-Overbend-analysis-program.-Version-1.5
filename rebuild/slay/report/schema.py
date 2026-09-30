@@ -44,7 +44,13 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SCHEMA_VERSION = '1.1.0'
+SCHEMA_VERSION = '1.2.0'
+# 1.2.0  the offset REGION scheme: `region_scheme`, the measured `offset_*`
+#        geometry, and the patterned `x1..x5` per-region peaks. A shroud
+#        steps no section, so it has no junction to probe and the region is
+#        its reporting unit -- without these its case row was
+#        indistinguishable from bare pipe but for `contact_lift_max`.
+# 1.1.0  peak groups gained `_station` and `_station_offset`.
 
 # Units, spelled once so they cannot drift between fields.
 M = 'm'
@@ -205,6 +211,33 @@ DERIVED = [
     Field('start_strain', 'float', NONE, 'strain', 'value',
           'peak strain at the START position -- what a single-position solve '
           'would have reported'),
+
+    # ---- offset (shroud) geometry ----------------------------------------
+    #
+    # MEASURED off the solved contact profile, not copied from the archetype
+    # definition, so these describe the component that was solved rather than
+    # the one that was asked for.
+    Field('region_scheme', 'str', NONE, 'name', 'derived',
+          "which region scheme the `x*` columns follow, or empty when the "
+          "case has none. 'X1-X5/offset' is the five-region scheme for an "
+          'offset body: taper+beyond, then the deep section in thirds from '
+          'the catenary side, then taper+beyond'),
+    Field('offset_L1', 'float', M, 'length', 'derived',
+          'DEEP SECTION length of the offset body -- the part at full depth. '
+          'X2/X3/X4 are its thirds'),
+    Field('offset_L2', 'float', M, 'length', 'derived',
+          'taper length, mean of the two ends'),
+    Field('offset_L2_cat', 'float', M, 'length', 'derived',
+          'taper length on the CATENARY side (high s)'),
+    Field('offset_L2_ves', 'float', M, 'length', 'derived',
+          'taper length on the VESSEL side (low s). Differs from '
+          '`offset_L2_cat` only for an asymmetric body'),
+    Field('offset_V', 'float', M, 'length', 'derived',
+          'offset depth below the pipe CENTRELINE. The pipe is held off the '
+          'rollers by V - OD/2, NOT by V -- using V over-elevates by half a '
+          'diameter (33% too much at V = 2D)'),
+    Field('offset_owner', 'str', NONE, 'name', 'derived',
+          'the component that owns the offset, e.g. GD-SH'),
 ]
 
 PEAKS = (
@@ -281,6 +314,56 @@ PATTERNS = [
           NONE, 'name', 'location',
           'the component that owns the surface there, or `pipe`',
           pattern=True),
+
+    # ---- the offset (shroud) REGION scheme -------------------------------
+    #
+    # Patterned for the same reason the junction columns are: they exist only
+    # for a case that HAS an offset body, and how many there are depends on
+    # the scheme rather than on anything fixed here. A shroud has no junction
+    # to probe -- it steps no section -- so the region is its reporting unit.
+    Field(r'x\d_peak_strain', 'float', NONE, 'strain', 'value',
+          'worst strain in that region over the WHOLE passage (MAX over '
+          'positions, never a sum). X2, the catenary-side third of the deep '
+          'section, is the peak in every case measured and is the region '
+          'that governs design', pattern=True),
+    Field(r'x\d_peak_strain_s_material', 'float', M, 'length', 'location',
+          'material coordinate of that peak -- a point on the PIPE, which '
+          'travels with it', pattern=True),
+    Field(r'x\d_peak_strain_s_station', 'float', M, 'length', 'location',
+          'station coordinate of that peak at the step it occurred',
+          pattern=True),
+    Field(r'x\d_peak_strain_step', 'int', IDX, 'count', 'step',
+          'passage position index at which the region peaked; -1 if the '
+          'region never had an element inside the reporting band',
+          pattern=True),
+    Field(r'x\d_peak_strain_shift', 'float', M, 'length', 'step',
+          'travel at that position', pattern=True),
+    Field(r'x\d_peak_moment', 'float', NM, 'moment', 'value',
+          'worst bending moment magnitude in that region over the passage',
+          pattern=True),
+    Field(r'x\d_frac_of_x2', 'float', NONE, 'ratio', 'derived',
+          'the region peak over X2. The reference puts X3 at 0.65-0.75 and '
+          'X4 lower still, so this is the column that says whether a case '
+          'behaves like the published scheme', pattern=True),
+    Field(r'x\d_peak_on_shroud', 'bool', NONE, 'flag', 'location',
+          'the region peak landed within the shroud footprint. X1 and X5 '
+          'each lump a TAPER together with the plain pipe beyond it, and the '
+          'reference calls both "governed by the plain-pipe catenary" -- '
+          'true at its own 2xOD mesh, false when refined, where the peak '
+          'migrates onto the catenary-side taper. Without this column a '
+          'reader cannot tell which of the two an X1 peak happened on',
+          pattern=True),
+    Field(r'x\d_s_lo', 'float', M, 'length', 'location',
+          'region lower bound in MATERIAL coordinates -- fixed on the steel, '
+          'so it names the same pipe at every position. EMPTY where the '
+          'region is unbounded (X5 runs back toward the vessel)',
+          pattern=True),
+    Field(r'x\d_s_hi', 'float', M, 'length', 'location',
+          'region upper bound, material coordinates. EMPTY where unbounded '
+          '(X1 runs out toward the stinger tip)', pattern=True),
+    Field(r'x\d_n_elements', 'int', NONE, 'count', 'derived',
+          'elements the region contains. A region with one or two elements '
+          'is reporting a mesh, not a strain field', pattern=True),
 ]
 
 

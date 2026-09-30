@@ -255,6 +255,78 @@ dataset, a median 4.5× the body peak. For a shroud there is no junction at
 all, because no section steps; the lift is the whole of it, and a result
 file that does not record the lift cannot tell a shroud case from bare pipe.
 
+## Where a shroud's strain is read — the five regions
+
+*Added 30 Sep, following the reference's Series 4 / Type B1 scheme.*
+
+A stiffening body announces where to look: the section steps, so there is a
+**junction**, and we report at it and at ±2, 4, 6 diameters either side.
+A shroud steps nothing, so there is no point to probe **at** — its effect is
+spread over its whole length. The reporting unit has to be a **region**.
+
+The shroud has three geometric parameters: a deep section of length `L1` at
+full depth, a taper of length `L2` at each end, and the depth `V`. The pipe
+is divided into five:
+
+```
+   catenary side  <--                                       -->  vessel side
+
+   |     X1     |    X2    |    X3    |    X4    |     X5     |
+   | taper +    | deep 1/3 | deep 1/3 | deep 1/3 | taper +    |
+   | beyond     | catenary | midspan  |  vessel  | beyond     |
+```
+
+| | Where | What it reads |
+|---|---|---|
+| **X1** | catenary-side taper, and the pipe beyond it | nominally the plain-pipe catenary — but see the caution below |
+| **X2** | deep section, catenary-side third | **the peak, and the region that governs design** |
+| **X3** | deep section, midspan third | intermediate — the reference puts it at 65–75% of X2 |
+| **X4** | deep section, vessel-side third | lowest of the three; plateaus once `V` exceeds about 1.5 OD |
+| **X5** | vessel-side taper, and the pipe beyond it | plain-pipe catenary |
+
+The five are a **partition** — X1 and X5 run out to the ends of the model —
+so every element belongs to exactly one, and the pipe either side of the
+shroud is reported rather than dropped. The boundaries are fixed in
+**material** coordinates, so a region is the same piece of steel at every
+position of the passage; in station coordinates they would slide with the
+shift and a per-region peak would be comparing different pipe at each step.
+
+**Which end is which is the thing that must not be wrong.** Reverse it and
+the scheme still produces five tidy regions, still partitions the pipe, and
+reports the quietest region as the one that governs. `s` increases toward
+the stinger and the catenary hangs off its tip, so the catenary side is
+**high `s`**. This is not taken on the frame algebra alone: our own ILS-SH
+peak sits at `s_material` 6.833, which lands in the catenary-side third,
+exactly where the reference says the peak is in every case it ran.
+
+**Two cautions, both recorded in the data rather than in anyone's memory.**
+
+*The thirds are thinner than the mesh.* At the ruled 2×OD density (G10) a
+third of the deep section is 1.354 m and an element is 0.813 m, so X2 and X3
+hold **two** elements each and X4 holds **one**. A ratio between them is
+partly reporting the mesh, which is why every region carries its element
+count. Refined, the ratios move and then settle:
+
+| mesh | X2 | X3/X2 | X4/X2 |
+|---|---|---|---|
+| 2×OD (ruled) | 0.6868% | 0.784 | 0.702 |
+| 1×OD | 0.7286% | 0.749 | 0.712 |
+| 0.5×OD | 0.7951% | 0.744 | 0.691 |
+
+X3/X2 converges to 0.744 — **inside** the reference's 65–75% band, which it
+sits outside of at the ruled density. The apparent disagreement was mesh,
+not physics. (X2 itself keeps climbing with refinement, the same
+non-convergence the Mesh section below records for a thick body.)
+
+*X1 is two different things.* It lumps the catenary-side taper together with
+the plain pipe beyond it, and the reference calls both "governed by the
+plain-pipe catenary". At 2×OD that holds. Refined it does not: the model
+peak moves **onto the taper**, 0.395 m outboard of the deep section, at
+1.022× the X2 peak — the taper is where the lift gradient is steepest, so
+curvature concentrates there. Each region peak therefore also records
+whether it landed on the shroud footprint, so a reader can tell which of the
+two an X1 peak happened on.
+
 ## Mesh
 
 The pipe is chopped into short straight pieces, 2 diameters long away from
@@ -274,6 +346,7 @@ against each other rather than for quoting as the strain in a real pipe.
 
 | Date | Action |
 |---|---|
+| 30 Sep 2026 | **Added: the five strain regions of a shroud.** A body that steps no section has no junction to probe, so its reporting unit is a region, after the reference's Series 4 / Type B1 scheme: X1 catenary taper and beyond, X2/X3/X4 the deep section in thirds from the catenary side, X5 vessel taper and beyond. Orientation pinned against the measured peak. Two cautions recorded with it: at the ruled mesh the deep thirds hold 2, 2 and 1 elements, and X1 lumps a taper together with plain pipe. |
 | 29 Sep 2026 | **Corrected: Step 6 is built.** The section claiming the sweep driver was not ported had been stale since 22 Sep. Replaced with what exists and how it is verified, including the edge-crossing rule that makes the passage envelope independent of the sweep step. |
 | 29 Sep 2026 | **Added: two kinds of component.** Everything here was written for a thick-walled stiffening body. A shroud adds no stiffness and acts entirely by lifting the pipe off the rollers (`lift = V − OD/2`, `V` from the CENTRELINE), and the two act in opposite senses on local curvature — measured and tabulated. |
 | 21 Sep 2026 | **Corrected: sliding added.** An earlier version of this file stopped at the starting position and argued no sliding was needed, on the strength of a sweep that covers only 40% of a roller spacing. Sequential sliding is Step 6 and the reading moves to Step 7, taken across the whole passage. |

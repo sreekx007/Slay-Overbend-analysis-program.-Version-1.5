@@ -381,6 +381,29 @@ def owner_span(rows, key):
     return (min(idx), max(idx)) if idx else None
 
 
+REGION_FILL = {'X1': '#eef3f7', 'X2': '#f7d9d5', 'X3': '#f7ecd5',
+               'X4': '#e8f0e2', 'X5': '#eef3f7'}
+
+
+def region_spans(rows):
+    """[(name, x_lo, x_hi)] in world x, from the sampled `region` column.
+
+    Read off the file rather than recomputed: the regions are fixed on the
+    STEEL, and the writer measured them once off the assembly. Re-deriving
+    them here from L1 and L2 would be a second opinion about where X2 is.
+    """
+    out, cur, lo = [], None, None
+    for r in rows:
+        g = r.get('region', '')
+        if g != cur:
+            if cur:
+                out.append((cur, lo, float(r['x'])))
+            cur, lo = g, float(r['x'])
+    if cur:
+        out.append((cur, lo, float(rows[-1]['x'])))
+    return [(n, min(a, b), max(a, b)) for n, a, b in out if n]
+
+
 def junction_x(rows):
     """World x of every section step, read off the sampled section owner.
 
@@ -477,13 +500,29 @@ def plot_profile(prof, out, step=None):
         ax.plot(px[a:b + 1], py[a:b + 1], color='#8a5a00', lw=6.5,
                 solid_capstyle='butt', zorder=6, alpha=0.9)
     jx = junction_x(g)
+    regs = region_spans(g)
     for panel in (ax, bx, cx):
-        if sp:
+        if regs:
+            # THE REGION SCHEME, shaded. An offset body steps no section, so
+            # it has no junction to mark; the regions ARE its reporting
+            # units and a figure that does not show them cannot be checked
+            # against the region table.
+            for name, x_lo, x_hi in regs:
+                panel.axvspan(x_lo, x_hi, color=REGION_FILL.get(name, 'none'),
+                              alpha=0.75, zorder=0)
+        elif sp:
             panel.axvspan(px[sp[1]], px[sp[0]], color='#f2e3c4', alpha=0.55,
                           zorder=0)
         for xj in jx:
             panel.axvline(xj, color='#c1121f', lw=1.1, ls=(0, (4, 2)),
                           alpha=0.8, zorder=2)
+    if regs:
+        for name, x_lo, x_hi in regs:
+            if name in ('X2', 'X3', 'X4') or x_hi - x_lo > 1.0:
+                cx.annotate(name, (0.5 * (x_lo + x_hi), 0.965),
+                            xycoords=('data', 'axes fraction'), ha='center',
+                            va='top', fontsize=9, color='#5a6672',
+                            fontweight='bold')
     ax.set_aspect('equal')
     ax.invert_yaxis()
     ax.grid(alpha=0.2)
@@ -617,8 +656,10 @@ def plot_profile(prof, out, step=None):
             cx.set_ylim(0, 100 * max(inw) * 1.22)
     cx.set_title(
         'zoom on the component -- '
-        + ('the junction STEP, at a scale where it can be read'
-           if jx else
+        + ('the junction STEP, at a scale where it can be read' if jx else
+           f'the {c.get("region_scheme", "")} regions: no section step, so '
+           'no strain discontinuity -- the rise is the LIFT bending the '
+           'pipe' if regs else
            'no section step, so no strain discontinuity: the rise is the '
            'LIFT bending the pipe, not a change of section'),
         fontsize=9.5, loc='left')

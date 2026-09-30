@@ -51,7 +51,9 @@ import ils_builder                                            # noqa: E402
 
 from slay.report import junction as jr                        # noqa: E402
 from slay.report import passage as rp                         # noqa: E402
+from slay.report import regions as rg                         # noqa: E402
 from slay.report import schema as sch                         # noqa: E402
+from slay.study import sweep                                  # noqa: E402
 
 import slide                                                  # noqa: E402
 
@@ -204,7 +206,7 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
             # and wall are the archetype's own, so `L_OD` and `t_ratio` are
             # read back off it rather than driving it.
             ils = slide.archetype(case['family'])
-        sc, L_comp, recs, junc, probs = slide.passage(
+        sc, L_comp, recs, junc, probs, positions = slide.passage(
             arch_id='none', R=case['R'], spacing=case['spacing'],
             tension_mt=case['tension_mt'], OD=OD, t_wall=t_wall,
             step=2.0 * OD, ils=ils, verbose=False)
@@ -240,6 +242,23 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         d = junc[env.index] if junc and junc[env.index] else {}
         row['stiffness_ratio'] = d.get('stiffness_ratio', 1.0)
         row['n_junctions'] = d.get('n_junctions', 0)
+
+        # THE OFFSET REGION SCHEME. An offset body steps no section, so it
+        # has no junction to probe and every junction column above is empty
+        # for it -- which is why a shroud's row was indistinguishable from
+        # bare pipe but for `contact_lift_max`. The regions are its
+        # reporting unit. Empty for every other family, so the columns are
+        # blank rather than zero and nothing pools them into an average.
+        pr0 = next((q for q in probs if q is not None), None)
+        if ils is not None and pr0 is not None:
+            s_centre = sweep.start_centre(sc, L_comp)
+            geom = rg.offset_geometry(ils, s_centre, OD)
+            row.update(rg.case_columns(
+                geom, rg.region_peaks(positions, pr0, geom, env.zone_s_max)))
+            # OVERWRITES the body peak group, which `rp.body_peaks` fills
+            # from the junction rows and so zeroes for a body that steps no
+            # section. For an offset body the body is its FOOTPRINT.
+            row.update(rg.body_peaks(positions, pr0, geom, sc, env.zone_s_max))
         row['status'] = ('ok' if row['n_converged'] == row['n_positions']
                          else f'partial {row["n_converged"]}/{row["n_positions"]}')
         row['error'] = ''

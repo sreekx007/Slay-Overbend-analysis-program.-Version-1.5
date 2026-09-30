@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 27
+# entries: 28
 
 - id: T001
   date: 2026-09-21
@@ -721,3 +721,47 @@
     being in the writer rather than in the eye.
   lesson: L075
   refs: [rebuild/slay/report/profile_schema.py, rebuild/slay/report/profile.py, tools/emit_profile.py, tools/plot_from_schema.py, docs/SLAY_BUILD_INSTRUCTION.md]
+
+- id: T028
+  date: 2026-09-30
+  goal: >-
+    Give GD-SH the five-region strain scheme of the reference (Series 4, Type
+    B1, Table XXIX), so an offset body has a reporting unit at all. It steps
+    no section, so it has no junction to probe and every junction column in
+    its case row was empty -- body_peak_strain read 0.0 for the family with
+    the highest strain in the dataset.
+  action: >-
+    slay.report.regions measures the offset body off the SOLVED contact
+    profile -- not from the archetype spec -- and divides the pipe into X1
+    (catenary-side taper and beyond), X2/X3/X4 (deep section in thirds from
+    the catenary side) and X5 (vessel-side taper and beyond). Case schema to
+    1.2.0 with measured offset_L1/L2/V and patterned x1..x5 peaks; profile
+    schema to 1.1.0 with a region column on both tables; body_peak_* for an
+    offset body now taken over its footprint. Mesh refined 2x and 4x to test
+    the ratios.
+  case: 'ILS-SH, R=85, spacing 9, 120 MT, 406.4x21, L1=10D L2=2.5D V=1D'
+  outcome: success
+  evidence: >-
+    Geometry recovered from the contact profile to the sampling pitch: L1 =
+    4.062 against a defined 4.064, L2 = 1.015 / 1.015 against 1.016, V =
+    0.4064 exactly, lift = V - OD/2 = 0.2032. Region ordering reproduces the
+    reference: X2 is the peak (0.6868 pct), then X3 (0.784 of X2), then X4
+    (0.702), X4 lowest of the three. body_peak_strain now 0.6868 pct at
+    s_material 6.833, SR2, step 4 -- was 0.0 with step -1. GD-TP unchanged at
+    0.1336 pct and carries NO region columns, so the change is scoped to
+    bodies that step no section. Mesh study 2xOD / 1xOD / 0.5xOD: X3/X2 runs
+    0.784 / 0.749 / 0.744 and X4/X2 0.702 / 0.712 / 0.691.
+  verdict: >-
+    The scheme reproduces the reference at the reference's own mesh, and the
+    apparent disagreement on X3/X2 was mesh rather than physics -- refined,
+    it converges to 0.744, inside the stated 65-75 pct band. Two cautions are
+    now recorded in the data rather than in anyone's memory. Each region
+    carries n_elements, because at 2xOD the deep thirds hold 2, 2 and 1
+    elements and a ratio between them is reporting a mesh (L079). And each
+    region peak carries peak_on_shroud, because X1 lumps the catenary-side
+    taper together with the plain pipe beyond it -- at 0.5xOD the model peak
+    moves onto that taper, 0.395 m outboard of the deep section, at 1.022x
+    the X2 peak, which the reference's "governed by the plain-pipe catenary"
+    does not anticipate.
+  lesson: L078
+  refs: [rebuild/slay/report/regions.py, rebuild/slay/report/schema.py, rebuild/slay/report/profile_schema.py, rebuild/tests/test_regions.py, tools/dataset.py]
