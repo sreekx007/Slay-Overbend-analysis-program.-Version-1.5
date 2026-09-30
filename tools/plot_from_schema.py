@@ -586,8 +586,11 @@ def plot_profile(prof, out, step=None):
         f'({float(c["L_comp"]) / OD:.2g} x OD), '
         f'I_comp/I_pipe = {float(c["stiffness_ratio"]):.3f}'
         + (f', frame kT = {max(float(r["stiffness_ratio"]) for r in mem):.2f}'
-           f' x pipe, {len(conn_x)} connectors spanning '
-           f'{abs(conn_x[-1] - conn_x[0]) / OD:.1f} D' if conn_x else '')
+           f' x pipe, '
+           + (f'{len(conn_x)} connectors spanning '
+              f'{abs(conn_x[-1] - conn_x[0]) / OD:.1f} D' if len(conn_x) > 1
+              else '1 connector')
+           if conn_x else '')
         + '\n'
         f'step {step} of {c["n_positions"]}, shift {shift:.3f} m'
         f'{"  <- envelope" if step == int(float(c["envelope_step"])) else ""}',
@@ -638,13 +641,18 @@ def plot_profile(prof, out, step=None):
         ex.fill(*ring(px[a:b + 1], py[a:b + 1], -half, half),
                 facecolor='#e0b062', edgecolor='#8a5a00', lw=1.2, zorder=6,
                 alpha=0.95, label='component (thicker section)')
-    if sp_con and not sp_sec:        # a SHROUD: contact only, no section
+    if sp_con and not sp_sec:        # contact surface only, no section step
         a, b = sp_con
         deep = np.array(col(g, 'y_contact')[a:b + 1])
+        # NAMED FROM THE FILE. 'Shroud' is one kind of offset body; GD-SB is
+        # another, and it carries a frame as well. The owner column says
+        # which, so the legend does not have to guess.
+        who = next((r['contact_owner'] for r in g[a:b + 1]
+                    if r['contact_owner'] not in ('pipe', '')), 'offset body')
         ex.fill(*ring(px[a:b + 1], py[a:b + 1],
                       np.full(len(deep), OD / 2.0), deep),
                 facecolor='#e0b062', edgecolor='#8a5a00', lw=1.2, zorder=6,
-                alpha=0.95, label='shroud (contact surface only)')
+                alpha=0.95, label=f'{who} (contact surface only)')
     # ABOVE the wall fill (zorder 3-6), or the roller is drawn and then
     # painted over -- which looked exactly like "no roller in this window".
     draw_members(ex, mem, lw_struct=1.6, lw_conn=2.6)

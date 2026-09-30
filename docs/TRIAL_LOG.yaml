@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 31
+# entries: 32
 
 - id: T001
   date: 2026-09-21
@@ -879,3 +879,36 @@
     position and an envelope over a passage cannot be below it.
   lesson: L084
   refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/kernel.py, rebuild/slay/solve/constraints.py, rebuild/slay/physics/problem.py, tools/study_f2.py, rebuild/tests/test_passage_connectors.py]
+
+- id: T032
+  date: 2026-09-30
+  goal: >-
+    Run EA-SB with an F2 connection and with an F1, now that the EA frame is
+    fastened to the pipe at all, and draw both.
+  action: >-
+    Emitted both as profile artifacts and drew them from the files.
+    emit_profile gained --system, so the connection system is declared on
+    the archetype rather than constructed in a tool. Swept the step at 2, 1
+    and 0.5 x OD because both passages truncated at the default.
+  case: 'ILS-EASB, R=85, spacing 9 m, 120 MT, 406.4x21; F2 (2 connectors at the inner slots, 5.33 D apart) and F1 (1 connector at the centre)'
+  outcome: partial
+  evidence: >-
+    Both solve and draw. F2 at 1xOD step runs the FULL sweep, 30/30
+    positions to shift 10.128 m, envelope 2.0818 pct. F1 reaches shift 3.251
+    m at best (2xOD, 7/8), envelope 1.8230 pct. GD-SB is an OFFSET body as
+    well as a framed one: it holds the pipe 1.4224 m -- 3.5 x OD -- off the
+    arc over a 6.502 m deep section with 0.709 m tapers, which is why its
+    strains are around 2 pct where GD-ST's are around 1.
+  verdict: >-
+    The envelopes are LOWER BOUNDS, not answers, and the reason is recorded
+    rather than smoothed over. Every configuration except F2 at 1xOD
+    truncates mid-passage on CUTBACK EXHAUSTED at lam=0.0000 with carried
+    state and deep plasticity around 2 pct; raising n_increments to 600 does
+    not help, and refining the sweep step is NOT monotonic -- F2 goes
+    4.064 m at 2xOD, the whole 10.128 m at 1xOD, then back to 1.829 m at
+    0.5xOD. A finer path is not a safer one here, so this is not the
+    increment-size problem that L081 was, and seeding does not apply because
+    the failures are mid-passage where re-seeding would discard the carried
+    plastic state that mode A exists to keep.
+  lesson: L084
+  refs: [tools/emit_profile.py, docs/diagrams/easb_f2.png, docs/diagrams/easb_f1.png]

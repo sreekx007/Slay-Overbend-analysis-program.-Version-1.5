@@ -47,7 +47,7 @@ import plot_stinger as gen                          # noqa: E402
 TON = gen.TON
 
 
-def _ea_ils(arch_id, P_c1, kT, L_top):
+def _ea_ils(arch_id, P_c1, kT, L_top, system=None):
     """An EA archetype re-dimensioned, by editing its own definition."""
     import copy
     import json
@@ -55,6 +55,11 @@ def _ea_ils(arch_id, P_c1, kT, L_top):
     import ils_builder
     spec = copy.deepcopy({a['id']: a for a in json.loads(
         gen.FIXTURE.read_text())['archetypes']}[arch_id]['definition'])
+    if system is not None:
+        # WHICH SLOTS ARE POPULATED, not how they behave: F1 is a single F
+        # at the centre slot, F2 a pair at the inner slots. Declaring the
+        # system does not create the connection -- the builder does.
+        spec['ils']['connection_system'] = system
     c = spec['components'][0]
     if P_c1 is not None:
         c['P_c1'] = P_c1
@@ -67,7 +72,8 @@ def _ea_ils(arch_id, P_c1, kT, L_top):
 
 def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
          L_OD=None, t_ratio=None, step=None, out=None, samples=None,
-         case_id=None, target_len=None, P_c1=None, kT=None, L_top=None):
+         case_id=None, target_len=None, P_c1=None, kT=None, L_top=None,
+         system=None):
     """Solve the passage and write the tables. Returns the summary.
 
     `P_c1`, `kT` and `L_top` re-dimension an EA structure (GD-ST / GD-SB):
@@ -77,8 +83,8 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     definition, so `ils_builder` stays the author of what the component IS
     (G7) rather than geometry being constructed here.
     """
-    ils = _ea_ils(arch_id, P_c1, kT, L_top) if any(
-        v is not None for v in (P_c1, kT, L_top)) \
+    ils = _ea_ils(arch_id, P_c1, kT, L_top, system) if any(
+        v is not None for v in (P_c1, kT, L_top, system)) \
         else gen.build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
     OD = ils.assembly.pipe.OD_pipe
     t_wall = ils.assembly.pipe.t_pipe
@@ -154,7 +160,7 @@ def main() -> int:
                target_len=arg('--mesh', float),
                case_id=arg('--case-id', str),
                P_c1=arg('--P-c1', float), kT=arg('--kT', float),
-               L_top=arg('--L-top', float))
+               L_top=arg('--L-top', float), system=arg('--system', str))
     env = res['envelope']
     print(f'\n=== {aid} -> profile artifact ===')
     for t, s in res['summary'].items():

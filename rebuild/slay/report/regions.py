@@ -60,14 +60,14 @@ N_SAMPLES = 4000
 REGIONS = ('X1', 'X2', 'X3', 'X4', 'X5')
 
 ABOUT = {
-    'X1': 'taper on the CATENARY side, and the pipe beyond the shroud -- '
-          'governed by the plain-pipe catenary, not by the shroud',
+    'X1': 'taper on the CATENARY side, and the pipe beyond the body -- '
+          'governed by the plain-pipe catenary, not by the body',
     'X2': 'deep section, CATENARY-side third -- the peak strain location, '
           'and the region that governs design',
     'X3': 'deep section, midspan third -- intermediate strain',
     'X4': 'deep section, VESSEL-side third -- the lowest of the three; '
           'plateaus once V exceeds about 1.5 x OD',
-    'X5': 'taper on the VESSEL side, and the pipe beyond the shroud',
+    'X5': 'taper on the VESSEL side, and the pipe beyond the body',
 }
 
 
@@ -271,6 +271,11 @@ def region_peaks(positions, problem, geom, zone_s_max, shift_of=None) -> dict:
 
 def body_peaks(positions, problem, geom, scene, zone_s_max) -> dict:
     """The `body_peak_*` groups for an OFFSET body. {} when there is none.
+
+    'Offset body' is wider than 'shroud'. GD-SH is one; so is GD-SB, which
+    lifts the pipe 1.4224 m -- 3.5 x OD -- while ALSO carrying a frame and
+    connectors. The scheme keys on what the geometry does (the contact
+    surface moves, the section does not), never on the component's name.
 
     THE DEFECT THIS FIXES. `report.passage.body_peaks` asks the junction
     rows which elements are on the body, because for a section-changing
