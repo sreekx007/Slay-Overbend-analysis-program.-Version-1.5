@@ -139,6 +139,44 @@ def comp_cases() -> list:
     return cases
 
 
+def arch_cases(sweep_axes: bool = False) -> list:
+    """One OFAT sweep per ARCHETYPE, on the stinger axes only.
+
+    WHY THIS EXISTS AS CODE. `dataset_components.csv` was written once by
+    hand and then had no producer, so when the schema moved to 1.2.0 the
+    file stayed at 1.1.0 with no way to bring it forward -- and a test had
+    come to depend on it. A dataset nothing can regenerate is a screenshot.
+
+    The archetypes are taken AS BUILT: `L_OD` and `t_ratio` are fields of an
+    ILS definition, not knobs, so an archetype sweep varies only the things
+    that are not part of the component -- radius, spacing, pipe, tension.
+    GD-SH lives here and nowhere else: the main matrix is plain pipe and
+    GD-TP, so without this file the dataset contains no shroud at all and
+    the whole region scheme would be unexercised by it.
+
+    Archetypes that cannot be solved are RECORDED as FAILED rather than
+    dropped, so the file says which ones the toolchain does not yet reach.
+
+    DEFAULT IS ONE BASELINE CASE PER ARCHETYPE -- what this file has always
+    held, made reproducible. `sweep_axes=True` (`--arch-sweep`) turns it into
+    a full OFAT over radius, spacing, pipe and tension, which is 20 cases per
+    archetype and hours rather than minutes. Regenerating a file should not
+    silently become a new study.
+    """
+    ids = [a['id'] for a in json.loads(FIXTURE.read_text())['archetypes']]
+    axes = dict(R=R_VALUES, spacing=SPACING_VALUES, pipe=PIPE_VALUES,
+                tension_mt=TENSION_VALUES)
+    base = {k: BASE[k] for k in axes}
+    variants = ofat(axes, base) if sweep_axes else [dict(base)]
+    cases = []
+    for aid in ids:
+        for j, c in enumerate(variants):
+            cases.append(dict(c, design='ofat', family=aid,
+                              L_OD=0.0, t_ratio=0.0,
+                              case_id=f'A-{aid}-{j:02d}'))
+    return cases
+
+
 def build_component(OD: float, t_wall: float, L_OD: float, t_ratio: float):
     """A GD-TP of the requested length and wall, on the requested pipe.
 
@@ -437,7 +475,12 @@ def main() -> int:
     limit = opt('--limit', None, int)
     resume = '--resume' in a
 
-    cases = plain_cases() + comp_cases()
+    # THREE FILES, THREE FAMILIES, one runner. `dataset_components.csv` had
+    # no producer at all until now, which is how it came to sit a schema
+    # version behind everything else.
+    arch_only = '--archetypes' in a
+    cases = (arch_cases('--arch-sweep' in a) if arch_only
+             else plain_cases() + comp_cases())
     if limit:
         cases = cases[:limit]
     total = len(cases)
@@ -447,9 +490,11 @@ def main() -> int:
     # an hour. Completed cases are carried forward verbatim rather than
     # re-solved, and the schema check in `load_done` refuses to continue a
     # file written against a different contract.
+    files = (('dataset_components.csv',) if arch_only
+             else ('dataset_plain.csv', 'dataset_gdtp.csv'))
     done = {}
     if resume:
-        for name in ('dataset_plain.csv', 'dataset_gdtp.csv'):
+        for name in files:
             done.update(load_done(out / name))
         if done:
             print(f'resuming: {len(done)} case(s) already done, '
@@ -468,12 +513,21 @@ def main() -> int:
 
     started, plain, comp = time.time(), [], []
     budget_hit = False
+
+    def flush():
+        if arch_only:
+            write_csv(comp, out / 'dataset_components.csv')
+        else:
+            write_csv(plain, out / 'dataset_plain.csv')
+            write_csv(comp, out / 'dataset_gdtp.csv')
+            write_report(plain, comp, out / 'DATASET.md', started,
+                         len(plain) + len(comp), total)
+
     for i, case in enumerate(cases, 1):
         old = done.get(case['case_id'])
         if old is not None:
             (plain if old.get('family') == 'plain' else comp).append(old)
-            write_csv(plain, out / 'dataset_plain.csv')
-            write_csv(comp, out / 'dataset_gdtp.csv')
+            flush()
             continue
         if time.time() - started > budget:
             print(f'budget reached after {i - 1} cases')
@@ -481,14 +535,14 @@ def main() -> int:
             break
         row = run_case(case, git_sha, stamp)
         (plain if row['family'] == 'plain' else comp).append(row)
-        print(f'[{i:3d}/{total}] {row["case_id"]:5s} {row["status"]:22s} '
+        print(f'[{i:3d}/{total}] {row["case_id"]:14s} {row["status"]:22s} '
               f'{row.get("seconds", 0):6.1f}s', flush=True)
-        write_csv(plain, out / 'dataset_plain.csv')
-        write_csv(comp, out / 'dataset_gdtp.csv')
-        write_report(plain, comp, out / 'DATASET.md', started, i, total)
-    write_report(plain, comp, out / 'DATASET.md', started,
-                 len(plain) + len(comp), total, budget_hit)
-    print(f'done: {len(plain)} plain, {len(comp)} gd-tp, '
+        flush()
+    flush()
+    if not arch_only:
+        write_report(plain, comp, out / 'DATASET.md', started,
+                     len(plain) + len(comp), total, budget_hit)
+    print(f'done: {len(plain)} plain, {len(comp)} component, '
           f'{(time.time() - started) / 3600.0:.2f} h')
     return 0
 
