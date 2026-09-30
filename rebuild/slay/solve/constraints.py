@@ -43,6 +43,44 @@ from slay.model.parts import TIES_OPEN, TIES_SHUT
 RELEASE_FTOL = 1e-6
 
 
+def constraint_rows_from(associations, part_index, engaged=None,
+                         ties_override=None):
+    """The same rows, from the two things `constraint_rows` actually needs.
+
+    SPLIT OUT so a `Problem` can use it. A Problem is flat and serialisable
+    on purpose -- no Model object -- and the passage solver only has one of
+    those. Taking the associations and the part index directly means the
+    sliding solver and the static one resolve ties through the SAME code
+    rather than through two readings of the same rule.
+    """
+    engaged = engaged or {}
+    ties_override = ties_override or {}
+    out = []
+    for a in associations:
+        ctype, ties = a.conn_type, a.ties
+        if a.node_a in ties_override:
+            ties = ties_override[a.node_a]
+            if ties is None:
+                continue                  # slot not populated: no tie at all
+        state = engaged.get(a.node_a, 0)
+        if ctype == 'D' and state:
+            ties = TIES_SHUT['D']
+        for k, on in enumerate(ties):
+            if not on:
+                continue
+            target = 0.0
+            if ctype == 'D' and state and k == 1:
+                if a.gap is None:
+                    raise ValueError(
+                        f'{a.node_a}: a D engaged with no P_gap. The gap is '
+                        f'component data (GD-ST/GD-SB P_gap) and has no '
+                        f'default -- a silent one would choose where the '
+                        f'redistributed strain goes.')
+                target = math.copysign(a.gap, state)
+            out.append((part_index[a.node_a], part_index[a.node_b], k, target))
+    return out
+
+
 def constraint_rows(model, engaged=None, ties_override=None):
     """(node_a, node_b, component, target) for every tie to enforce.
 
@@ -65,35 +103,8 @@ def constraint_rows(model, engaged=None, ties_override=None):
     produced them, so a comparison between joint types is exact rather than
     nearly so.
     """
-    idx = model._part_index
-    engaged = engaged or {}
-    ties_override = ties_override or {}
-    out = []
-    for a in model.associations:
-        ctype, ties = a.conn_type, a.ties
-        if a.node_a in ties_override:
-            ties = ties_override[a.node_a]
-            if ties is None:
-                continue                  # slot not populated: no tie at all
-        state = engaged.get(a.node_a, 0)
-        if ctype == 'D' and state:
-            ties = TIES_SHUT['D']
-        for k, on in enumerate(ties):
-            if not on:
-                continue
-            target = 0.0
-            if ctype == 'D' and state and k == 1:
-                if a.gap is None:
-                    raise ValueError(
-                        f'{a.node_a}: a D engaged with no P_gap. The gap is '
-                        f'component data (GD-ST/GD-SB P_gap) and has no '
-                        f'default -- a silent one would choose where the '
-                        f'redistributed strain goes. Nothing upstream '
-                        f'enforces it either (CUN-001), so it is checked '
-                        f'here.')
-                target = math.copysign(a.gap, state)
-            out.append((idx[a.node_a], idx[a.node_b], k, target))
-    return out
+    return constraint_rows_from(model.associations, model._part_index,
+                                engaged, ties_override)
 
 
 def deadband_associations(model):

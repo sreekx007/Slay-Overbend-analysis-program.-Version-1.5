@@ -47,7 +47,8 @@ import nlfea_v4 as fe
 
 from slay.solve import contact as ctc
 from slay.solve import penalty as pen
-from slay.solve.kernel import mesh_of_problem
+from slay.solve import constraints as cons
+from slay.solve.kernel import dof, mesh_of_problem, problem_connectors
 
 # Penalty multiplier on K's global diagonal maximum. 1e8 is the validated
 # value for a first (unchained) solve; a continued one uses less, because it
@@ -159,6 +160,26 @@ def solve(problem, state_in: SolveState = None, *,
         polar=polar)
     ndof = ms.n_dofs
 
+    # Built ONCE: a connector's 6x6 depends on the undeformed chord and the
+    # pipe section, neither of which changes as the pipe slides. Empty for
+    # every model without an EA structure, which is all of them but two
+    # archetypes -- so this costs nothing where it does nothing.
+    conn = problem_connectors(problem, ms)
+
+    # THE DECLARED TIES. A connector element has its OWN two nodes -- one at
+    # the pipe, one at the structure -- and Associations are what fasten
+    # them to the real pipeline and frame nodes (T3 section 7). Without them
+    # the frame is held by nothing: `solve.newton` says so in as many words,
+    # "a Group B model with its associations unapplied looks exactly like
+    # this", and that is exactly what the passage solver was doing.
+    #
+    # `engaged` is left empty, so every D is OPEN. That is not a shortcut:
+    # the deadband active set belongs to `solve.newton`, and a D that
+    # silently behaved as an F here would be the substitution G9 forbids --
+    # `problem_connectors` refuses anything but F before this point.
+    tie_rows = cons.constraint_rows_from(problem.associations,
+                                         problem.part_index or {})
+
     slots = ctc.slots_from_targets(problem.contacts, ms)
     anchor_dofs = _anchor_dofs(problem, ms)
     dist, joint = _loads(problem, ms, index_of)
@@ -196,11 +217,39 @@ def solve(problem, state_in: SolveState = None, *,
             for it in range(MAX_NEWTON):
                 K, Fint, Fext, th, ps_trial = fe.assemble(
                     ms, U, th, dist, joint, lam, plastic_state=ps_inc_start)
+                # THE PENALTY SCALES AGAINST THE BEAM STIFFNESS, and must be
+                # taken BEFORE the connectors are added. A connector's 6x6 is
+                # built at 1 x OD, so its diagonal is ~1.3e10 against the
+                # beams' ~3e6 -- folding it into `p_scale` multiplied the
+                # penalty by four orders of magnitude and the first residual
+                # came out at 1.0e18 with a NaN solve. `penalty.py`'s
+                # multiplier was tuned against the beam stiffness and means
+                # nothing against any other basis.
                 p_scale = float(K.diagonal().max())
                 p_val = p_scale * pen_mult
                 Kl = lil_matrix(K)
+
+                # CONNECTORS, ASSEMBLED OUTSIDE THE KERNEL MESH. A
+                # corotational beam takes its stiffness from its own length
+                # and a connector's length is geometry, not stiffness, so
+                # the kernel gets the pipeline and the frame only and this
+                # puts the ties back. Without it the EA frame is attached to
+                # nothing -- 18 elements floating free, a rigid-body
+                # mechanism, and an exactly singular matrix.
+                for _d, _k6 in conn:
+                    for _a in range(6):
+                        for _b in range(6):
+                            Kl[_d[_a], _d[_b]] += _k6[_a, _b]
+                    Fint[_d] += _k6 @ U[_d]
+
                 R = Fext - Fint
 
+                # Ties first: `apply_constraints` sizes its penalty from
+                # the diagonal it finds, so it must see the beam and
+                # connector stiffness already in place.
+                if tie_rows:
+                    pen.apply_constraints(Kl, R, U, tie_rows,
+                                          lambda n, c: dof(ms, n, c))
                 for d in anchor_dofs:
                     Kl[d, d] += p_val
                     R[d] += p_val * (0.0 - U[d])

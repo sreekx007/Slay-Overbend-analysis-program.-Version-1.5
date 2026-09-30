@@ -55,6 +55,11 @@ class Problem:
     elastic_spans: tuple = ()   # arc spans FORCED elastic, applied by solve
     material: object = None
     R: float = 0.0
+    part_index: dict = None     # part-node name -> node index. Carried so a
+                                # solver holding only a Problem can resolve
+                                # `associations` into DOFs: the names are
+                                # what the model speaks, the indices are what
+                                # the kernel numbers.
 
     # -- queries ----------------------------------------------------------
     @property
@@ -134,6 +139,7 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                           e.connector.length, e.connector.slot)
                          for e in model.elements if e.connector is not None),
         associations=tuple(model.associations),
+        part_index=dict(model._part_index),
         contacts=tuple(contact_targets(model, scene, assembly=assembly,
                                        shift=shift, s_centre=s_centre,
                                        OD=OD,

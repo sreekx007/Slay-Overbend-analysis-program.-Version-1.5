@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 30
+# entries: 31
 
 - id: T001
   date: 2026-09-21
@@ -836,3 +836,46 @@
     frame archetypes as physics when they are a mechanism in the model.
   lesson: L083
   refs: [rebuild/slay/physics/capacity.py, rebuild/tests/test_capacity.py, tools/dataset.py]
+
+- id: T031
+  date: 2026-09-30
+  goal: >-
+    Make EA-ST with an F2 connection analysable at all, then run the
+    reference's two published F2 cases against it.
+  action: >-
+    Diagnosed the singular matrix rather than guessing. The EA frame was
+    assembled attached to NOTHING: Problem splits connectors out of
+    `elements` and mesh_of_problem never put them back, and the associations
+    that fasten a connector's own two nodes to the real pipe and frame nodes
+    were applied by solve.newton but never by solve.passage. Added
+    kernel.problem_connectors, carried part_index onto the Problem, split
+    constraint_rows so a Problem can resolve ties through the SAME code the
+    static solver uses, and applied both in the Newton loop. Then built
+    tools/study_f2.py for the two cases with the X_c / X_i / X_e regions.
+  case: 'ILS-EAST F2, R=85, spacing 9 m, 120 MT, 406.4x21; Case 1 P_c1=10D kT=2.22, Case 2 P_c1=20D kT=2.85'
+  outcome: partial
+  evidence: >-
+    All three EA archetypes now converge where none ever had: ILS-EAST 14/14
+    positions, ILS-EASB 8/9, ILS-ILT 13/13. Both F2 cases run 19/19. Case 1
+    X_c envelope 0.923 pct against the reference's 0.936 pct, -1.4 pct.
+    Case 2 X_c 1.615 pct against 1.410, +14.5 pct, though position 5 of the
+    passage reads 1.414 pct. The ORDERING is reproduced in both cases:
+    X_c > X_e >> X_i, with X_i an order of magnitude below the others, which
+    is the reference's actual finding. The peak sits 1.00 D from the nearest
+    connector at every mesh and every L_top tried, matching Fig 33. L_top
+    sensitivity is small -- Case 1 moves 0.6 pct between 22 D and 30 D, Case
+    2 about 2 pct -- so the one assumed dimension is not what decides the
+    answer. Connector-free cases reproduce to 0.00e+00 pct, so nothing else
+    moved. 609 passed.
+  verdict: >-
+    The machinery works and Case 1 lands within 1.4 pct. TWO DISCREPANCIES
+    ARE NOT YET EXPLAINED and the outcome is recorded as partial for that
+    reason. X_e runs 27-34 pct LOW in both cases, consistently, which a
+    single sign of error suggests is systematic rather than noise -- the
+    reporting band excludes the last three stinger rollers and the reference
+    may not. X_i runs 65-74 pct high, though on values of 0.04-0.12 pct
+    where a 2xOD element is a coarse instrument. Case 2's X_c being high is
+    at least partly the comparison being unlike: the reference reports ONE
+    position and an envelope over a passage cannot be below it.
+  lesson: L084
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/kernel.py, rebuild/slay/solve/constraints.py, rebuild/slay/physics/problem.py, tools/study_f2.py, rebuild/tests/test_passage_connectors.py]

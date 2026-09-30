@@ -158,6 +158,69 @@ def _kernel_material(mid: int, material, E: float):
     raise TypeError(f'unknown material type {type(material).__name__}')
 
 
+def pipe_section_of(problem):
+    """(OD, t, E) of the PIPELINE section, for sizing connectors.
+
+    A connector's own 6x6 is built on the pipe's section properties -- it is
+    a clamp of pipe-like proportions, not a member with a section of its own
+    -- so a non-default diameter has to come from the Problem rather than
+    from `config`. Taken as the most common section among pipeline elements,
+    because a tapered component gives the pipeline several and the modal one
+    is the plain pipe.
+    """
+    secs = {s.index: s for s in problem.sections}
+    counts = {}
+    for (idx, _n1, _n2, owner, _line) in problem.elements:
+        if owner != 'pipeline' or idx not in secs:
+            continue
+        s = secs[idx]
+        counts[(s.OD, s.t, s.E)] = counts.get((s.OD, s.t, s.E), 0) + 1
+    if not counts:
+        return (config.OD_PIPE_DEF, config.T_WALL_DEF, config.STEEL_E)
+    return max(counts, key=counts.get)
+
+
+def problem_connectors(problem, ms, OD=None, t_wall=None, E=None):
+    """[(dofs, k6)] -- one entry per connector on a Problem.
+
+    WHY THIS EXISTS. `Problem` splits connectors out of `elements` into their
+    own field, and `mesh_of_problem` builds the kernel mesh from `elements`
+    alone -- correctly, because a corotational beam would take its stiffness
+    from its own length and a connector's length is geometry, not stiffness
+    (the module docstring above). But nothing then put the connectors BACK,
+    so `solve.passage` assembled the EA frame attached to nothing at all:
+    18 frame elements, 2 connectors dropped, a rigid-body mechanism and an
+    exactly singular matrix. `kernel.assemble` does this for the Model path
+    and had no counterpart here.
+
+    G9 IS ENFORCED HERE. The solver implements type F only. A P, S or D
+    connector is REFUSED rather than approximated, because approximating it
+    would silently answer a different question -- the joint type selects
+    which DOF the constraint ties, and substituting F ties all of them.
+    """
+    OD_p, t_p, E_p = pipe_section_of(problem)
+    OD = OD_p if OD is None else OD
+    t_wall = t_p if t_wall is None else t_wall
+    E = E_p if E is None else E
+
+    xy = {i: (sv, y) for (i, sv, y) in problem.nodes}
+    out = []
+    for (_idx, n1, n2, ctype, _length, slot) in problem.connectors:
+        kind = str(ctype).upper().lstrip('TYPE').strip() or str(ctype).upper()
+        if not kind.startswith('F'):
+            raise ValueError(
+                f'connector at slot {slot} is type {ctype!r}; the solver '
+                f'implements F only and must refuse the rest rather than '
+                f'approximate it (G9)')
+        (s1, y1), (s2, y2) = xy[n1], xy[n2]
+        k6 = connector_k6(s2 - s1, y2 - y1, axis=NOMINAL_AXIS,
+                          OD=OD, t_wall=t_wall, E=E)
+        dofs = [dof(ms, n1, 0), dof(ms, n1, 1), dof(ms, n1, 2),
+                dof(ms, n2, 0), dof(ms, n2, 1), dof(ms, n2, 2)]
+        out.append((dofs, k6))
+    return out
+
+
 def mesh_of_problem(problem, n_points_polar: int = 8, n_fibres: int = 20,
                     polar: bool = True):
     """(MeshedStructure, beams, element-index -> kernel element id).

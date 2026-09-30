@@ -1826,3 +1826,56 @@
   detect: test_the_hard_corner_gets_a_physical_explanation, test_a_comfortable_case_gets_NOTHING, test_the_threshold_separates_the_matrix_as_it_actually_ran
   refs: [rebuild/slay/physics/capacity.py, rebuild/tests/test_capacity.py, tools/dataset.py]
   date: 2026-09-30
+
+- id: L084
+  area: solve
+  class: defect
+  symptom: >-
+    No lay position of any EA archetype had ever converged. ILS-EAST,
+    ILS-EASB and ILS-ILT all reported CUTBACK EXHAUSTED at lam=0.0000 with
+    the kernel warning "Matrix is exactly singular", even with every roller
+    held, elastic, and no loads applied at all.
+  cause: >-
+    TWO defects stacked, either fatal alone and both looking identical from
+    outside. First, Problem splits connectors out of `elements` into
+    `connectors`, and mesh_of_problem builds the kernel mesh from `elements`
+    alone -- correct, since a corotational beam would take its stiffness from
+    its own length and a connector's length is geometry -- but nothing put
+    the connectors back, so their 6x6 was never assembled. Second, a
+    connector element has its OWN two nodes and ASSOCIATIONS are what fasten
+    them to the real pipeline and frame nodes; solve.newton applies them and
+    solve.passage never did. Between them the frame was 18 elements attached
+    to nothing.
+  rule: >-
+    A Problem must carry everything a solver needs to pose it. It gained
+    part_index so associations can be resolved into DOFs without a Model, and
+    solve.passage now assembles connector stiffness and applies the declared
+    ties through the SAME constraint_rows code the static solver uses -- one
+    rule read once, rather than two solvers enforcing different joints on the
+    same geometry. solve.newton already named the symptom in its own error
+    text: "a Group B model with its associations unapplied looks exactly like
+    this". Reading that would have saved the diagnosis.
+  detect: test_every_EA_archetype_now_solves_its_first_position, test_the_ties_exist_and_reach_both_bodies, test_constraint_rows_agree_between_the_model_and_problem_paths, test_a_model_without_a_frame_has_neither_connectors_nor_ties
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/kernel.py, rebuild/slay/solve/constraints.py, rebuild/slay/physics/problem.py, rebuild/tests/test_passage_connectors.py]
+  date: 2026-09-30
+
+- id: L085
+  area: solve
+  class: defect
+  symptom: >-
+    Adding connector stiffness, the first attempt moved the penalty scale to
+    AFTER the connectors -- "so the penalty is scaled against the stiffness
+    the structure actually has". The first residual came out at 1.0e18 and
+    the solve returned NaN.
+  cause: >-
+    A connector's 6x6 is built at 1 x OD, so its diagonal is about 1.3e10
+    against the beams' 3e6. Folding it into p_scale multiplied the penalty by
+    four orders of magnitude. penalty.py's multiplier was tuned by sweep
+    against the BEAM stiffness and means nothing against any other basis.
+  rule: >-
+    A tuned constant carries its basis with it. Changing what a multiplier
+    multiplies is changing the constant, even when the new basis is the more
+    defensible one. p_scale is taken before the connectors are added.
+  detect: test_the_penalty_is_scaled_on_the_BEAM_stiffness, test_every_EA_archetype_now_solves_its_first_position
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/penalty.py, rebuild/tests/test_passage_connectors.py]
+  date: 2026-09-30
