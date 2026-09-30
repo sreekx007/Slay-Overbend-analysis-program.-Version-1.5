@@ -1922,3 +1922,26 @@
   detect: test_numpy_scalars_serialise_as_plain_numbers, test_a_members_row_round_trips_as_numbers
   refs: [rebuild/slay/report/profile.py, rebuild/tests/test_profile_schema.py]
   date: 2026-09-30
+
+- id: L088
+  area: process
+  class: defect
+  symptom: >-
+    A new study for the reference's EA-SB cases was written to
+    tools/study_easb.py, which ALREADY EXISTED and holds a different study
+    -- ILS-EASB through every connection system, exercising the zero-length
+    connector. The file was overwritten and four tests in test_easb.py broke.
+  cause: >-
+    Not checking whether the name was taken. The write tool reported
+    "updated successfully" rather than "created", which said so plainly, and
+    the docs/TOOLCHAIN.md tool table listed study_easb.py among the
+    archetype studies. Both signals were there to read.
+  rule: >-
+    Before writing a new file, check the name is free -- and read what the
+    write tool says it did. "Updated" for a file you meant to create is a
+    destroyed file, and the only reason this one was recoverable is that it
+    was committed. The new study is study_easb_cases.py and says in its own
+    docstring which of the two it is not.
+  detect: test_ps_is_a_passenger_here_too, test_ea_sb_shields_its_pipe_less_than_ea_st
+  refs: [tools/study_easb.py, tools/study_easb_cases.py]
+  date: 2026-09-30

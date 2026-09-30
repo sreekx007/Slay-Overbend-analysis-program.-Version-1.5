@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 32
+# entries: 33
 
 - id: T001
   date: 2026-09-21
@@ -912,3 +912,43 @@
     plastic state that mode A exists to keep.
   lesson: L084
   refs: [tools/emit_profile.py, docs/diagrams/easb_f2.png, docs/diagrams/easb_f1.png]
+
+- id: T033
+  date: 2026-09-30
+  goal: >-
+    Run the reference's four published EA-SB cases -- F1 Case 1 and F2 Cases
+    1 to 3 -- at their stated parameters.
+  action: >-
+    Built tools/study_easb.py. The parameters map one for one onto
+    component_spec.BaseStructure's own field names (P_l1, P_l2, P_v, P_c1,
+    kB_ratio), so the cases are set by editing the archetype definition
+    rather than by constructing geometry. The region classifier is IMPORTED
+    from study_f2 rather than restated, so the EA-ST and EA-SB studies
+    cannot drift apart on what X_c means.
+  case: 'ILS-EASB, R=85, spacing 9 m, 120 MT, 406.4x21, sweep step 1xOD; P_v = 2D in every case'
+  outcome: partial
+  evidence: >-
+    All four converge over the FULL passage, where the archetype as shipped
+    had truncated. The shipped P_v is 1.6256 m = 4 D, giving a 3.5 D lift;
+    every published case is 2 D, a 1.5 D lift, and the difference is what
+    was driving the earlier truncations. Against the reference, X_c reads
+    -58.7, -43.7, -6.8 and -41.8 pct for F1 C1 and F2 C1-C3; X_e -19.4,
+    -10.1, -45.0, -10.5; X_i about +50 pct on values of 0.09-0.14 pct. The
+    ORDERING X_c > X_e >> X_i is reproduced in every case.
+  verdict: >-
+    A real disagreement, and one candidate explanation is ELIMINATED rather
+    than left open: we are LOW while taking a passage envelope, and an
+    envelope cannot be below a single position, so unlike EA-ST Case 2 this
+    is not an unlike-comparison artefact. Our model is also far more
+    sensitive to connector placement than the reference's -- F2 Case 2, the
+    only case whose connectors sit exactly at the deep section's edges, is
+    the only one that lands close at -6.8 pct, while the two cases with
+    connectors 2.5 D inboard both read about -42 pct. Re-defining X_c at the
+    body's taper instead of at the connector was tested and does not explain
+    it: the values move by at most 0.19 pct. P_l2 was checked and IS applied
+    -- the built extent is P_l1 + 2*P_l2 to the millimetre -- so the cases
+    are what they claim to be. F1D and F2D are NOT run: they carry D
+    connectors and the passage solver implements F only, which G9 requires
+    be refused rather than approximated.
+  lesson: L084
+  refs: [tools/study_easb_cases.py, tools/emit_profile.py, docs/diagrams/easb_f2_case2.png, docs/diagrams/easb_f1_case1.png]
