@@ -1,14 +1,14 @@
 # SLAY Overbend — ML case matrix
 
-**67 of 200 cases run**, 0.18 h of solving
+**72 of 200 cases run**, 0.21 h of solving
 
 | | |
 |---|---|
 | Produced | 30 September 2026 |
 | Branch | `claude/program-rebuild-status-bya72s` |
 | Runner | `tools/dataset.py`, seed 20260928 |
-| Converged fully | 61 (91%) |
-| Converged partly | 6 (9%) |
+| Converged fully | 66 (92%) |
+| Converged partly | 6 (8%) |
 | Failed | 0 (0%) |
 
 Row = one case = one complete passage. Target columns come in two readings: the bare name is the **snapshot** at the envelope position, `_env` is the worst that location saw at **any** position. Both come from the same solve.
@@ -17,7 +17,7 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 
 | File | Rows | Contents |
 |---|---|---|
-| `dataset_plain.csv` | 67 | plain pipe, no component |
+| `dataset_plain.csv` | 72 | plain pipe, no component |
 | `dataset_gdtp.csv` | 0 | GD-TP thick component |
 
 ## Axes
@@ -102,6 +102,11 @@ Row = one case = one complete passage. Target columns come in two readings: the 
 | P064 | lhs | 150 | 7.5 | 508×25.4 | 80 | 0 | 0 | — | — | 1.000 | 4.9s | ok |
 | P065 | lhs | 70 | 9 | 323.9×17.5 | 40 | 0 | 0 | — | — | 1.000 | 11.2s | ok |
 | P066 | lhs | 85 | 10.5 | 406.4×21 | 120 | 0 | 0 | — | — | 1.000 | 11.8s | ok |
+| P067 | lhs | 60 | 12 | 508×25.4 | 40 | 0 | 0 | — | — | 1.000 | 44.5s | ok |
+| P068 | lhs | 120 | 9 | 610×28.6 | 120 | 0 | 0 | — | — | 1.000 | 12.2s | ok |
+| P069 | lhs | 70 | 6 | 508×25.4 | 160 | 0 | 0 | — | — | 1.000 | 8.7s | ok |
+| P070 | lhs | 150 | 7.5 | 273.1×15.9 | 200 | 0 | 0 | — | — | 1.000 | 3.6s | ok |
+| P071 | lhs | 85 | 9 | 219.1×12.7 | 120 | 0 | 0 | — | — | 1.000 | 6.7s | ok |
 
 ## Cases that did not fully converge
 
