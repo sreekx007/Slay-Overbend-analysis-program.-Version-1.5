@@ -137,7 +137,7 @@ def _sections(step, shift, shroud=False):
                  section_owner=('comp' if (inside and not shroud)
                                 else 'pipe'),
                  region=(_region(0.5 * (a + b)) if shroud else ''),
-                 in_band=bool(b + shift < ZONE))
+                 owner='pipeline', in_band=bool(b + shift < ZONE))
         rows.append(r)
     return rows
 

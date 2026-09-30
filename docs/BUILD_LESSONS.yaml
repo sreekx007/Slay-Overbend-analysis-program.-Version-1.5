@@ -1879,3 +1879,46 @@
   detect: test_the_penalty_is_scaled_on_the_BEAM_stiffness, test_every_EA_archetype_now_solves_its_first_position
   refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/penalty.py, rebuild/tests/test_passage_connectors.py]
   date: 2026-09-30
+
+- id: L086
+  area: plot
+  class: defect
+  symptom: >-
+    The first EA-ST stinger figure had a strain trace that zig-zagged
+    violently between 0 and 0.92 pct either side of the connectors, looking
+    like a numerical instability in the solve.
+  cause: >-
+    Two structures drawn as one line. The sections table carried every
+    element of the problem, and an EA frame's 18 members solve on the same
+    axis as the pipe; sorted by material coordinate they interleave. The
+    table had section_owner, which says whose SECTION an element carries,
+    and a frame member carries the PIPE's section -- so the column that
+    looked like it would separate them could not.
+  rule: >-
+    Whose section an element carries and which body it belongs to are two
+    different questions, and a profile must answer both. The sections table
+    gained `owner`, and a trace filters on that. The solve was never wrong;
+    only the drawing was.
+  detect: test_owner_and_section_owner_are_different_questions, test_a_trace_filtered_on_owner_drops_the_frame
+  refs: [rebuild/slay/report/profile_schema.py, rebuild/slay/report/profile.py, tools/plot_from_schema.py, rebuild/tests/test_profile_schema.py]
+  date: 2026-09-30
+
+- id: L087
+  area: measure
+  class: defect
+  symptom: >-
+    The members table wrote every coordinate as the literal text
+    np.float64(-9.619599858094242), and the plotter refused the file.
+  cause: >-
+    _fmt used repr() for floats, and under numpy 2 a numpy scalar's repr is
+    np.float64(x) rather than x. Rows built from a displacement array carry
+    numpy scalars without anyone noticing; the geometry table had escaped it
+    only because its values happened to be cast through float() at the call
+    site.
+  rule: >-
+    Coerce at the WRITER, once, not by remembering to call float() at every
+    site that builds a row. A serialiser that trusts repr() is trusting
+    every upstream type to have a stable one.
+  detect: test_numpy_scalars_serialise_as_plain_numbers, test_a_members_row_round_trips_as_numbers
+  refs: [rebuild/slay/report/profile.py, rebuild/tests/test_profile_schema.py]
+  date: 2026-09-30

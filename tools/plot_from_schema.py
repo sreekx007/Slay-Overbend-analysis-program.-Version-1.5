@@ -308,6 +308,7 @@ def plot_case(row, schema, ax_j, ax_s):
 # convention that could be got wrong silently.
 
 TABLES = ('geometry', 'sections', 'stations')
+OPTIONAL_TABLES = ('members',)      # present only for an EA case
 
 
 def load_profile(stem):
@@ -318,10 +319,18 @@ def load_profile(stem):
         p = Path(f'{stem}.{t}.csv')
         if not p.exists():
             raise SystemExit(
-                f'no {t} table at {p}. A profile is three tables; emit one '
-                f'with `python3 tools/emit_profile.py`.')
+                f'no {t} table at {p}. A profile is three tables plus an '
+                f'optional `members`; emit one with '
+                f'`python3 tools/emit_profile.py`.')
         out[t] = load(p)
-    v = {out[t][1].get('profile_schema_version') for t in TABLES}
+    # OPTIONAL, and its absence means something: no attached structure. A
+    # case with no EA frame writes no members table at all, so demanding one
+    # would refuse every ordinary case.
+    for t in OPTIONAL_TABLES:
+        p = Path(f'{stem}.{t}.csv')
+        if p.exists():
+            out[t] = load(p)
+    v = {out[t][1].get('profile_schema_version') for t in out}
     if len(v) > 1:
         raise SystemExit(f'the three tables disagree on schema version: {v}')
     return out
@@ -442,6 +451,27 @@ def strain_runs(rows):
     return runs
 
 
+def draw_members(panel, mem, lw_struct=2.0, lw_conn=3.0):
+    """Draw the attached structure and its connectors on one axis.
+
+    Each member is a straight segment between two SOLVED points, so nothing
+    here needs to know what a portal frame is -- it draws what the file
+    says. Connectors are drawn heavier and in the body colour because they
+    are the load path into the pipe.
+    """
+    for r in mem:
+        x0, y0 = float(r['x_0']), float(r['y_0'])
+        x1, y1 = float(r['x_1']), float(r['y_1'])
+        if r['kind'] == 'connector':
+            panel.plot([x0, x1], [y0, y1], color='#8a5a00', lw=lw_conn,
+                       solid_capstyle='round', zorder=7)
+            panel.plot([x0], [y0], marker='s', ms=lw_conn + 1.5,
+                       color='#8a5a00', zorder=8)
+        else:
+            panel.plot([x0, x1], [y0, y1], color='#2f6f3e', lw=lw_struct,
+                       solid_capstyle='round', zorder=6, alpha=0.95)
+
+
 def plot_profile(prof, out, step=None):
     """The five-panel figure, drawn from the three tables and nothing else."""
     import matplotlib
@@ -453,12 +483,21 @@ def plot_profile(prof, out, step=None):
     geo_all, geo_s = prof['geometry']
     sec_all, sec_s = prof['sections']
     sta, sta_s = prof['stations']
+    mem_all = prof['members'][0] if 'members' in prof else []
 
     c = geo_all[0]
     if step is None:
         step = int(float(c['envelope_step']))
     g = sorted(at_step(geo_all, step), key=lambda r: int(r['sample']))
     sc = at_step(sec_all, step)
+    mem = at_step(mem_all, step) if mem_all else []
+    # THE TRACE IS THE PIPELINE'S. An attached structure's members solve on
+    # the same axis and carry the pipe's section, so a staircase drawn over
+    # every element interleaves two structures into one zig-zagging line.
+    # Older profiles have no `owner` column; those are pipeline-only anyway.
+    sc = [r for r in sc if r.get('owner', 'pipeline') == 'pipeline'] or sc
+    conn_x = sorted(0.5 * (float(r['x_0']) + float(r['x_1']))
+                    for r in mem if r['kind'] == 'connector')
     if not g or not sc:
         raise SystemExit(f'step {step} is not in this profile')
 
@@ -492,6 +531,12 @@ def plot_profile(prof, out, step=None):
                                         shrinkA=0, shrinkB=0), zorder=4)
     ax.plot(px, py, color='#1f7a8c', lw=2.2, zorder=5)
 
+    # THE ATTACHED STRUCTURE. A figure of an EA case that draws only the
+    # pipe omits the thing bending it. Members come off the `members` table
+    # as solved segments; the connectors are drawn heavier because they are
+    # the load path, and the pipe is only bent where they are.
+    draw_members(ax, mem, lw_struct=2.0, lw_conn=3.0)
+
     sp_sec = owner_span(g, 'section_owner')
     sp_con = owner_span(g, 'contact_owner')
     sp = sp_sec or sp_con
@@ -516,6 +561,13 @@ def plot_profile(prof, out, step=None):
         for xj in jx:
             panel.axvline(xj, color='#c1121f', lw=1.1, ls=(0, (4, 2)),
                           alpha=0.8, zorder=2)
+        # WHERE THE FRAME IS FASTENED DOWN. For an EA case this is X_c, the
+        # region that governs: a two-point attachment loads its own ends,
+        # not the pipe it spans, so the peak sits at a connector and the
+        # pipe BETWEEN them is the quietest part of the model.
+        for xc in conn_x:
+            panel.axvline(xc, color='#8a5a00', lw=1.3, ls=(0, (6, 2)),
+                          alpha=0.9, zorder=2)
     if regs:
         for name, x_lo, x_hi in regs:
             if name in ('X2', 'X3', 'X4') or x_hi - x_lo > 1.0:
@@ -532,7 +584,11 @@ def plot_profile(prof, out, step=None):
         f'spacing {float(c["spacing"]):.0f} m, '
         f'{float(c["tension_mt"]):.0f} MT, L = {float(c["L_comp"]):.3f} m '
         f'({float(c["L_comp"]) / OD:.2g} x OD), '
-        f'I_comp/I_pipe = {float(c["stiffness_ratio"]):.3f}\n'
+        f'I_comp/I_pipe = {float(c["stiffness_ratio"]):.3f}'
+        + (f', frame kT = {max(float(r["stiffness_ratio"]) for r in mem):.2f}'
+           f' x pipe, {len(conn_x)} connectors spanning '
+           f'{abs(conn_x[-1] - conn_x[0]) / OD:.1f} D' if conn_x else '')
+        + '\n'
         f'step {step} of {c["n_positions"]}, shift {shift:.3f} m'
         f'{"  <- envelope" if step == int(float(c["envelope_step"])) else ""}',
         fontsize=10, loc='left')
@@ -547,6 +603,15 @@ def plot_profile(prof, out, step=None):
     # 15 m long, and a window of "so many samples either side" gives the
     # short one a 3 m view with no roller in it -- the local curvature change
     # is only legible against the rollers that cause it.
+    # An EA frame steps neither the section nor the contact, so `sp` is
+    # None and there is no component span to centre on. Its CONNECTORS are
+    # the equivalent: they are where it acts on the pipe.
+    if sp is None and conn_x:
+        lo_x, hi_x = min(conn_x), max(conn_x)
+        keep = [k for k in range(len(g))
+                if lo_x - 2.0 <= px[k] <= hi_x + 2.0]
+        if keep:
+            sp = (min(keep), max(keep))
     if sp:
         a, b = sp
         half = max(1.0 * float(c['spacing']), 2.0 * abs(px[b] - px[a]))
@@ -582,6 +647,7 @@ def plot_profile(prof, out, step=None):
                 alpha=0.95, label='shroud (contact surface only)')
     # ABOVE the wall fill (zorder 3-6), or the roller is drawn and then
     # painted over -- which looked exactly like "no roller in this window".
+    draw_members(ex, mem, lw_struct=1.6, lw_conn=2.6)
     for r in sta:
         rx, ry = float(r['x']), float(r['y'])
         if qx.min() <= rx <= qx.max():
@@ -656,7 +722,10 @@ def plot_profile(prof, out, step=None):
             cx.set_ylim(0, 100 * max(inw) * 1.22)
     cx.set_title(
         'zoom on the component -- '
-        + ('the junction STEP, at a scale where it can be read' if jx else
+        + ('X_c at each CONNECTOR, X_i between them, X_e outside: a '
+           'two-point attachment loads its own ends, not the pipe it spans'
+           if conn_x else
+           'the junction STEP, at a scale where it can be read' if jx else
            f'the {c.get("region_scheme", "")} regions: no section step, so '
            'no strain discontinuity -- the rise is the LIFT bending the '
            'pipe' if regs else

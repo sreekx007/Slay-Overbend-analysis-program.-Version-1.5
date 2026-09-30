@@ -166,6 +166,7 @@ def section_rows(problem, result, shift, step, converged, zone_s_max,
     s_of = {i: sv for (i, sv, _y) in problem.nodes}
     ends = {idx: sorted((s_of[n1], s_of[n2]))
             for (idx, n1, n2, _o, _l) in problem.elements}
+    owner_of = {idx: o for (idx, _n1, _n2, o, _l) in problem.elements}
     moments = {i: m for (i, _s, m) in getattr(result, 'moments', ())}
 
     rows = []
@@ -183,6 +184,7 @@ def section_rows(problem, result, shift, step, converged, zone_s_max,
             strain=float(eps), moment=float(moments.get(idx, 0.0)),
             OD_section=float(getattr(sec, 'OD', 0.0)) if sec else 0.0,
             section_owner=(getattr(sec, 'owner', 'pipe') if sec else 'pipe'),
+            owner=str(owner_of.get(idx, 'pipeline')),
             region=rg.region_of_element(float(lo), float(hi), geom),
             in_band=bool(float(hi) + shift < zone_s_max),
         )
@@ -193,6 +195,49 @@ def section_rows(problem, result, shift, step, converged, zone_s_max,
 # ---------------------------------------------------------------------------
 # table 3 -- stations
 # ---------------------------------------------------------------------------
+
+def member_rows(problem, model, ms, U, shift, step, converged, context) -> list:
+    """One row per NON-PIPELINE element, for ONE position.
+
+    The attached structure and the connectors that fasten it. Both ends are
+    given in world coordinates on the SOLVED structure, because that is what
+    a drawing needs and re-deriving it from node ids would make the figure
+    depend on the kernel's numbering.
+
+    Empty for every model without an EA structure, which is why adding this
+    table costs nothing where there is nothing to say.
+    """
+    at = {n.index: n for n in model.nodes}
+    s_of = {i: sv for (i, sv, y) in problem.nodes}
+    y_of = {i: y for (i, sv, y) in problem.nodes}
+    ratio = {e.index: e.stiffness_ratio for e in model.elements}
+
+    def world_of(i):
+        n = at[i]
+        return _world(n.s + shift, n.y, U[dof(ms, i, 0)], U[dof(ms, i, 1)])
+
+    rows = []
+
+    def add(idx, n1, n2, kind, owner, ctype, slot):
+        x0, y0 = world_of(n1)
+        x1, y1 = world_of(n2)
+        row = _ctx('members', context)
+        row.update(table='members', step=step, shift=shift,
+                   converged=converged, element=int(idx), kind=kind,
+                   owner=str(owner), x_0=x0, y_0=y0, x_1=x1, y_1=y1,
+                   s_material_0=float(s_of[n1]), s_material_1=float(s_of[n2]),
+                   stiffness_ratio=float(ratio.get(idx) or 1.0),
+                   conn_type=str(ctype), slot=int(slot))
+        rows.append(row)
+
+    for (idx, n1, n2, owner, _line) in problem.elements:
+        if owner == 'pipeline':
+            continue
+        add(idx, n1, n2, 'structure', owner, '', -1)
+    for (idx, n1, n2, ctype, _length, slot) in problem.connectors:
+        add(idx, n1, n2, 'connector', 'GD-Con', ctype, slot)
+    return rows
+
 
 def station_rows(scene, context) -> list:
     """One row per roller. No `step`: rollers do not move when the pipe does."""
@@ -260,10 +305,21 @@ def _check(table: str, rows: list) -> None:
 
 
 def _fmt(v):
-    if isinstance(v, bool):
+    """One value, as CSV text.
+
+    NUMPY SCALARS ARE NOT PYTHON FLOATS, and under numpy 2 their `repr` is
+    `np.float64(-9.6196)` rather than `-9.6196`. A row built from a
+    displacement array carries them without anyone noticing, and the file
+    then parses as text: the members table went out with every coordinate
+    wrapped like that and the plotter refused it. Coerced here, once, rather
+    than by remembering to call `float()` at every site that builds a row.
+    """
+    if isinstance(v, bool) or isinstance(v, np.bool_):
         return 'true' if v else 'false'
-    if isinstance(v, float):
-        return repr(v)
+    if isinstance(v, (float, np.floating)):
+        return repr(float(v))
+    if isinstance(v, (int, np.integer)):
+        return str(int(v))
     return v
 
 
@@ -298,7 +354,7 @@ def write(stem, scene, positions, model_of, ils, s_centre, OD, context,
     # boundary is a fixed point on the steel, so it must not be re-derived
     # per position -- the two tables would then disagree about where X2 is.
     geom = rg.offset_geometry(ils, s_centre, OD)
-    geo, sec = [], []
+    geo, sec, mem = [], [], []
     for step, pos in enumerate(positions):
         model, ms, U, problem = model_of(pos)
         conv = bool(getattr(pos, 'converged', True))
@@ -307,9 +363,14 @@ def write(stem, scene, positions, model_of, ils, s_centre, OD, context,
         sec += section_rows(problem, pos.result, pos.shift, step, conv,
                             zone_s_max, context, geom=geom,
                             fx=s_to_x(model, ms, U, pos.shift))
+        mem += member_rows(problem, model, ms, U, pos.shift, step, conv,
+                           context)
     out = {}
     for table, rows in (('geometry', geo), ('sections', sec),
-                        ('stations', station_rows(scene, context))):
+                        ('stations', station_rows(scene, context)),
+                        ('members', mem)):
+        if not rows:
+            continue          # no attached structure: no members table
         out[table] = write_table(
             table, rows, Path(str(stem) + ps.TABLE_SUFFIX[table]))
     return out

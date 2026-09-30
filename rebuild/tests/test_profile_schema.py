@@ -197,7 +197,7 @@ def _sections(steps=(0, 1), n=3, **over):
                      x_0=-float(k), x_1=-float(k + 1),
                      strain=0.001 * (k + 1), moment=1.0e5 * (k + 1),
                      OD_section=0.4064, section_owner='pipe', region='',
-                     in_band=True)
+                     owner='pipeline', in_band=True)
             r.update(over)
             rows.append(r)
     return rows
@@ -223,3 +223,68 @@ def test_a_valid_multi_step_table_is_accepted(tmp_path):
     back = list(csv.DictReader(p.open()))
     assert {r['step'] for r in back} == {'0', '1'}
     assert {r['shift'] for r in back} == {'0.0', '1.5'}
+
+
+# ---------------------------------------------------------------------------
+# two defects found while drawing an EA case
+# ---------------------------------------------------------------------------
+
+def test_owner_and_section_owner_are_different_questions():
+    """L086. Whose SECTION an element carries, and which BODY it belongs to.
+
+    An EA frame member carries the pipe's section, so `section_owner` reads
+    'pipe' for it and cannot separate the frame from the pipeline. A strain
+    trace filtered on the wrong one draws two structures as a single
+    zig-zagging line.
+    """
+    h = ps.header('sections')
+    assert 'owner' in h and 'section_owner' in h
+    a = ps.describe('sections', 'owner')
+    b = ps.describe('sections', 'section_owner')
+    assert a.about != b.about
+    assert 'pipeline' in a.about
+
+
+def test_a_trace_filtered_on_owner_drops_the_frame():
+    """The filter itself, on rows that mix the two bodies."""
+    rows = _sections(steps=(0,), n=3)
+    for r in rows:
+        r['owner'] = 'ST'
+    rows[0]['owner'] = 'pipeline'
+    kept = [r for r in rows if r.get('owner', 'pipeline') == 'pipeline']
+    assert len(kept) == 1 and kept[0]['element'] == 0
+
+
+def test_numpy_scalars_serialise_as_plain_numbers():
+    """L087. Under numpy 2 a numpy scalar's repr is `np.float64(x)`, and the
+    members table went out with every coordinate wrapped in that text."""
+    np = pytest.importorskip('numpy')
+    assert rprof._fmt(np.float64(-9.6196)) == repr(-9.6196)
+    assert rprof._fmt(np.int64(7)) == '7'
+    assert rprof._fmt(np.bool_(True)) == 'true'
+    assert rprof._fmt(np.bool_(False)) == 'false'
+    # and the plain Python types still behave
+    assert rprof._fmt(1.5) == repr(1.5)
+    assert rprof._fmt(True) == 'true'
+    assert rprof._fmt('x') == 'x'
+
+
+def test_a_members_row_round_trips_as_numbers(tmp_path):
+    """The failure end to end: a row built from numpy must read back numeric."""
+    np = pytest.importorskip('numpy')
+    ctx = dict(profile_schema_version=ps.PROFILE_SCHEMA_VERSION,
+               case_id='c1', table='members')
+    row = {k: v for k, v in ctx.items() if k in ps.header('members')}
+    row.update(table='members', step=0, shift=0.0, converged=True,
+               element=1, kind='connector', owner='GD-Con',
+               x_0=np.float64(-9.6196), y_0=np.float64(0.1),
+               x_1=np.float64(-9.6196), y_1=np.float64(0.71),
+               s_material_0=np.float64(5.8), s_material_1=np.float64(5.8),
+               stiffness_ratio=np.float64(2.22), conn_type='F',
+               slot=np.int64(2))
+    p = tmp_path / 'c1.members.csv'
+    rprof.write_table('members', [row], p)
+    back = list(csv.DictReader(p.open()))[0]
+    assert float(back['x_0']) == pytest.approx(-9.6196)
+    assert int(back['slot']) == 2
+    assert back['conn_type'] == 'F'

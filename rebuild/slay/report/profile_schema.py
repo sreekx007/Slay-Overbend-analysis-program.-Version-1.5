@@ -61,7 +61,16 @@ import re
 
 from slay.report.schema import IDX, M, NM, NONE, Field
 
-PROFILE_SCHEMA_VERSION = '1.1.0'
+PROFILE_SCHEMA_VERSION = '1.3.0'
+# 1.3.0  `owner` on the sections table: which BODY the element belongs to,
+#        as distinct from `section_owner`, which is whose SECTION it
+#        carries. An EA frame's elements carry the pipe's section but are
+#        not the pipe, and a strain trace that cannot tell them apart
+#        interleaves two structures into one zig-zagging line.
+# 1.2.0  a `members` table: the structural elements that are NOT the
+#        pipeline -- an EA frame and the connectors that fasten it. Without
+#        it a figure of an EA case draws the pipe and omits the thing
+#        acting on it.
 # 1.1.0  `region` on the geometry and sections tables, and `region_scheme`
 #        in the case context: the five-region scheme for an offset body
 #        (`slay.report.regions`). Empty for a case that has no offset body.
@@ -71,6 +80,7 @@ TABLE_SUFFIX = {
     'geometry': '.geometry.csv',
     'sections': '.sections.csv',
     'stations': '.stations.csv',
+    'members': '.members.csv',
 }
 
 
@@ -274,6 +284,12 @@ SECTIONS = _identity('sections') + POSITION + [
           'BREAK there rather than be drawn through', per='sample'),
     Field('section_owner', 'str', NONE, 'name', 'location',
           "'pipe' or the component id", per='sample'),
+    Field('owner', 'str', NONE, 'name', 'location',
+          "which BODY this element belongs to -- 'pipeline', or an attached "
+          "structure such as 'ST'. NOT the same as `section_owner`, which "
+          'says whose SECTION it carries: an EA frame member carries the '
+          "pipe's section and is not the pipe. A strain trace must filter on "
+          'THIS, or it draws two structures as one line', per='sample'),
     Field('region', 'str', NONE, 'name', 'location',
           "the offset body's strain region this element belongs to, by its "
           'MIDPOINT -- X1..X5 from the catenary side, or empty. An element '
@@ -313,10 +329,63 @@ STATIONS = _identity('stations') + [
 ]
 
 
+# ---------------------------------------------------------------------------
+# table 4 -- members, one row per NON-PIPELINE element per position
+# ---------------------------------------------------------------------------
+#
+# WHAT THIS IS FOR. An externally-attached structure -- EA-ST's portal frame,
+# EA-SB's -- is not part of the pipeline and appears nowhere in the geometry
+# or sections tables, which sample the pipe. A figure built from those alone
+# draws the pipe correctly and omits the thing bending it. This table
+# carries the frame's own members and the connectors that fasten them down,
+# each as a straight segment in world coordinates, which is all a drawing
+# needs.
+#
+# CONNECTORS ARE MEMBERS HERE, marked by `kind`. They are separate from the
+# frame in the model -- a connector's stiffness comes from the pipe section
+# and not from its own length -- but on a drawing they are both lines
+# between two solved points, and keeping them in one table means a figure
+# cannot draw the frame while silently omitting what holds it on.
+
+MEMBERS = _identity('members') + POSITION + [
+    Field('element', 'int', IDX, 'count', 'identifier',
+          'element index in the solved problem, or the connector index',
+          per='sample'),
+    Field('kind', 'str', NONE, 'name', 'identifier',
+          "'structure' for a member of the attached structure, 'connector' "
+          'for a tie down to the pipe', per='sample'),
+    Field('owner', 'str', NONE, 'name', 'location',
+          "which body it belongs to -- 'ST', 'SB', 'GD-Con'", per='sample'),
+    Field('x_0', 'float', M, 'length', 'value',
+          'WORLD x of one end, on the SOLVED structure', per='sample'),
+    Field('y_0', 'float', M, 'length', 'value', 'WORLD y of that end, +y down',
+          per='sample'),
+    Field('x_1', 'float', M, 'length', 'value', 'WORLD x of the other end',
+          per='sample'),
+    Field('y_1', 'float', M, 'length', 'value', 'WORLD y of the other end',
+          per='sample'),
+    Field('s_material_0', 'float', M, 'length', 'location',
+          'material coordinate of the first end', per='sample'),
+    Field('s_material_1', 'float', M, 'length', 'location',
+          'material coordinate of the second end', per='sample'),
+    Field('stiffness_ratio', 'float', NONE, 'ratio', 'value',
+          "the member's modulus over the pipeline's -- EA-ST's kT. 1.0 where "
+          'nothing scales it', per='sample'),
+    Field('conn_type', 'str', NONE, 'name', 'identifier',
+          "joint type for a connector ('F'), empty for a structural member. "
+          'The solver implements F only and refuses the rest (G9)',
+          per='sample'),
+    Field('slot', 'int', IDX, 'count', 'identifier',
+          'connector slot number, or -1 for a structural member',
+          per='sample'),
+]
+
+
 TABLES = {
     'geometry': GEOMETRY,
     'sections': SECTIONS,
     'stations': STATIONS,
+    'members': MEMBERS,
 }
 
 PATTERNS: list = []     # no open column sets here: every grain is enumerable
@@ -405,4 +474,5 @@ _GRAIN = {
     'geometry': 'one row per sample per passage position',
     'sections': 'one row per element per passage position',
     'stations': 'one row per roller; fixed for the case',
+    'members': 'one row per non-pipeline element per passage position',
 }
