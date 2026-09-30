@@ -157,3 +157,26 @@ def build_scene(R: float = None,
 
     return Scene(path=path, stations=tuple(stations), extent=extent,
                  elastic_zones=elastic_zones, spacing=spacing)
+
+
+def all_bidirectional(scene: Scene) -> Scene:
+    """The same Scene with no roller permitted to lift off.
+
+    GEOMETRICALLY IDENTICAL -- same path, same stations, same extent and
+    elastic zones -- so a model built from either meshes the same way and a
+    displacement field carries between them. Only `one_sided` differs, which
+    is a property of the contact slots and of nothing else.
+
+    WHAT IT IS FOR. A one-sided roller cannot pull, so on a straight
+    unstressed pipe with no tension yet the stinger rollers simply release
+    and the pipe never reaches the arc. Holding every roller is what BUILDS
+    the geometry, and the geometry is what supplies the geometric stiffness
+    that a lay tension is reacted by. It is step 1 of the staged sequence
+    (`T5_solve_spec.md` 5e) and the first step of `study.sweep.seed_state`.
+    """
+    n_sr = len([s for s in scene.stations if s.name.startswith('SR')]) - 1
+    n_vr = len([s for s in scene.stations if s.name.startswith('VR')])
+    st = roller_stations(scene.path, n_sr=n_sr, n_vr=n_vr,
+                         spacing=scene.spacing, one_sided=frozenset())
+    return Scene(path=scene.path, stations=tuple(st), extent=scene.extent,
+                 elastic_zones=scene.elastic_zones, spacing=scene.spacing)

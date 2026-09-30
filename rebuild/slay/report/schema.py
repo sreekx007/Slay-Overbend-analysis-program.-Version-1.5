@@ -44,7 +44,9 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SCHEMA_VERSION = '1.2.0'
+SCHEMA_VERSION = '1.3.0'
+# 1.3.0  `n_seeded`: positions that only converged via the staged seed.
+#        Non-zero rows would previously have been FAILED.
 # 1.2.0  the offset REGION scheme: `region_scheme`, the measured `offset_*`
 #        geometry, and the patterned `x1..x5` per-region peaks. A shroud
 #        steps no section, so it has no junction to probe and the region is
@@ -203,6 +205,15 @@ DERIVED = [
           'positions the passage scheduled'),
     Field('n_converged', 'int', NONE, 'count', 'derived',
           'positions that converged'),
+    Field('n_seeded', 'int', NONE, 'count', 'derived',
+          'positions that only converged via the STAGED SEED -- bend the '
+          'pipe onto the rollers elastically, then add gravity, then '
+          'tension, then chain the real solve onto that. Seeding is a '
+          'FALLBACK: a position that converges directly never uses it and '
+          'keeps its exact load path, so this column is 0 for almost every '
+          'case. Where it is not 0 the case would otherwise have been '
+          'FAILED, and the row is telling you the answer came by a '
+          'different route'),
     Field('zone_s_max', 'float', M, 'length', 'derived',
           'reporting band cut, in STATION coordinates; everything at or '
           'beyond it is excluded (the D6 tip artefact)'),

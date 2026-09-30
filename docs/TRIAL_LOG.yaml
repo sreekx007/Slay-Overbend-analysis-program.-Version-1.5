@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 28
+# entries: 29
 
 - id: T001
   date: 2026-09-21
@@ -765,3 +765,41 @@
     does not anticipate.
   lesson: L078
   refs: [rebuild/slay/report/regions.py, rebuild/slay/report/schema.py, rebuild/slay/report/profile_schema.py, rebuild/tests/test_regions.py, tools/dataset.py]
+
+- id: T029
+  date: 2026-09-30
+  goal: >-
+    Fix the convergence corner that lost three of the 200 matrix cases --
+    168.3 mm pipe, 12 m spacing, 160 MT, R = 60-70 m -- all reporting
+    CUTBACK EXHAUSTED at lam=0.0000.
+  action: >-
+    Diagnosed first rather than assumed. lam=0.0000 means the FIRST
+    increment was already beyond reach, and since the kernel applies loads
+    at full value while only the contact targets are ramped, cutback had
+    nothing left to shrink. Added study.sweep.seed_state -- three elastic
+    steps carrying state forward (every roller held with no loads, then the
+    ruled one-sided set with gravity, then tension) -- and chained the real
+    solve onto it. Applied ONLY where the direct solve failed and only where
+    there is no carried state. scene.all_bidirectional moved into the scene
+    layer from the tool that had it.
+  case: 'P042 (R=70) and T060 (R=60), both spacing 12 m, 160 MT, 168.3x11.0; regression sample of 7 converging cases'
+  outcome: success
+  evidence: >-
+    Both failing cases now converge 3/3 positions, seeded=1 (only position
+    0), peaks 1.5360 pct and 1.9030 pct. Seven previously-converging cases
+    spanning radius, spacing, pipe, tension and both families reproduce to
+    0.00e+00 pct -- bit for bit, so the fallback moved nothing that was
+    already right. Direct solve still fails with seed=False, pinned by
+    test_the_hard_corner_fails_without_a_seed. 585 passed, linter clean.
+  verdict: >-
+    The order is the whole fix: bend first, load second. The opposite order
+    -- settle the loads with targets held, then ramp -- is a documented dead
+    end that diverges above about 15 MT (L050/L051), and reading that before
+    building anything is what stopped a day being spent re-deriving it. The
+    three frame archetypes share the failure MESSAGE and are a different
+    defect: ILS-EAST fails at seeding step 1 with no loads at all and a
+    singular stiffness matrix, which is a mechanism in the model rather than
+    a load out of reach (L082). They stay FAILED and are not claimed as
+    fixed.
+  lesson: L081
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, rebuild/tests/test_seed_state.py, rebuild/slay/report/schema.py]

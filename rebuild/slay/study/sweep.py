@@ -67,6 +67,7 @@ from dataclasses import dataclass, field
 
 from slay.model.assemble import build_model
 from slay.physics.problem import build_problem
+from slay.scene.scene import all_bidirectional
 from slay.solve.passage import solve
 
 CLEAR_BEFORE = 1.0        # m, leading edge clear of SR2 at the start
@@ -83,6 +84,7 @@ class Position:
     s_lead: float                     # component leading edge, station coords
     s_trail: float                    # component trailing edge
     result: object = field(repr=False)
+    seeded: bool = False              # reached via the staged seed, not direct
 
     @property
     def converged(self) -> bool:
@@ -258,10 +260,57 @@ def _required_stations(scene) -> tuple:
                  if st.role is StationRole.FIXED)
 
 
+def seed_state(model, scene, problem_kw):
+    """Build a converged state to start a hard first position from.
+
+    (state, note). `state` is None when the seeding itself could not
+    converge, and the caller is then no worse off than without it.
+
+    WHY THE FIRST POSITION IS THE HARD ONE. `solve` ramps the contact targets
+    by `lam` but applies tension and gravity at FULL VALUE from Newton
+    iteration 1 -- the kernel does not scale loads, and that is deliberate
+    (L050). So a cutback shrinks the targets and nothing else, and
+    `CUTBACK EXHAUSTED at lam=0.0000` means the very first step was already
+    beyond reach. On a straight unstressed pipe there is no geometric
+    stiffness to react a lay tension with, and no amount of ramping creates
+    any: 160 MT on 168.3 mm pipe is 9.4 times its own EI/L^2 at 12 m
+    spacing.
+
+    THE ORDER MATTERS AND THE OPPOSITE ORDER WAS TRIED AND REJECTED. Settling
+    the LOADS first with the targets held at their anchors diverges above
+    about 15 MT (`T5_solve_spec.md` 5, L050/L051). What works is the reverse:
+    bend the pipe onto the rollers FIRST, so the geometric stiffness exists,
+    and only then hand it the loads. Three elastic steps, each carrying
+    state forward, exactly the first three of the staged sequence that
+    reproduces the reference to within 1.7% (5e):
+
+        1  every roller held, no loads      -- builds the geometry
+        2  ruled one-sided set + gravity    -- lift-off, with weight to resist
+        3  + tension                        -- onto a pipe already bent
+
+    Step 4, plasticity, is the caller's own solve chained onto this. The
+    seed is ELASTIC throughout: J2 is incremental and path-dependent, so
+    letting it yield during seeding would write a plastic history that the
+    real load path never went through.
+    """
+    held = all_bidirectional(scene)
+    state = None
+    tension = problem_kw.get('tension', 0.0)
+    for sce, gravity, tens in ((held, False, 0.0),
+                               (scene, True, 0.0),
+                               (scene, True, tension)):
+        kw = dict(problem_kw, material=None, gravity=gravity, tension=tens)
+        result, state = solve(build_problem(model, sce, **kw),
+                              state_in=state)
+        if not result.converged:
+            return None, result.status
+    return state, 'seeded'
+
+
 def run(scene, ils=None, *, L_comp=0.0, step=None,
         clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER,
         station=STATION, mode='A', s_centre=None,
-        target_len=None, include_critical=True, verbose=False,
+        target_len=None, include_critical=True, seed=True, verbose=False,
         **problem_kw) -> list:
     """Solve the passage. Returns a list of `Position`, one per lay position.
 
@@ -319,10 +368,29 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     for i, shift in enumerate(schedule(total, step, include=crit)):
         problem = build_problem(model, scene, shift=shift, **problem_kw)
         result, state_out = solve(problem, state_in=state)
+
+        # SEEDING IS A FALLBACK, NOT THE DEFAULT PATH, and deliberately so.
+        # Every case that converges directly keeps the exact load path it
+        # had before this was added, so the fix cannot quietly move a
+        # number that was already right; only cases that returned nothing
+        # at all change. Applied when there is no carried state -- the
+        # first position, or every position in mode B -- because a later
+        # position starts from a pipe that is already bent and is not the
+        # hard one. Re-seeding mid-passage would also discard the carried
+        # plastic state, which is mode A's whole point.
+        seeded = False
+        if seed and not result.converged and state is None:
+            primed, _note = seed_state(model, scene,
+                                       dict(problem_kw, shift=shift))
+            if primed is not None:
+                retry, retry_state = solve(problem, state_in=primed)
+                if retry.converged:
+                    result, state_out, seeded = retry, retry_state, True
+
         out.append(Position(index=i, shift=shift,
                             s_lead=s_centre + L_comp / 2.0 + shift,
                             s_trail=s_centre - L_comp / 2.0 + shift,
-                            result=result))
+                            result=result, seeded=seeded))
         if verbose:
             print(f'  pos {i:2d}  shift {shift:7.3f} m  {result.status}')
         state = state_out if mode == 'A' else None

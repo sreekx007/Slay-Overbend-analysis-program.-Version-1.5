@@ -253,6 +253,8 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
             row['L_OD'] = L_comp / OD if OD else 0.0
         row['n_positions'] = len(recs)
         row['n_converged'] = sum(1 for r in recs if r.converged)
+        row['n_seeded'] = sum(1 for q in positions
+                              if getattr(q, 'seeded', False))
         env = rp.envelope(recs)
         # EVERY PEAK WITH ITS LOCATION AND ITS STEP -- the schema's peak
         # groups, filled. Strain and moment peak at DIFFERENT positions in

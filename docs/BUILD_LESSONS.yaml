@@ -1743,3 +1743,59 @@
   detect: '-'
   refs: [tools/dataset.py, docs/dataset/DATASET.md]
   date: 2026-09-30
+
+- id: L081
+  area: solve
+  class: ruling
+  symptom: >-
+    Three of the 200 matrix cases died with CUTBACK EXHAUSTED at lam=0.0000,
+    all in one corner: 168.3 mm pipe, 12 m spacing, 160 MT, R = 60-70 m.
+    Smallest pipe, widest spacing, highest tension, tightest radius -- every
+    axis pushing the same way.
+  cause: >-
+    `solve` ramps the contact targets by lam but hands over tension and
+    gravity at FULL VALUE from Newton iteration 1, because the kernel does
+    not scale loads and that is deliberate (L050). So a cutback shrinks the
+    targets and nothing else, and lam=0.0000 means the very first step was
+    already beyond reach. On a straight unstressed pipe there is no
+    geometric stiffness to react a lay tension with, and ramping cannot
+    create any.
+  rule: >-
+    Bend the pipe onto the rollers FIRST, then load it. Three elastic steps
+    carrying state forward -- every roller held with no loads, then the ruled
+    one-sided set with gravity, then tension -- and chain the real solve onto
+    that. This is the first three steps of the staged sequence that
+    reproduces the reference to within 1.7 pct (T5 5e). The OPPOSITE order
+    was tried and rejected: settling the loads first with the targets held
+    diverges above about 15 MT (L050/L051). Seeding is a FALLBACK, applied
+    only where the direct solve failed and only where there is no carried
+    state, so a case that converged before keeps its exact load path -- 7
+    sampled cases reproduce to 0.00e+00 pct. The seed is elastic throughout
+    because J2 is path-dependent and yielding during seeding would write a
+    history the real load path never took.
+  detect: test_the_hard_corner_fails_without_a_seed, test_the_hard_corner_converges_with_a_seed, test_a_case_that_converges_directly_is_untouched, test_the_seed_is_elastic_throughout
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, rebuild/tests/test_seed_state.py]
+  date: 2026-09-30
+
+- id: L082
+  area: model
+  class: finding
+  symptom: >-
+    The three frame archetypes -- ILS-EAST, ILS-EASB, ILS-ILT -- fail with
+    the same CUTBACK EXHAUSTED message as the R=60/70 corner, which invited
+    treating them as the same defect. Seeding does not fix them.
+  cause: >-
+    Not the same defect at all. ILS-EAST fails at seeding STEP 1, with every
+    roller held, elastic, and NO LOADS APPLIED, and the kernel warns "Matrix
+    is exactly singular". A singular stiffness matrix under zero load is a
+    MECHANISM in the model -- an unconstrained degree of freedom -- not a
+    load the solver cannot reach. Its model carries GD-Con connector and ST
+    stalk elements that the pipeline-only archetypes do not.
+  rule: >-
+    Read the failure, not the message. Two defects sharing a status string
+    are still two defects, and a fix aimed at the wrong one would have been
+    reported as a partial success. The test that separates them is cheap:
+    strip every load and see whether it still fails.
+  detect: '-'
+  refs: [rebuild/slay/study/sweep.py, docs/dataset/dataset_components.csv]
+  date: 2026-09-30
