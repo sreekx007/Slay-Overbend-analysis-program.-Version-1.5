@@ -1799,3 +1799,30 @@
   detect: '-'
   refs: [rebuild/slay/study/sweep.py, docs/dataset/dataset_components.csv]
   date: 2026-09-30
+
+- id: L083
+  area: solve
+  class: finding
+  symptom: >-
+    After seeding fixed two of the three corner cases, T060 still failed --
+    and an earlier check had appeared to show it converging. That check was
+    wrong: it ran PLAIN PIPE with T060's stinger parameters, while T060 is a
+    gd-tp case with a component. The label said T060 and the run was not.
+  cause: >-
+    T060 is not reachable. At 160 MT on a 168.3 x 11.0 mm section the lay
+    tension ALONE is 80.2 pct of first yield (289 of 360 MPa); add the
+    bending a 60 m radius imposes and the elastic demand is 162 pct. The
+    section is fully plastic and has no bending stiffness left to react the
+    load. That is plastic collapse, a physical limit, not a solver defect.
+    The baseline case sits at 12.9 pct for comparison.
+  rule: >-
+    Name a check after what it actually runs, and compute the physical
+    reason rather than quoting the solver's. slay.physics.capacity annotates
+    a failure with its membrane utilisation where that utilisation is high,
+    and SAYS NOTHING where it is not -- the silence is the load-bearing
+    half, because it keeps a genuine solver defect visible as one. The three
+    frame archetypes fail at 12.9 pct and get no message, which is how they
+    stay separated from this (L082).
+  detect: test_the_hard_corner_gets_a_physical_explanation, test_a_comfortable_case_gets_NOTHING, test_the_threshold_separates_the_matrix_as_it_actually_ran
+  refs: [rebuild/slay/physics/capacity.py, rebuild/tests/test_capacity.py, tools/dataset.py]
+  date: 2026-09-30

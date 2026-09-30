@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 29
+# entries: 30
 
 - id: T001
   date: 2026-09-21
@@ -803,3 +803,36 @@
     fixed.
   lesson: L081
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, rebuild/tests/test_seed_state.py, rebuild/slay/report/schema.py]
+
+- id: T030
+  date: 2026-09-30
+  goal: >-
+    Account for the one corner case seeding did not rescue, T060, rather
+    than leaving it as an unexplained FAILED row.
+  action: >-
+    Diagnosed it. An earlier check had seemed to show T060 converging; that
+    check ran PLAIN PIPE with T060's stinger parameters while T060 is a
+    gd-tp case, so it was not T060 at all. Re-ran the real configuration:
+    seeding steps 1-3 converge and step 4, switching plasticity on, does
+    not. Raising the increment count to 600 does not help, nor does turning
+    J2 on during the tension step, which makes the seed itself fail. Added
+    slay.physics.capacity to compute the membrane utilisation and annotate a
+    failure with it.
+  case: 'T060: gd-tp, R=60, spacing 12 m, 160 MT, 168.3x11.0, L_OD 5.0, t_ratio 2.0'
+  outcome: success
+  evidence: >-
+    Lay tension alone is 80.2 pct of first yield, 289 of 360 MPa, on a 54.36
+    cm2 section. With the bending a 60 m radius imposes the elastic demand is
+    162 pct of yield. The baseline case is at 12.9 pct. n_increments 20, 60,
+    200 and 600 all give CUTBACK EXHAUSTED at lam=0.0000. The failure row
+    now carries the reason; the three frame archetypes, at 12.9 pct, carry
+    no such message and stay visible as a model defect.
+  verdict: >-
+    T060 is not a convergence defect and forcing it to converge would have
+    been the wrong outcome -- the section is fully plastic under tension
+    before any bending is applied. The screen exists to tell that apart from
+    a load path badly sequenced, and its SILENCE matters as much as its
+    message: a screen that explained every failure would have retired the
+    frame archetypes as physics when they are a mechanism in the model.
+  lesson: L083
+  refs: [rebuild/slay/physics/capacity.py, rebuild/tests/test_capacity.py, tools/dataset.py]

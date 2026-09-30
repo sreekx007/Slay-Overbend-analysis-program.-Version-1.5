@@ -49,6 +49,8 @@ sys.path.insert(0, str(REPO / 'tools'))
 
 import ils_builder                                            # noqa: E402
 
+from slay.data.materials import material                      # noqa: E402
+from slay.physics import capacity as cap                      # noqa: E402
 from slay.report import junction as jr                        # noqa: E402
 from slay.report import passage as rp                         # noqa: E402
 from slay.report import regions as rg                         # noqa: E402
@@ -304,7 +306,16 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
         row['error'] = ''
     except Exception as exc:                       # noqa: BLE001
         row['status'] = 'FAILED'
-        row['error'] = f'{type(exc).__name__}: {exc}'[:300]
+        # A PHYSICAL REASON WHERE THERE IS ONE. `CUTBACK EXHAUSTED at
+        # lam=0.0000` says where the solver stopped and nothing about why,
+        # and two very different things arrive wearing it: a load path that
+        # was badly sequenced (fixable, and fixed -- L081) and a section
+        # that cannot carry the load at all. Silence here means the loads
+        # were comfortable, which keeps a real solver defect visible as one.
+        why = cap.explain_failure(OD, t_wall, case['tension_mt'] * slide.TON,
+                                  material('j2').sigma_y0, case['R'])
+        row['error'] = (f'{type(exc).__name__}: {exc}'[:240]
+                        + (f' -- {why}' if why else ''))[:600]
         row['traceback'] = traceback.format_exc()[-400:]
     row['seconds'] = round(time.time() - t0, 1)
     return row
