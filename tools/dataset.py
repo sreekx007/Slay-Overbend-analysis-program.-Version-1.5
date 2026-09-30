@@ -380,17 +380,27 @@ def write_report(plain, comp, path, started, done, total, budget_hit=False):
     ok = [r for r in plain + comp if r.get('status') == 'ok']
     part = [r for r in plain + comp if str(r.get('status', '')).startswith('partial')]
     bad = [r for r in plain + comp if r.get('status') == 'FAILED']
+    rows = plain + comp
     el = time.time() - started
     L = []
     A = L.append
     A('# SLAY Overbend — ML case matrix')
     A('')
-    A(f'**{done} of {total} cases run** in {el / 3600.0:.2f} h'
+    # SOLVE TIME, NOT WALL CLOCK OF THE LAST SEGMENT. `el` measures only
+    # the run that happened to write this file, so after a --resume it
+    # reported 0.17 h for a matrix that took 1.1 h of solving -- a figure
+    # that is wrong by however many times the run was interrupted. The
+    # per-case `seconds` column is carried forward with the rows, so summing
+    # it survives any number of resumes.
+    solve_h = sum(float(r.get('seconds') or 0.0) for r in rows) / 3600.0
+    A(f'**{done} of {total} cases run**, {solve_h:.2f} h of solving'
       + ('  — **stopped on the time budget**' if budget_hit else ''))
     A('')
     A('| | |')
     A('|---|---|')
-    A(f'| Date | 28 September 2026 |')
+    # Was hardcoded to a date the report was not produced on. A file that
+    # states its own provenance wrongly is worse than one that omits it.
+    A(f'| Produced | {time.strftime("%d %B %Y", time.gmtime())} |')
     A(f'| Branch | `claude/program-rebuild-status-bya72s` |')
     A(f'| Runner | `tools/dataset.py`, seed {SEED} |')
     A(f'| Converged fully | {len(ok)} ({_pct(len(ok), done)}) |')

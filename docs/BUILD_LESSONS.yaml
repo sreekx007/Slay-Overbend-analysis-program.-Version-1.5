@@ -1720,3 +1720,26 @@
   detect: test_case_columns_are_all_declared
   refs: [rebuild/slay/report/regions.py, docs/TRIAL_LOG.yaml]
   date: 2026-09-30
+
+- id: L080
+  area: process
+  class: defect
+  symptom: >-
+    DATASET.md stated "Date | 28 September 2026" on a file produced on the
+    30th, and reported the matrix as taking 0.17 h when it had taken 1.06 h
+    of solving. Both numbers were in the header a reader would quote.
+  cause: >-
+    The date was a hardcoded string. The elapsed time was wall clock of the
+    run that happened to write the file, so every --resume reset it and the
+    figure was wrong by however many times the run had been interrupted.
+    Neither was noticed while the runner completed in one pass; resume made
+    the second one visible and the first was never true.
+  rule: >-
+    A file states its own provenance from the run, never from a literal. Time
+    that must survive a resume is summed from the per-case `seconds` column,
+    which is carried forward with the rows, not measured from the start of
+    the current process. A file that states its provenance wrongly is worse
+    than one that omits it, because the wrong value gets quoted.
+  detect: '-'
+  refs: [tools/dataset.py, docs/dataset/DATASET.md]
+  date: 2026-09-30
