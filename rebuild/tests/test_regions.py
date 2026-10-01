@@ -200,3 +200,68 @@ def test_unbounded_edges_are_written_blank(sh):
     assert cols['x1_s_hi'] == ''      # X1 runs out toward the stinger tip
     assert cols['x5_s_lo'] == ''      # X5 runs back toward the vessel
     assert isinstance(cols['x2_s_lo'], float)
+
+
+# ---------------------------------------------------------------------------
+# the reference's X_c / X_i / X_e convention, for an ATTACHED STRUCTURE
+# ---------------------------------------------------------------------------
+#
+# A different scheme from the offset body's X1-X5 above: that one divides a
+# body by its own geometry, this one by where a structure is FASTENED. Both
+# are the reference's; neither is ours to redefine.
+
+def _f2():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location(
+        'study_f2_under_test', REPO / 'tools' / 'study_f2.py')
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_X_c_is_two_diameters_either_side():
+    """L089. Sections VII.B and VIII.B both say '2 x Pipe OD on either side
+    of the connector point'. An earlier 1.5 D was chosen to suit the mesh."""
+    f2 = _f2()
+    assert f2.AT_CONNECTOR_OD == 2.0
+    D = f2.D
+    conn = [10.0, 20.0]
+    assert f2.classify(10.0 + 1.99 * D, conn) == 'X_c'
+    assert f2.classify(10.0 - 1.99 * D, conn) == 'X_c'
+    assert f2.classify(10.0 + 2.01 * D, conn) != 'X_c'
+
+
+def test_X_i_is_between_the_connectors():
+    f2 = _f2()
+    assert f2.classify(15.0, [10.0, 20.0]) == 'X_i'
+
+
+def test_a_single_connector_has_no_interior():
+    """F1 fastens at one point, so there is nothing to be between -- which
+    is why the reference tabulates no X_i for it."""
+    f2 = _f2()
+    D = f2.D
+    assert f2.classify(10.0 + 5 * D, [10.0]) == 'X_e'
+    assert f2.classify(10.0 - 5 * D, [10.0]) == 'X_e'
+    assert f2.classify(10.0, [10.0]) == 'X_c'
+
+
+def test_X_e_abuts_X_c_rather_than_the_structure(sh):
+    """L090. The prose says 'outside the structures'; Figs 27 and 38 draw
+    X_e running up to X_c, which includes pipe under the structure but
+    outboard of its connectors. The reference's own numbers back the figure,
+    so a point there is X_e even when a body span is supplied."""
+    f2 = _f2()
+    D = f2.D
+    conn, body = [10.0, 20.0], (4.0, 26.0)
+    under = 10.0 - 3 * D          # under the body, outboard of a connector
+    assert body[0] < under < conn[0]
+    assert f2.classify(under, conn, body) == 'X_e'
+
+
+def test_every_point_lands_in_exactly_one_region():
+    f2 = _f2()
+    conn, body = [10.0, 20.0], (4.0, 26.0)
+    for k in range(600):
+        s = -5.0 + 40.0 * k / 599.0
+        assert f2.classify(s, conn, body) in f2.REGIONS

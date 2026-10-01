@@ -58,7 +58,8 @@ sys.path.insert(0, str(REPO / 'tools'))
 import ils_builder                                    # noqa: E402
 import slide                                          # noqa: E402
 from slay.report import passage as rp                 # noqa: E402
-from study_f2 import region_peaks                     # noqa: E402
+from slay.study import sweep                          # noqa: E402
+from study_f2 import REGIONS, region_peaks            # noqa: E402
 
 FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
 D = 0.4064
@@ -100,12 +101,14 @@ def run_case(name, R, spacing, tension_mt, step_OD):
         arch_id='none', ils=ils, R=R, spacing=spacing,
         tension_mt=tension_mt, step=step_OD * D, verbose=False)
     s_max, _lbl = rp.zone(sc)
+    s_centre = sweep.start_centre(sc, L_comp)
+    body = (s_centre - L_comp / 2.0, s_centre + L_comp / 2.0)
 
-    env, span, per_pos = {'X_c': 0.0, 'X_i': 0.0, 'X_e': 0.0}, None, []
+    env, span, per_pos = {r: 0.0 for r in REGIONS}, None, []
     for pos, prob in zip(positions, probs):
         if prob is None or not pos.converged:
             continue
-        got, span = region_peaks(pos, prob, s_max)
+        got, span = region_peaks(pos, prob, s_max, body)
         per_pos.append((pos.index, pos.shift, got))
         for k in env:
             env[k] = max(env[k], got[k])

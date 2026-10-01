@@ -58,14 +58,16 @@ sys.path.insert(0, str(REPO / 'tools'))
 import ils_builder                                    # noqa: E402
 import slide                                          # noqa: E402
 from slay.report import passage as rp                 # noqa: E402
+from slay.study import sweep                          # noqa: E402
 
 FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
 D = 0.4064
 
-# The pipe within this many diameters of a connector is 'at' it. 1.5 D is
-# about two elements at the ruled 2 x OD density, so the band is resolved
-# rather than being a single element's opinion.
-AT_CONNECTOR_OD = 1.5
+# THE REFERENCE'S OWN NUMBER, not a convenient one. Sections VII.B and
+# VIII.B both say X_c is "2 x Pipe OD on either side of the connector
+# point". An earlier 1.5 D here was chosen to be about two elements wide at
+# the ruled mesh -- defensible as a band, wrong as this band.
+AT_CONNECTOR_OD = 2.0
 
 PAPER = {
     'Case 1': dict(P_c1_D=10.0, kT=2.22, X_c=0.936, X_i=0.043, X_e=0.732),
@@ -89,29 +91,59 @@ def build(P_c1_D, kT, L_top_D):
     return ils_builder.build_ils(spec)
 
 
-def classify(s_mid, lo, hi):
-    """Which region a point on the pipe is in, by the connector stations."""
-    if min(abs(s_mid - lo), abs(s_mid - hi)) <= AT_CONNECTOR_OD * D:
+REGIONS = ('X_c', 'X_i', 'X_e')
+
+
+def classify(s_mid, conn, body=None):
+    """Which region a point on the pipe is in. The reference's definitions:
+
+        X_c   "Region near the connector. 2 x Pipe OD on either side of the
+              connector point."
+        X_i   an INTERIOR region -- between two connectors.
+        X_e   "refers to pipeline OUTSIDE THE STRUCTURES."
+
+    X_e'S BOUNDARY: THE PROSE AND THE FIGURE DISAGREE, and the figure wins.
+    Taken literally, "outside the structures" would exclude the pipe that
+    lies under a structure but outboard of its connectors -- which for
+    EA-SB is the TAPER, where strain concentrates. Figs 27 and 38 show
+    X_e's arrow running right up to where X_c begins, so that pipe is
+    inside X_e.
+
+    MEASURED, not assumed. Bucketing the under-structure pipe separately
+    and comparing both readings against the reference's own X_e:
+
+        case        X_e abutting X_c      X_e outside the body
+        F1 Case 1   1.136%  (-19.4%)      0.728%  (-48.4%)
+        F2 Case 1   1.304%  (-10.1%)      0.808%  (-44.3%)
+        F2 Case 3   1.432%  (-10.5%)      0.881%  (-45.0%)
+
+    Three cases agree far better with the abutting reading, and the fourth
+    cannot tell them apart -- F2 Case 2 puts its connectors at the body's
+    own edges, so there is no under-structure pipe to argue over. `body` is
+    accepted and ignored, kept so the alternative stays easy to re-measure.
+    """
+    if min(abs(s_mid - c) for c in conn) <= AT_CONNECTOR_OD * D:
         return 'X_c'
-    return 'X_i' if lo < s_mid < hi else 'X_e'
+    if len(conn) > 1 and min(conn) < s_mid < max(conn):
+        return 'X_i'
+    return 'X_e'
 
 
-def region_peaks(position, problem, s_max):
+def region_peaks(position, problem, s_max, body=None):
     """{region: peak |strain|} for one solved position, inside the band."""
     xy = {i: s for (i, s, _y) in problem.nodes}
-    cs = sorted(xy[n1] for (_i, n1, _n2, _t, _l, _s) in problem.connectors)
-    lo, hi = cs[0], cs[-1]
+    conn = sorted(xy[n1] for (_i, n1, _n2, _t, _l, _s) in problem.connectors)
     ends = {i: sorted((xy[a], xy[b]))
             for (i, a, b, _o, _l) in problem.elements}
-    out = {'X_c': 0.0, 'X_i': 0.0, 'X_e': 0.0}
+    out = {r: 0.0 for r in REGIONS}
     for (i, _sm, e) in position.result.strains:
         a, b = ends.get(i, (0.0, 0.0))
         mid = 0.5 * (a + b)
         if mid + position.shift >= s_max:       # the D6 tip artefact
             continue
-        r = classify(mid, lo, hi)
-        out[r] = max(out[r], abs(e))
-    return out, (lo, hi)
+        out[classify(mid, conn, body)] = max(
+            out[classify(mid, conn, body)], abs(e))
+    return out, (conn[0], conn[-1])
 
 
 def run_case(name, R, spacing, tension_mt, L_top_D, step_OD):
@@ -121,13 +153,16 @@ def run_case(name, R, spacing, tension_mt, L_top_D, step_OD):
         arch_id='none', ils=ils, R=R, spacing=spacing,
         tension_mt=tension_mt, step=step_OD * D, verbose=False)
     s_max, _label = rp.zone(sc)
+    # The STRUCTURE's material span, which is what X_e is keyed on.
+    s_centre = sweep.start_centre(sc, L_comp)
+    body = (s_centre - L_comp / 2.0, s_centre + L_comp / 2.0)
 
-    per_pos, env = [], {'X_c': 0.0, 'X_i': 0.0, 'X_e': 0.0}
+    per_pos, env = [], {r: 0.0 for r in REGIONS}
     span = None
     for pos, prob in zip(positions, probs):
         if prob is None or not pos.converged:
             continue
-        got, span = region_peaks(pos, prob, s_max)
+        got, span = region_peaks(pos, prob, s_max, body)
         per_pos.append((pos.index, pos.shift, got))
         for k in env:
             env[k] = max(env[k], got[k])
@@ -178,7 +213,8 @@ def main() -> int:
             for (i, sh, g) in r['per_pos']:
                 mark = ' <- envelope' if g['X_c'] == env['X_c'] else ''
                 print(f'    {i:4d}{sh:9.3f}{100 * g["X_c"]:9.3f}%'
-                      f'{100 * g["X_i"]:9.3f}%{100 * g["X_e"]:9.3f}%{mark}')
+                      f'{100 * g["X_i"]:9.3f}%{100 * g["X_e"]:9.3f}%'
+                      f'{mark}')
     return 0
 
 

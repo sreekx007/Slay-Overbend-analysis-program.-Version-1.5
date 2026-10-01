@@ -1945,3 +1945,51 @@
   detect: test_ps_is_a_passenger_here_too, test_ea_sb_shields_its_pipe_less_than_ea_st
   refs: [tools/study_easb.py, tools/study_easb_cases.py]
   date: 2026-09-30
+
+- id: L089
+  area: measure
+  class: defect
+  symptom: >-
+    The X_c / X_i / X_e regions were implemented from the reference's
+    FIGURES without checking its stated definitions. X_c was given a half
+    width of 1.5 D, chosen as about two elements at the ruled mesh; sections
+    VII.B and VIII.B both say "2 x Pipe OD on either side of the connector
+    point".
+  cause: >-
+    A band width picked for the mesh rather than read from the source. It
+    happened to change nothing -- every peak already sat within 1.5 D of a
+    connector, so all eight case results are identical at 2 D -- which is
+    exactly why it would have survived indefinitely.
+  rule: >-
+    A published convention is read from the publication, not inferred from
+    its pictures or chosen to suit the discretisation. A definition that
+    makes no difference today still has to be right, because the day it
+    starts mattering is not announced.
+  detect: test_X_c_is_two_diameters_either_side, test_a_single_connector_has_no_interior
+  refs: [tools/study_f2.py, tools/study_easb_cases.py, rebuild/tests/test_regions.py]
+  date: 2026-10-01
+
+- id: L090
+  area: measure
+  class: finding
+  symptom: >-
+    The reference's prose and its own figures disagree about where X_e
+    stops. The text says X_e "refers to pipeline outside the structures";
+    Figs 27 and 38 draw X_e's arrow running right up to where X_c begins,
+    which includes pipe lying UNDER the structure but outboard of its
+    connectors -- for EA-SB, the taper, where strain concentrates.
+  cause: >-
+    Reading the prose literally and 'correcting' the implementation to
+    match it. That moved X_e from -10 to -48 pct against the reference's own
+    numbers.
+  rule: >-
+    Where a source contradicts itself, MEASURE BOTH READINGS and let its own
+    published numbers decide. Bucketing the under-structure pipe separately:
+    X_e abutting X_c gives -19.4 / -10.1 / -10.5 pct on the three cases that
+    can tell the readings apart, against -48.4 / -44.3 / -45.0 for X_e
+    outside the body. The figure wins. The fourth case cannot distinguish
+    them -- its connectors sit on the body's own edges -- and saying which
+    cases are evidence matters as much as the verdict.
+  detect: '-'
+  refs: [tools/study_f2.py]
+  date: 2026-10-01
