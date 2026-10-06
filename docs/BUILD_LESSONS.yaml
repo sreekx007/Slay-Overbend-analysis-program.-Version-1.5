@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 62
+# entries: 93
 
 - id: L001
   area: kernel
@@ -2044,4 +2044,32 @@
     earlier F-only results deserves to know these two are unaffected.
   detect: '-'
   refs: [rebuild/slay/solve/passage.py, rebuild/tests/test_skew_frame.py]
+  date: 2026-10-06
+
+- id: L093
+  area: process
+  class: defect
+  symptom: >-
+    Asked whether a comparison table against the source papers existed, the
+    answer was no -- the material was spread over four documents and two
+    tools that printed to stdout and persisted nothing. Consolidating it
+    found a table whose tension was never stated, run at 120 MT and read
+    against a 100 MT target, and the conclusion drawn from it reversed: the
+    X3/X2 ratio converges to 0.767 at the paper's tension, just OUTSIDE the
+    stated 65-75 pct band, not to 0.744 inside it.
+  cause: >-
+    The ratio looks tension-insensitive at the ruled 2xOD mesh -- 0.800
+    against 0.784 -- so the substitution survived the obvious check. The gap
+    holds under refinement and 0.75 is exactly where the band's edge sits,
+    so the two tensions settle on opposite sides of it. Nothing about the
+    wrong-tension comparison read as wrong; it read as agreement.
+  rule: >-
+    Keep ONE consolidated comparison, one row per published case, naming the
+    program that produced each number -- and treat an unlabelled
+    configuration as a defect, not untidiness. A missing tension does not
+    leave a reader guessing, it silently recruits the wrong run into a
+    comparison that still reads plausibly. Corollary: check a sensitivity
+    claim at the REFINED mesh, not the ruled one, before relying on it.
+  detect: test_the_header_count_matches
+  refs: [docs/VALIDATION.md, docs/modules/T9_physics_sequence.md, rebuild/tests/test_build_lessons.py]
   date: 2026-10-06

@@ -62,6 +62,19 @@ def test_schema_holds(entries):
         assert re.fullmatch(r'L\d{3}', e['id']), e['id']
 
 
+def test_the_header_count_matches(entries):
+    """The header states how many entries there are, and until 6 Oct it said
+    62 against 93 -- a register drifting from its own summary, which is the
+    whole failure mode this file exists to stop (L093). `test_trial_log` has
+    carried this check since it was written; this one did not, so the drift
+    accumulated silently for 31 entries.
+    """
+    head = REGISTER.read_text().split('\n- id:')[0]
+    stated = [ln for ln in head.splitlines() if ln.startswith('# entries:')]
+    assert stated, 'the header states an entry count'
+    assert int(stated[0].split(':')[1]) == len(entries)
+
+
 def test_ids_are_unique_and_never_reused(entries):
     ids = [e['id'] for e in entries]
     assert len(set(ids)) == len(ids)

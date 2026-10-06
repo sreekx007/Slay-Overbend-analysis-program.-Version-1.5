@@ -342,15 +342,44 @@ hold **two** elements each and X4 holds **one**. A ratio between them is
 partly reporting the mesh, which is why every region carries its element
 count. Refined, the ratios move and then settle:
 
+*R = 85 m, 9 m spacing, **120 MT** — NOT Series 4's 100 MT, so these X2
+values are not comparable to the published 0.70%. See the note below.*
+
 | mesh | X2 | X3/X2 | X4/X2 |
 |---|---|---|---|
 | 2×OD (ruled) | 0.6868% | 0.784 | 0.702 |
 | 1×OD | 0.7286% | 0.749 | 0.712 |
 | 0.5×OD | 0.7951% | 0.744 | 0.691 |
 
-X3/X2 converges to 0.744 — **inside** the reference's 65–75% band, which it
-sits outside of at the ruled density. The apparent disagreement was mesh,
-not physics. (X2 itself keeps climbing with refinement, the same
+X3/X2 converges to 0.744 at this tension, and the ratio converges rather
+than drifting — the strong mesh dependence at the ruled density is mesh, not
+physics.
+
+**The tension was missing from this table until 6 Oct, and it reversed a
+conclusion drawn from it.** These rows are at 120 MT; Series 4 — the source
+of both the 65–75% band and the 0.70% that `ILS-SH`'s dimensions match
+exactly — is at **100 MT**. Re-run at the paper's own tension, X3/X2
+converges to **0.767, just OUTSIDE the band**, not 0.744 inside it:
+
+| mesh | X3/X2 at 100 MT (Series 4) | X3/X2 at 120 MT (above) |
+|---|---|---|
+| 2×OD | 0.800 | 0.784 |
+| 1×OD | 0.770 | 0.749 |
+| 0.5×OD | **0.767** | **0.744** |
+
+At the ruled mesh the two tensions look interchangeable (0.800 against
+0.784), which is why the substitution went unnoticed; the gap survives
+refinement and 0.75 is where the band's edge sits, so they settle on
+opposite sides of it. **The earlier claim of agreement with the band was an
+artefact of reading a 120 MT run against a 100 MT target.** The absolute X2
+column here is likewise not a Series 4 number. The comparison at the
+paper's own configuration — and the X2 trend, which brackets 0.70% under
+refinement — is in `docs/VALIDATION.md` §C.
+
+The standing rule, state R *and* tension *and* spacing beside every strain,
+was written after the same mistake in T5 §4; this is the second time it has
+been broken, and the first time it cost a conclusion rather than just
+clarity. (X2 itself keeps climbing with refinement, the same
 non-convergence the Mesh section below records for a thick body.)
 
 *X1 is two different things.* It lumps the catenary-side taper together with
@@ -399,7 +428,9 @@ on the body's own edges and leave no under-structure pipe to argue over.
 
 ### What the EA cases say so far
 
-Measured at R = 85 m, 9 m spacing, 120 MT, against the reference's values:
+Measured at R = 85 m, 9 m spacing, 120 MT, against the reference's values.
+*These six rows also appear in `docs/VALIDATION.md` §E, beside every other
+published case and with the deltas computed.*
 
 | case | X_c ours / ref | X_i ours / ref | X_e ours / ref |
 |---|---|---|---|

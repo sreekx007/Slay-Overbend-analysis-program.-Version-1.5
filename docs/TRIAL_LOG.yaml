@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 35
+# entries: 36
 
 - id: T001
   date: 2026-09-21
@@ -1033,3 +1033,46 @@
     at 9/10, so that envelope is a lower bound.
   lesson: L091
   refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/constraints.py, rebuild/tests/test_skew_frame.py, docs/diagrams/east_ps.png]
+
+- id: T036
+  date: 2026-10-06
+  goal: Establish whether a single comparison exists between the two source
+    papers, the original toolchain and the rebuild -- and assemble one if not.
+  action: >-
+    Surveyed what comparison material exists before running anything. Then
+    closed the one gap that was a measurement rather than a missing run:
+    ILS-SH ships V = 1.0 D, L1 = 10 D, L2 = 2.5 D, which is EXACTLY Paper 1's
+    Series 4 R = 85 / 100 MT row at a published X2 of 0.70 pct, and that
+    comparison had never been made. Ran it at the paper's own tension at
+    three mesh densities.
+  case: ILS-SH, R=85, spacing 9 m, 100 MT, 406.4x21, mesh 2xOD / 1xOD / 0.5xOD
+  outcome: measurement
+  evidence: "NO consolidated table existed. Material sat in RESULTS.md 1.1    \ (rebuild vs run_slay), T5 5e (the same table again), T9_components_spec    \ 6b (run_slay vs Paper 1 on GD-TP), T9_physics_sequence (six EA cases vs    \ Paper 2), and two study tools that printed comparisons at runtime and    \ persisted nothing. The repo also called both papers \"the reference\"    \ and distinguished them nowhere.\n\nSeries 4, ILS-SH at 100 MT against    \ the published 0.70 pct:\n\n  2xOD (ruled)  X2 0.6318  -9.7 pct   X3/X2    \ 0.800\n  1xOD          X2 0.6625  -5.4 pct   X3/X2 0.770\n  0.5xOD        \    X2 0.7164  +2.3 pct   X3/X2 0.767\n\nRefinement carries X2 THROUGH    \ the published value, crossing it between 1xOD and 0.5xOD."
+  verdict: >-
+    The ledger is docs/VALIDATION.md, one row per published case naming the
+    program that produced each number. Assembling it established three
+    things. The strongest result in the repo is rebuild against run_slay on
+    plain pipe, within 1.7 pct at every radius. Three published series have
+    no rebuild column at all -- Series 3 at the paper's configuration (nine
+    values, the highest-value run outstanding), 12 of 13 Series 4 cases (a V
+    sweep, the cheapest, needing three names added to emit_profile's
+    dimension passthrough first), and both Series 5 cases (blocked on region
+    reporting for ILS-SHTP, not on physics). And the reason the exercise paid
+    for itself: the Series 4 mesh table in T9_physics_sequence was run at 120
+    MT against a 100 MT target and carried no tension label, so the X3/X2
+    conclusion drawn from it does not survive -- 0.767, just OUTSIDE the
+    paper's 65-75 pct band, not 0.744 inside it. It looked tension-insensitive
+    at the ruled mesh (0.800 vs 0.784), which is why it went unnoticed; the
+    gap holds under refinement and 0.75 is where the band's edge sits.
+    Corrected in both files.
+
+    Two gaps recorded rather than fixed. Paper 2 has no citation in this
+    repo, so every EA number is checked against a transcription from supplied
+    figures -- which matters most for the EA-SB rows 40-60 pct out, where a
+    transcription error would read exactly like a physics disagreement. And
+    we report extreme-fibre strain per element while both papers report
+    nominal strain at integration points: expected to coincide for a B31 beam
+    in bending, never checked against the kernel, and a systematic offset
+    candidate under EVERY row of the ledger.
+  lesson: L093
+  refs: [docs/VALIDATION.md, docs/RESULTS.md, docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md]
