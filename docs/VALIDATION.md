@@ -159,12 +159,47 @@ curves cross.
 Within 6% at R = 85 and R = 100; +19 to +26% at R = 70. Same R-trend
 divergence as §A.2, now in a component case.
 
-### B.2 Rebuild against Series 3 — **NOT RUN at the paper's configuration**
+### B.2 Rebuild against Series 3 — all nine values, at the paper's own configuration
 
-The rebuild has run GD-TP, but at R = 85 / 9 m / 120 MT — not Series 3's
-100 MT / 8 m — so **no row of §B.1 has a rebuild number beside it.** What
-the rebuild has measured on GD-TP is the *sliding* behaviour Series 3 cannot
-show, and it is the more important finding:
+*Measured 6 Oct 2026. R = 70 / 85 / 100 m, 100 MT, **9 m spacing** (the
+paper's, confirmed from the source), L = 1000 mm, 2 × OD mesh (the paper's
+own density), constant bore. Passage envelope with edge crossings; every
+case put the envelope at shift 1.000 m — the travel where the component's
+leading edge sits on SR2, which is where the paper says Phase 1 peaks.*
+
+| Case | t | R | rebuild | Paper 1 | delta | `run_slay` (8 m) |
+|---|---|---|---|---|---|---|
+| A1 | 32 mm | 70 m | 0.6421% | 0.562% | **+14.3%** | 0.7086% |
+| A1 | | 85 m | 0.4875% | 0.473% | **+3.1%** | 0.4876% |
+| A1 | | 100 m | 0.3815% | 0.339% | +12.5% | 0.3478% |
+| A2 | 42 mm | 70 m | 0.7132% | 0.647% | +10.2% | 0.7877% |
+| A2 | | 85 m | 0.5546% | 0.508% | +9.2% | 0.5308% |
+| A2 | | 100 m | 0.4214% | 0.358% | +17.7% | 0.3782% |
+| A3 | 53 mm | 70 m | 0.7857% | 0.727% | **+8.1%** | 0.8650% |
+| A3 | | 85 m | 0.6237% | 0.556% | +12.2% | 0.5715% |
+| A3 | | 100 m | 0.4519% | 0.425% | +6.3% | 0.4074% |
+
+**All nine within +3.1% to +17.7%, mean about +10%, and every one high.**
+
+Two things worth separating. *The agreement is one-sided*, which is what the
+envelope offset predicts: we take a peak across the passage and the paper
+reports a single analysis, so we cannot read low, and +10% is the right
+order for that offset. *And the R-trend divergence is absent here* — the
+deltas do not flip sign across the radii the way plain pipe's +17.9 / +5.6 /
+−8.1% does. That matters, because §B.1's `run_slay` column *does* show the
+flip (−9.4 / −0.0 / +9.7% against our figures). The difference between the
+two columns is the spacing: `run_slay` ran at 8 m against a 9 m paper.
+
+**So §B.1's "+19 to +26% at R = 70" was partly a spacing mismatch, not
+toolchain divergence.** At the paper's own 9 m the rebuild is +14.3% there.
+`run_slay`'s column is retained as a program-to-program check — ours sits
+within 9.5% of it at every point — but it is not a like-for-like comparison
+against Paper 1 and should not be read as one.
+
+### B.3 Sliding — what Series 3 cannot show
+
+Series 3's figures are single-position. The rebuild's own sliding study at
+R = 85 / 9 m / 120 MT is the stronger finding:
 
 | Step | Positions | Envelope with edge crossings |
 |---|---|---|
@@ -177,10 +212,8 @@ Converged to **0.7% spread**, every run placing the envelope at the travel
 where the component's leading edge sits exactly on SR2. **A single-position
 solve at the start reads 0.4597% — 24.6% below the envelope.** Series 3's
 numbers are single-position, so the paper's own figures are a lower bound on
-the case it describes.
-
-**Closing B.2 is the single highest-value validation run outstanding** — it
-would put a rebuild column against nine published values.
+the case it describes — and that is the most likely reading of §B.2's
+uniform +10%.
 
 ---
 
@@ -385,8 +418,8 @@ that envelope is a **lower bound**.
 | Rebuild vs `run_slay`, plain pipe, 3 radii | **Within 1.7%** — strongest result in the repo |
 | Rebuild vs Paper 1, plain pipe, 3 radii | +17.9 / +5.6 / −8.1%, R-trend divergence, documented |
 | `run_slay` vs Paper 1, GD-TP, 9 values | Within 6% at R = 85/100; +19–26% at R = 70 |
-| Rebuild vs Paper 1, GD-TP | **No comparison exists** — never run at 100 MT / 8 m |
-| Rebuild vs Paper 1, GD-SH | **1 of 13 cases** — −9.7% / −5.4% / **+2.3%** as the mesh refines, bracketing the published value |
+| Rebuild vs Paper 1, GD-TP | **9 of 9 values**, +3.1% to +17.7%, all high |
+| Rebuild vs Paper 1, GD-SH | **1 of 13 cases**, three regions — X2 +2.3%, X3 −0.2%, X4 +19.0% at 0.5 × OD |
 | Rebuild vs Paper 1, Series 5 | **No comparison exists** — no region columns for `ILS-SHTP` |
 | Rebuild vs Paper 2, EA F1/F2 | 6 cases. **Ordering reproduced in all 6**; magnitudes open |
 | Rebuild vs Paper 2, EA F1D/F2D | Refused under G9 — needs the `D` active set |
@@ -412,11 +445,14 @@ Written down rather than fixed, so the next session starts from them.
    configuration does not merely leave a reader guessing, it silently
    recruits the wrong run into a comparison and the comparison still reads
    plausibly.
-3. **Three published series have no rebuild column at all** (Series 3 at
-   the paper's configuration, 12 of 13 Series 4 cases, both Series 5
-   cases). Series 4's V sweep is the cheapest — three names added to
-   `emit_profile.py`'s dimension passthrough, then a sweep; Series 3 is the
-   highest-value, at nine published values.
+3. **Still no rebuild column:** 12 of 13 Series 4 cases, both Series 5
+   cases, and Series 3's Study 2 (length variation, TABLE XXIII, six values
+   at L = 2.5 D to 40 D) and Study 3 (spacing, TABLE XXVI). Series 3 Study 1
+   is now done (§B.2). Series 4's V sweep is the cheapest — three names
+   added to `emit_profile.py`'s dimension passthrough, then a sweep. Study 2
+   is the most interesting, because the paper reports peak strain
+   *saturating* at 40 D as the component spans two rollers, which is a
+   behaviour change rather than a number.
 4. **We report extreme-fibre strain per element; the papers report
    "nominal strains at element integration points."** These are expected to
    coincide for a B31 beam in pure bending but this has **never been

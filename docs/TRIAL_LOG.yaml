@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 36
+# entries: 37
 
 - id: T001
   date: 2026-09-21
@@ -1076,3 +1076,53 @@
     candidate under EVERY row of the ledger.
   lesson: L093
   refs: [docs/VALIDATION.md, docs/RESULTS.md, docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md]
+
+- id: T037
+  date: 2026-10-06
+  goal: Give Paper 1 Series 3 Study 1 a rebuild column -- the nine
+    wall-thickness cases that had none -- at the paper's own configuration.
+  action: >-
+    Read Paper 1 in full (52 pp) BEFORE running, so the configuration came
+    from the source rather than a transcription. That turned up three facts
+    the transcriptions lacked: roller spacing is 9 m c/c throughout (our
+    earlier GD-TP comparison used 8 m), Series 4 and 5 are governed by Phase
+    2 rather than Phase 1, and TABLE XXXIV exists and gives the X3/X4
+    absolutes we did not have. Then ran the nine cases through emit_profile.
+  case: ILS-TP, R=70/85/100 m, 100 MT, 9 m spacing, L=1000 mm,
+    t=32/42/53 mm, 406.4x21, 2xOD mesh, envelope with edge crossings
+  outcome: measurement
+  evidence: |-
+    FIRST ATTEMPT WAS WORTHLESS AND LOOKED FINE: all nine converged and
+    reported three numbers repeated three times, because emit_profile's CLI
+    had been dropping --t-ratio and --L-OD and every case ran the
+    archetype's default 42 mm wall (L094). Caught only because the nine
+    were printed together -- read one at a time each was plausible.
+
+    After the fix, against paper TABLE XX:
+
+      A1 32mm  0.6421 / 0.4875 / 0.3815   paper 0.562 / 0.473 / 0.339
+      A2 42mm  0.7132 / 0.5546 / 0.4214   paper 0.647 / 0.508 / 0.358
+      A3 53mm  0.7857 / 0.6237 / 0.4519   paper 0.727 / 0.556 / 0.425
+
+    +3.1 to +17.7 pct, mean about +10 pct, ALL NINE HIGH. Every case put the
+    envelope at shift 1.000 m -- the travel where the component's leading
+    edge sits on SR2, which is where the paper says Phase 1 peaks.
+  verdict: >-
+    Series 3 Study 1 now has a rebuild column at the paper's own
+    configuration. Two readings, kept apart. The one-sided agreement is what
+    the envelope offset predicts -- we take a peak across the passage, the
+    paper reports a single analysis, so we cannot read low, and +10 pct is
+    the right order; our own sliding study reads 24.6 pct above a
+    single-position solve of the same case, which is that effect measured
+    directly.
+
+    Separately, the R-trend divergence is ABSENT here: the deltas do not flip
+    sign across the radii the way plain pipe's +17.9 / +5.6 / -8.1 does. The
+    run_slay column, run at 8 m against a 9 m paper, DOES flip. So the
+    "+19 to +26 pct at R = 70" recorded against Paper 1 for GD-TP was partly
+    a spacing mismatch rather than toolchain divergence; at the paper's own
+    9 m the rebuild is +14.3 pct there. run_slay stays as a program-to-program
+    check -- we sit within 9.5 pct of it everywhere -- but it is not a
+    like-for-like comparison against Paper 1 and must not be read as one.
+  lesson: L094
+  refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
