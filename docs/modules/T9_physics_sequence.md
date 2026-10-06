@@ -16,8 +16,9 @@ line of rollers, and down the curved stinger into the sea. Somewhere in that
 length is an inline component. Take it below to be a thick-walled body — a
 forged section with the same bore as the pipe and a heavier wall, so it is
 stiffer than the pipe and its outside surface stands proud of it. That is
-one of two kinds we model; the other is a shroud, which adds no stiffness
-and works purely by lifting. **Two kinds of component** near the end sets
+one of three kinds we model; another is a shroud, which adds no stiffness
+and works purely by lifting, and the third is a structure bolted to the pipe
+at points. **Three kinds of component** near the end sets
 out the difference, and the sequence below applies to both.
 
 We want the worst strain the pipe suffers as this component goes over the
@@ -212,10 +213,12 @@ makes the envelope step-independent — 0.5731 / 0.5727 / 0.5722 / 0.5689%
 across a fourfold range of step, found in 5 positions where blind refinement
 needed 16.
 
-## Two kinds of component, and they are not the same physics
+## Three kinds of component, and they are not the same physics
 
-*Added 29 Sep. Everything above was written for a thick-walled body; a
-second kind behaves oppositely and the sequence applies to both.*
+*Added 29 Sep for the first two; a third added 6 Oct. Everything above was
+written for a thick-walled body. The others behave differently — one
+oppositely, one by a different mechanism entirely — and the sequence
+applies to all three.*
 
 **A stiffening body (GD-TP, GD-TT).** A forged section with the same bore
 and a heavier wall. It is stiffer than the pipe, so it resists being bent
@@ -249,13 +252,45 @@ while forcing a 28.3 m bend into the adjacent pipe, three times tighter than
 the stinger itself. A shroud does the reverse: with nothing to resist
 bending, the lift forces curvature into the component region.
 
+**An attached structure (EA-ST, EA-SB).** *Added 6 Oct, with the EA sweep
+cases.* Neither of the above. A frame — a portal standing over the pipe
+(EA-ST) or a body it rides on (EA-SB) — is **fastened to the pipeline at
+discrete points**, and that is the whole of how it acts. Between those
+points it is a separate structure spanning over the pipe, carrying its own
+share of the bending in its own members, with a stiffness `kT` (ST) or `kB`
+(SB) quoted as a multiple of the pipeline's.
+
+So its load path is nothing like a body threaded onto the pipe:
+
+* **The pipe is bent hard AT a fastening**, because that is the only place
+  the structure can push or pull on it.
+* **The pipe BETWEEN two fastenings is the quietest in the model** — an
+  order of magnitude below the fastenings. The frame spans over it and
+  takes the curvature instead. *A two-point attachment does not load the
+  pipe it spans; it loads its own ends.*
+* Outboard of the structure the pipe returns to the plain stinger overbend.
+
+EA-SB is **both kinds at once**, which is easy to miss: as well as being
+fastened down, its body lifts the pipe off the arc by `P_v − OD/2`, exactly
+as a shroud does. Our archetype ships `P_v = 4 D` (a 3.5 D lift) while every
+published case is `2 D` (1.5 D); the difference is severe enough to stop
+passages converging, so the shipped default is not a case anyone has
+published.
+
+**Only one joint type is modelled.** A fastening is type **F** — fully
+tied. The `P`, `S` and `D` joints in the reference release selected degrees
+of freedom (`D` is a deadband that opens and shuts), and the solver refuses
+them rather than approximating them with an F. Substituting F ties every
+DOF and silently answers a different question, which is what guardrail G9
+forbids.
+
 **Why this matters for reading results.** For a stiffening body the worst
 strain is in the pipe at the junction, not on the body — measured across the
 dataset, a median 4.5× the body peak. For a shroud there is no junction at
 all, because no section steps; the lift is the whole of it, and a result
 file that does not record the lift cannot tell a shroud case from bare pipe.
 
-## Where a shroud's strain is read — the five regions
+## Where an offset body's strain is read — the five regions
 
 *Added 30 Sep, following the reference's Series 4 / Type B1 scheme.*
 
@@ -327,6 +362,67 @@ curvature concentrates there. Each region peak therefore also records
 whether it landed on the shroud footprint, so a reader can tell which of the
 two an X1 peak happened on.
 
+## Where an attached structure's strain is read — X_c, X_i, X_e
+
+*Added 6 Oct, with the EA sweep cases. A different scheme again, and for a
+different reason: an offset body is divided by its own geometry, an attached
+structure by where it is FASTENED.*
+
+A body threaded onto the pipe is reported at its junctions or by its deep
+section. Neither applies to a frame bolted on at points, so the reference
+divides the pipe by the fastenings instead:
+
+| | Where | What it reads |
+|---|---|---|
+| **X_c** | within **2 × pipe OD** either side of a connector | **the peak, and what governs** |
+| **X_i** | the interior, between two connectors | the quietest pipe in the model — an order of magnitude below X_c |
+| **X_e** | outboard, from X_c out to the far field | the plain stinger overbend |
+| *X_i2* | a second interior, in the F1D/F2D layouts | not implemented — those need the `D` joint the solver refuses |
+
+A single fastening (F1) has no interior at all, so it has **no X_i** — and
+the reference tabulates none for it.
+
+**Two things about this convention were got wrong and are worth keeping.**
+X_c was first implemented 1.5 diameters either side, a band sized to be
+about two elements at the ruled mesh rather than read from the source, which
+says 2 × pipe OD. It changed no number — every peak already sat inside
+1.5 D — which is exactly why it would have survived indefinitely.
+
+And **the reference's prose and its own figures disagree** about where X_e
+stops. The text says X_e is "pipeline outside the structures"; Figs 27 and
+38 draw X_e running right up to where X_c begins, which *includes* pipe
+lying under the structure but outboard of its connectors — for EA-SB, the
+taper, where strain concentrates. Implementing the prose moved X_e from
+−10% to −45% against the reference's own numbers, so the figure is what we
+follow. Three cases settle it; the fourth cannot, because its connectors sit
+on the body's own edges and leave no under-structure pipe to argue over.
+
+### What the EA cases say so far
+
+Measured at R = 85 m, 9 m spacing, 120 MT, against the reference's values:
+
+| case | X_c ours / ref | X_i ours / ref | X_e ours / ref |
+|---|---|---|---|
+| EA-ST F2 Case 1 | 0.923 / 0.936 (**−1.4%**) | 0.075 / 0.043 | 0.537 / 0.732 |
+| EA-ST F2 Case 2 | 1.615 / 1.410 (+14.5%) | 0.124 / 0.075 | 0.679 / 1.021 |
+| EA-SB F1 Case 1 | 0.950 / 2.30 (−58.7%) | — | 1.136 / 1.41 |
+| EA-SB F2 Case 1 | 1.261 / 2.24 (−43.7%) | 0.137 / 0.086 | 1.304 / 1.45 |
+| EA-SB F2 Case 2 | 2.238 / 2.40 (**−6.8%**) | 0.123 / 0.086 | 0.836 / 1.52 |
+| EA-SB F2 Case 3 | 1.473 / 2.53 (−41.8%) | 0.127 / 0.085 | 1.432 / 1.60 |
+
+**The ordering X_c > X_e ≫ X_i is reproduced in every case**, which is the
+reference's actual finding and the thing the scheme exists to show. The
+magnitudes are another matter and the disagreement is not yet explained.
+
+One candidate is eliminated rather than left open: on EA-SB we read **low**
+while taking a passage *envelope*, and an envelope cannot be below a single
+position — so unlike EA-ST Case 2 this cannot be the unlike-comparison
+artefact of reporting a sweep against a single analysis. What the numbers do
+show is that our model is far more sensitive to connector **placement** than
+the reference's: EA-SB F2 Case 2, the one case whose connectors sit exactly
+on the body's edges, is the only one that lands close, while the two with
+connectors 2.5 D inboard both read about −42%.
+
 ## Mesh
 
 The pipe is chopped into short straight pieces, 2 diameters long away from
@@ -346,6 +442,8 @@ against each other rather than for quoting as the strain in a real pipe.
 
 | Date | Action |
 |---|---|
+| 6 Oct 2026 | **Added: a third kind of component.** An externally attached structure (EA-ST, EA-SB) is fastened to the pipe at DISCRETE POINTS and spans over everything between them, so the pipe is bent hard at a fastening and is quietest between two — a two-point attachment loads its own ends, not the pipe it spans. EA-SB is both kinds at once: it is also an offset body, lifting by `P_v − OD/2`. Only the type F joint is modelled; P, S and D are refused rather than approximated (G9). |
+| 6 Oct 2026 | **Added: the X_c / X_i / X_e regions**, the reporting scheme for an attached structure, with the six EA case results measured against the reference. The ordering is reproduced in every case; the magnitudes are not, and one explanation — a sweep envelope read against a single analysis — is eliminated because we read LOW. Two convention errors recorded with it: X_c sized to the mesh rather than to the stated 2 × OD, and an X_e boundary where the reference's prose and its own figures disagree. |
 | 30 Sep 2026 | **Added: the five strain regions of a shroud.** A body that steps no section has no junction to probe, so its reporting unit is a region, after the reference's Series 4 / Type B1 scheme: X1 catenary taper and beyond, X2/X3/X4 the deep section in thirds from the catenary side, X5 vessel taper and beyond. Orientation pinned against the measured peak. Two cautions recorded with it: at the ruled mesh the deep thirds hold 2, 2 and 1 elements, and X1 lumps a taper together with plain pipe. |
 | 29 Sep 2026 | **Corrected: Step 6 is built.** The section claiming the sweep driver was not ported had been stale since 22 Sep. Replaced with what exists and how it is verified, including the edge-crossing rule that makes the passage envelope independent of the sweep step. |
 | 29 Sep 2026 | **Added: two kinds of component.** Everything here was written for a thick-walled stiffening body. A shroud adds no stiffness and acts entirely by lifting the pipe off the rollers (`lift = V − OD/2`, `V` from the CENTRELINE), and the two act in opposite senses on local curvature — measured and tabulated. |

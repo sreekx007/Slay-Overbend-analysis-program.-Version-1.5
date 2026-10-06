@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 33
+# entries: 34
 
 - id: T001
   date: 2026-09-21
@@ -952,3 +952,39 @@
     be refused rather than approximated.
   lesson: L084
   refs: [tools/study_easb_cases.py, tools/emit_profile.py, docs/diagrams/easb_f2_case2.png, docs/diagrams/easb_f1_case1.png]
+
+- id: T034
+  date: 2026-10-01
+  goal: >-
+    Check, when asked, whether the X_c / X_i / X_e regions actually follow
+    the reference's stated convention rather than our reading of its
+    pictures.
+  action: >-
+    Compared the implementation against sections VII.B and VIII.B word by
+    word. Found X_c implemented at a half width of 1.5 D against a stated
+    2 x Pipe OD. Found the reference's prose and its own figures disagreeing
+    about where X_e stops, implemented the prose, measured the result, and
+    reverted to the figure's reading when the numbers refused it.
+  case: 'EA-ST F2 Cases 1-2 and EA-SB F1/F2 Cases 1-3, R=85, spacing 9 m, 120 MT'
+  outcome: success
+  evidence: >-
+    The X_c width was wrong and changes NOTHING -- every peak already sat
+    within 1.5 D of a connector, so all eight case results are identical at
+    2 D. On X_e, bucketing the under-structure pipe separately gives, against
+    the reference's own X_e: abutting X_c -19.4 / -10.1 / -10.5 pct on the
+    three cases that can distinguish the readings, against -48.4 / -44.3 /
+    -45.0 pct for X_e outside the body. F2 Case 2 cannot distinguish them at
+    all, because its connectors sit on the body's own edges and leave no
+    under-structure pipe. 623 passed.
+  verdict: >-
+    Two different kinds of error, and only one of them had a symptom. The
+    width was a band sized for the discretisation rather than read from the
+    source, and because it changed no number it would have survived
+    indefinitely (L089). The X_e boundary was worse: the prose reading is
+    the one I implemented first, and it was the published numbers that said
+    so, not any reasoning about what 'outside the structures' ought to mean
+    (L090). Where a source contradicts itself, measure both readings and let
+    its own results decide -- and say which cases are evidence, since one of
+    the four is not.
+  lesson: L089
+  refs: [tools/study_f2.py, tools/study_easb_cases.py, rebuild/tests/test_regions.py]
