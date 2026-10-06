@@ -81,6 +81,10 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
          system=None, extra=None):
     """Solve the passage and write the tables. Returns the summary.
 
+    `extra` carries a component's own dimensions -- GD-SB's `P_l1`, `P_l2`,
+    `P_v`, `kB_ratio` and GD-SH's `V`, `L1`, `L2` -- straight onto the
+    archetype's component definition.
+
     `P_c1`, `kT` and `L_top` re-dimension an EA structure (GD-ST / GD-SB):
     the connector span, the frame's stiffness as a multiple of the
     pipeline's, and the frame's own width. All three are in METRES except
@@ -157,19 +161,33 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
                 columns=rg.case_columns(geom, rpk))
 
 
-EA_DIMS = ('P_l1', 'P_l2', 'P_v', 'kB_ratio')
+# A component's own dimensions, under the names `component_spec` gives them,
+# so `ils_builder` stays the author of what a component IS (G7) and these are
+# only ever edits to an archetype's own definition.
+#
+#   EA-SB (GD-SB)   P_l1 deep length, P_l2 taper, P_v offset depth,
+#                   kB_ratio frame stiffness as a multiple of the pipeline's
+#   shroud (GD-SH)  V offset depth below the pipe CENTRELINE, L1 deep
+#                   length, L2 taper at each end
+#
+# V / L1 / L2 were missing until 6 Oct, which is why Paper 1's Series 4 V
+# sweep could not be driven from here at all -- the one sweep the generator
+# was closest to being able to run.
+COMPONENT_DIMS = ('P_l1', 'P_l2', 'P_v', 'kB_ratio', 'V', 'L1', 'L2')
+
+EA_DIMS = COMPONENT_DIMS      # the older name, kept so callers do not break
 
 
 def _extra(argv=None):
-    """EA-SB's own dimensions from the command line, or None if none given.
+    """A component's dimensions from the command line, or None if none given.
 
     Returning None rather than a dict of Nones is the whole point: `emit`
     decides which builder to use by whether anything was asked for, and a
-    dict of four Nones is truthy (L094).
+    dict of Nones is truthy (L094).
     """
     argv = sys.argv if argv is None else argv
     out = {}
-    for k in EA_DIMS:
+    for k in COMPONENT_DIMS:
         flag = f'--{k.replace("_", "-")}'
         if flag in argv:
             out[k] = float(argv[argv.index(flag) + 1])

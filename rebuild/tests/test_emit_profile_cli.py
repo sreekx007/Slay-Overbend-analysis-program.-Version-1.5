@@ -45,8 +45,8 @@ def test_an_EA_flag_is_picked_up():
             'kB_ratio': 3.0, 'P_l1': 4.0}
 
 
-def test_every_EA_dimension_has_a_flag_spelling_that_round_trips():
-    for k in emit_profile.EA_DIMS:
+def test_every_component_dimension_has_a_flag_that_round_trips():
+    for k in emit_profile.COMPONENT_DIMS:
         flag = f'--{k.replace("_", "-")}'
         assert emit_profile._extra(['prog', flag, '7.5']) == {k: 7.5}
 
@@ -87,3 +87,31 @@ def test_three_wall_thicknesses_build_three_different_stiffnesses():
         ods.add(round(getattr(b, 'OD_comp', None)
                       or getattr(b, 'OD', 0.0), 6))
     assert len(ods) == 3, f'constant-bore growth collapsed: {sorted(ods)}'
+
+
+def test_the_shroud_dimensions_are_drivable():
+    """Paper 1's Series 4 is a sweep of V at fixed L1 and L2, and until
+    6 Oct none of the three could be set from the command line -- so the one
+    published sweep this generator was closest to running was the one it
+    could not express. `P_v` is GD-SB's offset and is NOT a substitute: a
+    different component, measured from a different datum.
+    """
+    for k in ('V', 'L1', 'L2'):
+        assert k in emit_profile.COMPONENT_DIMS
+    got = emit_profile._extra(
+        ['prog', '--V', '0.6096', '--L1', '4.064', '--L2', '1.016'])
+    assert got == {'V': 0.6096, 'L1': 4.064, 'L2': 1.016}
+
+
+@pytest.mark.parametrize('V_D', [0.75, 1.0, 1.5, 2.0, 2.5, 3.0])
+def test_a_V_reaches_the_built_shroud(V_D):
+    """The flag has to change the geometry, not merely parse -- which is
+    exactly the distinction L094 was about. These six depths are Paper 1
+    TABLE XXXI's R = 85 sweep.
+    """
+    OD = 0.4064
+    ils = emit_profile._ea_ils('ILS-SH', None, None, None, None,
+                               {'V': V_D * OD})
+    body = ils.assembly.components[0]
+    assert body.V == pytest.approx(V_D * OD), (
+        f'--V {V_D}D did not reach the component')
