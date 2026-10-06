@@ -21,13 +21,35 @@ only the original toolchain has, and some neither.
 
 | | What it covers | Citation |
 |---|---|---|
-| **Paper 1** | Plain pipe (Study 1 / TABLE X), thick pipe GD-TP (Series 3 / TABLE XIX–XX), shroud GD-SH (Series 4 / TABLE XXIX, XXXI), the two combined (Series 5 / TABLE XXXIX) | *Towards AI-Assisted Concept Design of ILS*, IJRASET Vol. 14 Issue VII, July 2026. Benchmark is an **Abaqus** B31 beam model |
+| **Paper 1** | Plain pipe (Study 1 / TABLE X, XI), thick pipe GD-TP (Series 3 / TABLE XIX–XXVI), shroud GD-SH (Series 4 / TABLE XXVIII–XXXIV), the two combined (Series 5 / TABLE XXXVIII–XXXIX) | Sivaraman & Reddy, *Toward AI-Assisted Conceptual Design of Subsea Inline Structures*, IJRASET Vol. 14 Issue VII, July 2026, pp. 1127–…, doi 10.22214/ijraset.2026.84268. Benchmark is an **Abaqus** B31 beam model. **Read in full 6 Oct 2026** — 52 pp |
 | **Paper 2** | External attached structures — EA-ST (stand-off) and EA-SB (sledge base) on F1 and F2 connections, and the X_c / X_i / X_e reporting scheme (its Figs 27 and 38) | **Not recorded in this repo.** Supplied as figures only; the case tables and region definitions were transcribed from them. See *Gaps* below |
 
 **Paper 1 is the source of every TABLE-numbered target in
 `T9_components_spec.md`; Paper 2 is the source of every EA case.** Before
 this file the repo called both "the reference" and distinguished them
 nowhere, which is the first thing the ledger fixes.
+
+### Paper 1's transcriptions are now verified against the source
+
+The PDF was supplied and read on 6 Oct. **Every target value transcribed
+into this repo checks out** — TABLE X (0.46 / 0.38 / 0.32), TABLE XX (the
+nine GD-TP values), TABLE XXXI (the twelve shroud X2 values) and TABLE
+XXXIX (0.70 / 0.952 / 1.26) are all exactly as recorded. Three things the
+transcriptions had wrong or missing, all configuration rather than results:
+
+1. **Roller spacing is 9 m c/c throughout the paper**, stated once in the
+   model description ("Rollers are spaced out at length of 9m c/c") and
+   never repeated per study. Our GD-TP comparison in §B.1 was run at **8 m**
+   — a configuration mismatch, not a like-for-like delta. Flagged in §B.
+2. **Every Series 4 and Series 5 case is governed by Phase 2**, not Phase 1.
+   Phase 1 is plastic bending over the first two rollers from a straight,
+   stress-free pipe; Phase 2 is the elastic bend-unload cycle over the
+   mid-stinger rollers, *offset by the residual plastic curvature Phase 1
+   left behind*. Plain pipe and Series 3 are Phase 1. This is a real
+   difference in what is being reported and is discussed in §C.
+3. **TABLE XXXIV exists and we did not have it.** It gives X3 and X4
+   absolutes for all six offset depths, so the shroud comparison is three
+   regions wide rather than one. See §C.
 
 ### A third comparison that is not a paper
 
@@ -197,33 +219,44 @@ hold refined — so the region scheme's own recorded caution reproduces at the
 paper's tension as well, and each region peak carries whether it landed on
 the shroud footprint so the two things X1 lumps together can be told apart.
 
-**Two corrections this ledger surfaced, one of which reverses a recorded
-conclusion.**
+### C.0 Three regions, against TABLE XXXIV
 
-*The mesh table was run at the wrong tension.* `T9_physics_sequence.md`'s
-table (X2 = 0.6868 / 0.7286 / 0.7951%) is at **120 MT**, not Series 4's
-100 MT, and carried no tension label. Those are not Series 4 numbers and
-must not be read against 0.70%.
+Reading Paper 1 in full produced a table we did not have: **TABLE XXXIV**
+gives X3 and X4 absolutes for every offset depth at this exact
+configuration, so the comparison is three regions wide. At our finest mesh:
 
-*And the conclusion drawn from it does not survive.* That table concluded
-X3/X2 converges to **0.744 — "inside the reference's 65–75% band"**. At the
-paper's own tension it converges to **0.767**, which is *outside* that band,
-marginally and on the high side:
+| region | Paper 1 (TABLE XXXIV, V = 1.0 D) | ours, 0.5 × OD | delta |
+|---|---|---|---|
+| **X2** catenary third | 0.70% | 0.7164% | **+2.3%** |
+| **X3** midspan third | 0.55% | 0.5491% | **−0.2%** |
+| **X4** vessel third | 0.43% | 0.5117% | +19.0% |
+| X3/X2 | 79% | 76.6% | −3.0% |
+| X4/X2 | 61% | 71.4% | +16.4% |
 
-| mesh | X3/X2 at 100 MT (Series 4) | X3/X2 at 120 MT (as recorded) |
-|---|---|---|
-| 2 × OD | 0.800 | 0.784 |
-| 1 × OD | 0.770 | 0.749 |
-| 0.5 × OD | **0.767** | **0.744** |
+**X2 and X3 agree to within 2.5%.** X4 is 19% high, and X4 is the region
+the paper says *plateaus* beyond V ≈ 1.5 D — a plateau is exactly the
+behaviour a one-element region cannot resolve, and X4 holds 1 element at
+2 × OD and 6 at 0.5 × OD against X2's 7.
 
-The ratio looked tension-insensitive at the ruled mesh — 0.800 against
-0.784, which is what I checked first — but the gap holds under refinement
-and 0.75 is exactly where the band's edge sits, so the two tensions land on
-opposite sides of it. **The "inside the band" claim was an artefact of
-comparing a 120 MT run to a 100 MT target.** What is true: X3/X2 converges,
-it converges close to the band, and it converges just above it. The
-qualitative finding the region scheme exists to show — X2 is the peak of the
-three deep thirds, and X3 sits well above X4 — is unaffected.
+**The X3/X2 "band" question, settled from the source.** This has now moved
+twice, so here is the whole of it. The repo recorded X3/X2 converging to
+0.744 and called that "inside the reference's 65–75% band". Re-run at the
+paper's own 100 MT it converges to 0.767, which I then recorded as *outside*
+that band. Both readings were comparing against the paper's **prose
+generalisation** — TABLE XXIX says "typically 65–75%" and the text above
+TABLE XXXIV says "approximately 65–70%". The paper's own tabulated value
+for the case we match dimensionally is **79%**, and its own six cases run
+68 / 79 / 79 / 73 / 71 / 67%, so the generalisation does not even contain
+its own V = 1.0 D entry. Against the case value our 76.6% is **−3.0%**.
+
+*Compare case against case, never case against the prose summarising a
+spread of cases* — the band was never the right target, and two successive
+"corrections" against it were both beside the point.
+
+**One real correction stands.** `T9_physics_sequence.md`'s mesh table
+(X2 = 0.6868 / 0.7286 / 0.7951%) is at **120 MT**, not Series 4's 100 MT,
+and carried no tension label. Those are not Series 4 numbers and must not
+be read against 0.70%.
 
 ### C.1 The rest of Series 4 — NOT RUN
 
