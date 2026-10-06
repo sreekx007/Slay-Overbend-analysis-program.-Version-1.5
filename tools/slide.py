@@ -210,8 +210,15 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
 
     total = sweep.sweep_length(L_comp, cb, ca)
     step = OD if step is None else step
+    # THE SCENE AND THE RUN MUST AGREE ON BOTH, or `sweep.run` refuses the
+    # pair (L096): the stinger margin holds the terminal slot, and its size
+    # depends on the contact surface AND the diameter. This call used to pass
+    # neither, which was harmless only while the default was 'centreline' and
+    # the margin was zero.
     sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L_comp,
-                         clear_before=cb, clear_after=ca)
+                         clear_before=cb, clear_after=ca,
+                         contact_surface=contact_surface,
+                         OD=None if OD == OD_DEF else OD)
 
     kw = dict(tension=tension_mt * TON,
               material=None if elastic else material('j2'),

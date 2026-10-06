@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 97
+# entries: 98
 
 - id: L001
   area: kernel
@@ -2177,4 +2177,33 @@
     here", and nobody checks a quiet number.
   detect: test_an_unmeasured_region_is_flagged_not_zeroed, test_frac_of_x2_is_not_computed_against_an_unmeasured_X2, test_the_thirds_can_be_shorter_than_one_element
   refs: [rebuild/slay/report/regions.py, tools/emit_profile.py, rebuild/tests/test_region_empty.py]
+  date: 2026-10-06
+
+- id: L098
+  area: solve
+  class: finding
+  symptom: >-
+    ILS-EASB runs all 30 positions of its passage with
+    contact_surface='centreline' and truncates at position 7 with
+    contact_surface='bottom', failing CUTBACK EXHAUSTED at lam=0.0000 at
+    shift 2.032 m of a 10.128 m travel -- 20 pct of the passage. Both F2 and
+    PS truncate at the same position.
+  cause: >-
+    Not diagnosed. The contact surface raises R_eff by 0.59 pct and moves
+    every slot (R_eff - R) * theta outboard, which is a small change
+    everywhere else -- plain pipe moved under 1 pct, Series 3 under 2 pct,
+    the EA-ST cases under 1 pct. ILS-EASB ships P_v = 1.6256 m, 4 D, a 3.5 D
+    lift, the most severe geometry in the repo, and it is the only case where
+    the change costs CAPABILITY rather than accuracy. Both connection systems
+    failing at the same position says the cause is the structure's geometry
+    and not the joint.
+  rule: >-
+    Report a capability regression as loudly as a wrong number, and mark the
+    results it produces as lower bounds rather than quietly tabulating a
+    truncated envelope beside a full one. A 7/8 envelope and a 30/30 envelope
+    are not the same quantity. First thing to try: the staged seeding that
+    rescued the R = 60/70 corner, since this fails at the FIRST increment of a
+    position the previous one reached comfortably.
+  detect: '-'
+  refs: [docs/validation/VALIDATION_v2.0_2026-10-06.md, tools/slide.py]
   date: 2026-10-06

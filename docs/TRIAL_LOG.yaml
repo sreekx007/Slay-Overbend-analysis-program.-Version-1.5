@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 39
+# entries: 40
 
 - id: T001
   date: 2026-09-21
@@ -1253,3 +1253,65 @@
     either way.
   lesson: L095, L096
   refs: [rebuild/slay/physics/contact.py, rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, tools/stage_run.py]
+
+- id: T040
+  date: 2026-10-06
+  goal: Re-measure every ledger case on the new default contact surface, after
+    v1.0's results were established to be on the superseded one.
+  action: >-
+    Versioned the ledger rather than editing it -- v1.0 keeps its numbers
+    untouched so the two are comparable -- and re-ran 31 cases: Series 3's
+    nine, Series 4's twelve plus a three-density mesh study, Paper 2's six EA
+    cases, and the four PS control rows.
+  case: Series 3 ILS-TP R=70/85/100 100MT 9m; Series 4 ILS-SH 12 configs 9m
+    2xOD plus mesh 2/1/0.5xOD; EA-ST and EA-SB published cases R=85 9m 120MT;
+    PS control on the shipped archetypes
+  outcome: partial
+  evidence: |-
+    Series 3, against paper TABLE XX, and against v1.0:
+
+      A1  0.6298 / 0.4815 / 0.3779   +12.1 / +1.8 / +11.5 pct   v1.0 -0.9 to -1.9
+      A2  0.7002 / 0.5476 / 0.4188    +8.2 / +7.8 / +17.0 pct   v1.0 -0.6 to -1.8
+      A3  0.7709 / 0.6153 / 0.4489    +6.0 / +10.7 / +5.6 pct   v1.0 -0.7 to -1.9
+
+    Series 4 X2, R=85 series: 0.5241 / 0.5976 / 0.7336 / 0.8824 / 1.0034 /
+    1.1577 -- -15.5 to -35.7 pct, fanning out with depth. R=70 T=120 series:
+    0.8481 / 0.9672 / 1.1415 -- +5.0 / -0.3 / -0.7 pct, the closest agreement
+    in the ledger. X2 holds ONE element at 2xOD in 9 of 12 cases.
+
+    Mesh at the dimensionally-matched case, paper X2 0.70 X3 0.55 X4 0.43:
+      2xOD    0.5976 (-14.6)  0.5170 ( -6.0)  0.4586 ( +6.7)
+      1xOD    0.6668 ( -4.7)  0.5513 ( +0.2)  0.4778 (+11.1)
+      0.5xOD  0.7271 ( +3.9)  0.5381 ( -2.2)  0.5092 (+18.4)
+
+    EA cases, X_c within -2.1 to +2.4 pct of v1.0, all six full passage.
+    PS control: EA-ST 24/24 both systems, within 1 pct of v1.0.
+    EA-SB: 7/8 positions, where v1.0 ran 30/30.
+  verdict: >-
+    The contact surface is a small effect everywhere it can be measured, and
+    its size depends on whether the peak has a feature to pin it to. Plain
+    pipe scattered -0.91 to +0.45 pct because its peak jumps between elements
+    as the slots move outboard; Series 3 moved uniformly -0.6 to -1.9 pct
+    because its peak sits at the pipe-to-component junction, a fixed material
+    feature; the EA cases moved under 2.4 pct. Same effect, with and without
+    something to pin the peak to.
+
+    Three things it did NOT change, which is the useful result: Series 4's
+    under-amplification with depth (still fanning from -15.5 to -35.7 pct),
+    the X3/X4 collapse past a depth threshold, and the EA-SB magnitude
+    disagreement. All three survive, so the contact surface is ELIMINATED as
+    a candidate explanation for any of them rather than being a fix.
+
+    Two defects the re-run exposed. L097: three Series 4 cases reported
+    X3 = 0.0000 pct for a region holding NO ELEMENTS -- L1 = 5 D makes each
+    third 0.677 m against an 0.813 m element -- and v1.0 published those zeros
+    as measurements. L098: ILS-EASB truncates at 20 pct of its passage on the
+    new surface where it ran all of it before, the one place the change costs
+    capability rather than accuracy, undiagnosed.
+
+    And a plumbing gap the L096 check caught in passing: tools/slide.py
+    accepted contact_surface but did not pass it to scene_for, so the scene
+    and the run disagreed. Harmless only while the default made the margin
+    zero.
+  lesson: L097, L098
+  refs: [docs/validation/VALIDATION_v2.0_2026-10-06.md, docs/validation/VALIDATION_v1.0_2026-10-06.md, tools/slide.py, rebuild/slay/report/regions.py]

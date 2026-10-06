@@ -452,16 +452,45 @@ different question. The solver refuses it rather than approximating it.
 of these and no delta can be computed.** Recorded so the ledger is not
 mistaken for complete.
 
-| Archetype | System | X_c | X_i | X_e | Positions |
-|---|---|---|---|---|---|
-| ILS-EAST | F2 | *pending* | *pending* | *pending* | |
-| ILS-EAST | **PS** | *pending* | *pending* | *pending* | |
-| ILS-EASB | F2 | *pending* | *pending* | *pending* | |
-| ILS-EASB | **PS** | *pending* | *pending* | *pending* | |
+| Archetype | System | X_c | X_i | X_e | Positions | v1.0 positions |
+|---|---|---|---|---|---|---|
+| ILS-EAST | F2 | 0.601% | 0.062% | 0.478% | 24/24 | 24/24 |
+| ILS-EAST | **PS** | 0.357% | 0.355% | 0.419% | 24/24 | 24/24 |
+| ILS-EASB | F2 | **0.328%** ⚠ | **0.086%** ⚠ | **1.599%** ⚠ | **7/8** | 30/30 |
+| ILS-EASB | **PS** | **0.311%** ⚠ | **0.208%** ⚠ | **1.551%** ⚠ | **7/8** | 9/10 |
 
-v1.0, for comparison: EA-ST F2 0.607 / 0.062 / 0.483 and PS 0.360 / 0.358 /
-0.420; EA-SB F2 1.185 / 0.142 / 2.082 and PS 0.481 / 0.243 / 1.986, the last
-truncating at 9/10 positions so that envelope is a lower bound.
+**EA-ST is a clean re-measurement**: 24/24 both times, and every value within
+1% of v1.0 (F2 0.607 / 0.062 / 0.483 → 0.601 / 0.062 / 0.478; PS 0.360 /
+0.358 / 0.420 → 0.357 / 0.355 / 0.419). PS still relieves the connector and
+removes the shielding — X_c falls 41%, and X_i rises from an order of
+magnitude below X_c to **equal** it, because with the slot free to slide the
+frame can no longer hold the pipe it spans. Unchanged by the contact surface.
+
+> ### ⚠ EA-SB does not survive the contact surface change
+>
+> **`ILS-EASB` ran 30/30 positions on 'centreline' and truncates at position
+> 7 on 'bottom'**, failing with `CUTBACK EXHAUSTED at lam=0.0000` at
+> shift 2.032 m of a 10.128 m travel. It covers **20% of the passage**, so
+> its three region values are lower bounds over a fifth of the travel and
+> are **not comparable to v1.0's**, which covered all of it. Marked ⚠ for
+> that reason, not because the solver reported anything wrong about the seven
+> positions it did solve.
+>
+> This is the one place the surface change costs capability rather than
+> accuracy, and it is the most severe geometry in the repo: `ILS-EASB` ships
+> `P_v = 1.6256 m`, **4 D**, a 3.5 D lift. Both connection systems truncate
+> at the same position, which says the cause is the structure's geometry and
+> not the joint.
+>
+> **Not diagnosed.** The candidate worth trying first is the staged seeding
+> that rescued the R = 60/70 corner (shape before loads), since this fails at
+> the first increment of a position the previous one reached comfortably.
+
+**These are the archetypes at their SHIPPED dimensions, not the paper's case
+dimensions**, which is why the F2 rows here do not match §E's. The F2 column
+is present only as the control the PS column is read against. For `ILS-EASB`
+the difference is severe: 4 D of offset against every published case's 2 D.
+**No row of this table may be read against a published value.**
 
 **These are the archetypes at their SHIPPED dimensions, not the paper's case
 dimensions**, which is why the F2 rows here will not match the F2 rows in
@@ -493,7 +522,7 @@ EA-SB, and X_i rose to **equal** X_c on EA-ST.
 | Rebuild vs Paper 1, Series 5 | **0 of 2** — no region columns for `ILS-SHTP` |
 | Rebuild vs Paper 2, EA F1/F2 | **6 of 6**, ordering reproduced in all; X_c −59.1% to +13.6% |
 | Rebuild vs Paper 2, EA F1D/F2D | Refused under G9 |
-| PS layouts | Prediction only; Paper 2 publishes no PS case |
+| PS layouts | Prediction only; Paper 2 publishes no PS case. EA-ST clean at 24/24; **EA-SB truncates at 20% of its travel on the new contact surface** |
 
 ## G. Gaps
 
@@ -520,6 +549,10 @@ EA-SB, and X_i rose to **equal** X_c on EA-ST.
 6. **Whether our envelope and the paper's "Ph2" are the same mechanical
    state** is unsettled, and sits under every Series 4 and Series 5 row.
 7. **§B.3's sliding study has not been re-run** on the new default.
+8. **`ILS-EASB` truncates at 20% of its passage on the default contact
+   surface** (§E.2), where it ran the full travel on 'centreline'. The only
+   capability regression from that change, undiagnosed, and it affects the
+   most severe geometry in the repo.
 
 ---
 
