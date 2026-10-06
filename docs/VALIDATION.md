@@ -64,9 +64,23 @@ and Paper 1, all documented, none of them bugs:
 
 ## A. Paper 1, Study 1 — plain pipe
 
-406.4 × 21 mm, 120 MT, J2 plasticity (σ_y0 = 360 MPa, `material('j2')`).
-The case M1 gates on. *No API grade is recorded anywhere in this repo and
-none is asserted here — 360 MPa is X52's specified minimum, not X65's.*
+406.4 × 21 mm (16" × 21 mm seamless), 120 MT, J2 plasticity
+(`material('j2')`). The case M1 gates on.
+
+**The steel is DNV Grade 450**, API 5L X65-equivalent, named in
+`nlfea_v4.py`: SMYS 450 MPa, certificate value 448 MPa, E = 207 GPa,
+Ramberg-Osgood n = 20.59. We carry it in two forms — `material('ro')` at
+E = 207 GPa / σ_ys = 450 MPa / n = 20.59 / α_dnv = 1.300, and
+`material('j2')` as an incremental table from **360 to 530 MPa** over 0 to
+5.26% plastic strain at E = 210 GPa.
+
+*The J2 table's 360 MPa is **not** a grade SMYS and must not be read as one.*
+It is where this steel's round-house curve leaves the elastic line —
+exactly 0.800 × 450 MPa — and it is pinned to the project's own Abaqus
+benchmark BM_Test_B (360 MPa first yield, not the 385 MPa of a
+similarly-shaped table that exists elsewhere). Both forms are the same
+450 MPa steel; a reader seeing 360 MPa and inferring a lower grade would be
+making the mistake this paragraph exists to stop.
 
 ### A.1 Rebuild against `run_slay` — like-for-like, J2 against J2
 
