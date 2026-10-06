@@ -1,5 +1,16 @@
 # SLAY Overbend — Validation ledger v2.0
 
+> ## ⚠ SUPERSEDED by `VALIDATION_v3.0_2026-10-06.md`
+>
+> The results here are **not wrong** — v3.0 carries the same measurements,
+> plus the shroud-with-thick-pipe cases and bending moment for every case.
+> What changed is the organisation: v3.0 is laid out on the papers' own
+> table numbering and compares the rebuild against the papers only, where
+> this file also carried the `run_slay` toolchain and v1.0's superseded
+> numbers in the same tables.
+>
+> Kept unedited as the record of that stage.
+
 **Every published case we have a number for, in one table.**
 
 One row per published case. Each row says which program produced our

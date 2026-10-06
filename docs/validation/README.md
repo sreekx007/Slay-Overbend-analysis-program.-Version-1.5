@@ -1,6 +1,6 @@
 # Validation ledgers
 
-**Current version: [`VALIDATION_v2.0_2026-10-06.md`](VALIDATION_v2.0_2026-10-06.md).**
+**Current version: [`VALIDATION_v3.0_2026-10-06.md`](VALIDATION_v3.0_2026-10-06.md).**
 
 One file per revision, named `VALIDATION_v<major>.<minor>_<YYYY-MM-DD>.md`.
 A ledger is dated and versioned because **a measured result is meaningless
@@ -13,10 +13,16 @@ tell a re-measurement from a correction.
 measured, and the successor is a re-measurement of the same cases, so the
 two have to stay comparable.
 
-| Version | Date | Rebuild results computed with | Status |
+| Version | Date | What | Status |
 |---|---|---|---|
-| [2.0](VALIDATION_v2.0_2026-10-06.md) | 6 Oct 2026 | `contact_surface='bottom'` — `R + r_roller + OD/2`, the physical surface | **current** |
-| [1.0](VALIDATION_v1.0_2026-10-06.md) | 6 Oct 2026 | `contact_surface='centreline'` — the pipe centreline on the `R` arc | superseded |
+| [3.0](VALIDATION_v3.0_2026-10-06.md) | 6 Oct 2026 | Organised on the papers' own table numbering; rebuild against the papers only; bending moment for every case | **current** |
+| [2.0](VALIDATION_v2.0_2026-10-06.md) | 6 Oct 2026 | Re-measured on `contact_surface='bottom'`, the physical surface | superseded |
+| [1.0](VALIDATION_v1.0_2026-10-06.md) | 6 Oct 2026 | First consolidated ledger, on `contact_surface='centreline'` | superseded |
+
+A **major** bump also covers a restructure that changes what the file is
+for: v3.0 dropped the `run_slay` and previous-version columns, because the
+question the ledger answers is *rebuild against the papers* and a table
+carrying four comparisons answers it less well than one carrying two.
 
 ### Bump the version when
 

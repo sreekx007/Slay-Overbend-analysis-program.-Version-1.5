@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 40
+# entries: 41
 
 - id: T001
   date: 2026-09-21
@@ -1315,3 +1315,69 @@
     zero.
   lesson: L097, L098
   refs: [docs/validation/VALIDATION_v2.0_2026-10-06.md, docs/validation/VALIDATION_v1.0_2026-10-06.md, tools/slide.py, rebuild/slay/report/regions.py]
+
+- id: T041
+  date: 2026-10-06
+  goal: Run the shroud-with-thick-pipe cases, the last unrun block of Paper 1
+    that was blocked rather than merely unscheduled, and report bending moment
+    alongside strain for every case.
+  action: >-
+    Three defects stood between ILS-SHTP and a comparison, found one behind
+    the other: offset_geometry refused any assembly whose section stepped;
+    keying on the deepest contact instead fixed 5 D and broke 10 D, where the
+    body fills the deep section and every deepest sample also steps; and
+    --L-OD wrote L_comp onto components[0], which is the SHROUD. Then
+    extracted peak moment from every profile artifact already on disk.
+  case: ILS-SHTP, R=85 m, 100 MT, 9 m spacing, 2xOD mesh, shroud L1=10D
+    L2=2.5D V=1D, thick pipe 5D and 10D; plus moment for all 24 earlier cases
+  outcome: success
+  evidence: |-
+    TABLE XXXIX, against paper 0.952 / 1.26 pct and 1405 / 1555 kN.m:
+
+      baseline shroud only  X2 0.5976  (-14.6 pct)   BM 1274
+      Case 1   5 D body     X2 0.8240  (-13.4 pct)   BM 1314  (-6.5 pct)
+      Case 2   10 D body    peak 1.2204 (-3.1 pct)   BM 1367  (-12.1 pct)
+
+    Amplification over the shroud-only baseline: paper +36 / +80 pct, ours
+    +37.9 / +104.2 pct.
+
+    BENDING MOMENT, TABLE XXI, nine thick-pipe cases:
+      A1  1289 / 1238 / 1175   paper 1311 / 1251 / 1131   -1.7 / -1.1 / +3.9
+      A2  1306 / 1264 / 1205   paper 1347 / 1288 / 1144   -3.1 / -1.9 / +5.3
+      A3  1320 / 1284 / 1221   paper 1366 / 1311 / 1150   -3.3 / -2.0 / +6.2
+  verdict: >-
+    BENDING MOMENT AGREES FAR BETTER THAN STRAIN: -3.3 to +6.2 pct against
+    +1.8 to +17.0 pct on the same nine cases. That is the most useful result
+    of the exercise. Moment is a section force set by the curvature the
+    rollers impose; strain is a local extreme-fibre quantity read off one
+    element, carrying the envelope offset, the mesh, and wherever the peak
+    lands. The two agreeing to different degrees says the GLOBAL MECHANICS
+    ARE RIGHT and the disagreement lives in local strain reporting -- a much
+    narrower place to look than "the model reads high". It also sharpens the
+    open question about extreme-fibre strain against nominal strain at
+    integration points, which would produce exactly this pattern.
+
+    CASE 2'S REGION LABEL NEEDS CARE and the paper's own wording says why. It
+    calls the peak the "pipe-to-component junction at X2", and at 10 D the
+    body is exactly as long as the deep section, so its catenary junction
+    sits at s = 6.983 -- precisely our X1/X2 boundary. Our peak lands 0.4 m
+    outboard at s = 7.386, which our partition counts as X1 and the paper
+    counts as X2. Same pipe, same feature, different boundary convention, so
+    1.2204 against 1.26 pct is the like-for-like comparison and the X2 column
+    for that case (0.1085 pct) is not. Reported with the reasoning rather
+    than silently taking the favourable number.
+
+    The amplification is reproduced at 5 D (+37.9 against +36 pct) and
+    overstated at 10 D (+104 against +80), and the arithmetic says why: the
+    absolute values agree far better at the junction (-3.1 pct) than at the
+    shroud-only baseline (-14.6 pct), so the ratio inherits the baseline's
+    shortfall.
+
+    Bending moment across the shroud V sweep is nearly FLAT -- 1248 to 1373
+    kN.m over a fourfold range of offset depth, 10 pct end to end, while X2
+    more than doubles. The rollers set the curvature and the shroud
+    redistributes where the strain appears without much changing the section
+    force. The paper publishes no moment for those cases, so that is a
+    prediction rather than a comparison.
+  lesson: '-'
+  refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, rebuild/slay/report/regions.py, tools/plot_stinger.py, rebuild/tests/test_combined_regions.py]
