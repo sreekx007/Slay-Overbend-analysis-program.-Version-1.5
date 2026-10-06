@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 42
+# entries: 43
 
 - id: T001
   date: 2026-09-21
@@ -1436,3 +1436,75 @@
     in the ledger is one-sided high.
   lesson: '-'
   refs: [tools/study_table_xi.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]
+
+- id: T043
+  date: 2026-10-06
+  goal: Run Paper 1 TABLE XXIII and XXIV -- component length -- where the
+    paper reports peak strain SATURATING at 40 D while bending moment keeps
+    climbing, a behaviour change rather than a number.
+  action: >-
+    Six runs at 100 MT, 9 m spacing. TABLE XXII's wall thickness is not
+    constant across radii -- 65 mm at R = 70 and 53 mm at R = 85 -- so the
+    two radii are different components and the tool encodes that rather than
+    assuming one. When the 40 D result came out high, traced the peak
+    position by position on both the 20 D and 40 D cases before drawing any
+    conclusion from the envelope.
+  case: ILS-TP, R=70 m at 65 mm and R=85 m at 53 mm, L = 2.5D/10D/20D and
+    10D/20D/40D, 100 MT, 9 m spacing, 1xOD step
+  outcome: partial
+  evidence: |-
+    All six converged.
+
+      R    L      ours eps   paper      d%     ours BM  paper     d%
+      70   2.5D   0.8471    0.780    + 8.6     1347    1384    - 2.7
+      70   10D    1.4583    1.499    - 2.7     1423    1650    -13.8
+      70   20D    2.1340    2.514    -15.1     1472    2223    -33.8
+      85   10D    0.9541    1.104    -13.6     1350    1581    -14.6
+      85   20D    1.4016    1.861    -24.7     1414    1977    -28.5
+      85   40D    3.1043    1.914    +62.2     1518    2883    -47.3
+
+    20 D -> 40 D at R = 85, on three reporting bases:
+
+      Phase 1, position 0     +27.4 pct     (paper +2.8)
+      mid-passage peak        +76.1 pct     (paper +2.8)
+      passage envelope       +121.5 pct     (paper +2.8)
+      moment                 + 7.4 pct     (paper +45.8)
+
+    Position trace, 40 D: peak rises to 2.47 pct by position 15, sits near
+    2.4 through position 30, then climbs to 3.10 over the last five
+    positions as the leading edge nears the excluded-zone boundary at
+    s = 36 m. The 20 D case peaks at position 9 and decays monotonically.
+  verdict: >-
+    THE SATURATION IS NOT REPRODUCED ON ANY REPORTING BASIS. The headline
+    +62.2 pct overstates it -- the 40 D envelope is set by the last positions
+    of an 18 m travel at s = 25 m, while the paper reports Phase 1 at SR2 --
+    but reading like for like does not rescue it: +27.4 pct at Phase 1,
+    +76.1 at the mid-passage peak, none of them the paper's +2.8. And the
+    moment half fails in the other direction and cannot be fixed by choosing
+    a position at all: ours rises 7.4 pct where the paper's rises 45.8.
+
+    SHORT COMPONENTS AGREE AND LONG ONES DO NOT, monotonically: +8.6 pct on
+    strain and -2.7 on moment at 2.5 D, falling to -15/-25 on strain and
+    -28/-34 on moment by 20 D. Whatever the mechanism, it scales with how
+    many roller spans the component covers.
+
+    THIS NARROWS THE EARLIER HYPOTHESIS RATHER THAN SUPPORTING IT. A
+    local-strain-reporting offset explains a strain reading high while the
+    moment is right -- TABLE XXI, TABLE XI, and the 2.5 D row here. It does
+    NOT explain a moment reading 47 pct low. So the long-component
+    disagreement needs a second and different explanation, most likely in how
+    a long stiff body makes and breaks contact across more than one roller --
+    which is the same mechanism the paper credits for the saturation.
+
+    AND IT QUALIFIES A RESULT ALREADY RECORDED: TABLE XXI's moment agreement
+    of -3.3 to +6.2 pct is specific to SHORT components. All nine of its
+    cases are about 2.5 D, the one length at which this table also agrees.
+    Quoted without that context it would overstate how well the moments
+    match in general.
+
+    One thing to settle before trusting the 40 D number: its peak RISES AGAIN
+    over the last five positions while the 20 D case decays. A long body
+    re-rising as it nears the cut of the reported region may be an artefact
+    of where that cut is, not a strain the pipe carries.
+  lesson: '-'
+  refs: [tools/study_table_xxiii.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]

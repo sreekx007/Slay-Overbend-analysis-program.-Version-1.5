@@ -153,23 +153,88 @@ The moment delta also flips sign with radius — negative at R = 70 and 85,
 positive at R = 100 — which is the R-trend divergence again, visible in a
 quantity that is otherwise in good agreement.
 
-### TABLE XXIII and XXIV — component length — NOT RUN
+### TABLE XXIII and XXIV — component length
 
-| R | Length | Paper strain | Paper BM | ours |
-|---|---|---|---|---|
-| 70 m | 2.5 D | 0.780% | 1384 kN·m | — |
-| 70 m | 10 D | 1.499% | 1650 kN·m | — |
-| 70 m | 20 D | 2.514% | 2223 kN·m | — |
-| 85 m | 10 D | 1.104% | 1581 kN·m | — |
-| 85 m | 20 D | 1.861% | 1977 kN·m | — |
-| 85 m | 40 D | 1.914% | 2883 kN·m | — |
+*`tools/study_table_xxiii.py`. 100 MT. **The wall thickness is not constant
+across radii** — TABLE XXII specifies 65 mm (3.1×) at R = 70 and 53 mm
+(2.5×) at R = 85, so the two radii are different components, not one
+component at two radii. All six converged.*
 
-**The most interesting unrun block.** Peak strain **saturates** between 20 D
-and 40 D (1.861 → 1.914%, +2.8%) while the moment keeps climbing
-(1977 → 2883, +45.8%). The paper attributes the strain plateau to the
-component growing long enough to span two rollers. A quantity that saturates
-while its driver does not is a behaviour change, not a number, and it is the
-same double-roller mechanism as TABLE XXXII's L1 ≥ 25 D regime.
+| R | Length | t | Paper strain | ours | Δ | Paper BM | ours BM | Δ |
+|---|---|---|---|---|---|---|---|---|
+| 70 m | 2.5 D | 65 mm | 0.780% | 0.8471% | **+8.6%** | 1384 kN·m | 1347 kN·m | **−2.7%** |
+| 70 m | 10 D | 65 mm | 1.499% | 1.4583% | **−2.7%** | 1650 kN·m | 1423 kN·m | −13.8% |
+| 70 m | 20 D | 65 mm | 2.514% | 2.1340% | −15.1% | 2223 kN·m | 1472 kN·m | −33.8% |
+| 85 m | 10 D | 53 mm | 1.104% | 0.9541% | −13.6% | 1581 kN·m | 1350 kN·m | −14.6% |
+| 85 m | 20 D | 53 mm | 1.861% | 1.4016% | −24.7% | 1977 kN·m | 1414 kN·m | −28.5% |
+| 85 m | 40 D | 53 mm | 1.914% | 3.1043% | **+62.2%** | 2883 kN·m | 1518 kN·m | **−47.3%** |
+
+> ### The double-roller saturation is NOT reproduced — on any reporting basis
+>
+> The paper's finding is that past a certain length the component spans two
+> rollers, so extra stiffness is carried by a second support rather than by
+> curvature in the pipe: **strain flattens while the moment keeps climbing**.
+>
+> | R = 85, 20 D → 40 D | strain | moment |
+> |---|---|---|
+> | Paper 1 | **+2.8%** | **+45.8%** |
+> | ours, passage envelope | +121.5% | +7.4% |
+>
+> **The +121.5% overstates it, and the position trace says why.** The 40 D
+> envelope is not set where the paper reads: it is set by the *last*
+> positions of an 18 m travel, at s ≈ 25 m, while the paper reports Phase 1
+> at SR2. Compared like for like the disagreement is smaller but does not go
+> away:
+>
+> | 20 D → 40 D, read at | ours | Paper 1 |
+> |---|---|---|
+> | Phase 1, position 0 | +27.4% | +2.8% |
+> | the mid-passage peak | +76.1% | +2.8% |
+> | the passage envelope | +121.5% | +2.8% |
+>
+> **No basis flattens.** The moment half fails too and cannot be rescued by
+> choosing a position: ours rises 7.4% where the paper's rises 45.8%. So we
+> produce the opposite of both halves — strain that keeps climbing with
+> length, and a moment that does not.
+>
+> *Reproducing a behaviour change is a stronger test than matching a number,
+> because it cannot be had by tuning.* This one fails in both directions at
+> once, and it is the clearest disagreement in the ledger.
+>
+> **A separate thing the trace exposed, worth its own look.** On the 40 D
+> case our peak rises to 2.47% by position 15, sits flat near 2.4% through
+> position 30, and then **climbs again** to 3.10% over the last five
+> positions as the component's leading edge approaches the excluded-zone
+> boundary at s = 36 m. The 20 D case shows no such late rise — it peaks at
+> position 9 and decays monotonically thereafter. A long body re-rising as it
+> nears the end of the reported region may be an edge artefact of where the
+> zone is cut rather than a strain the pipe carries, and until that is
+> settled the 40 D envelope should be treated as the least trustworthy number
+> in this file.
+>
+> At Phase 1, where the paper reads, our 40 D case is **−64.2%** against its
+> 1.914%; at the mid-passage plateau it is **+28.9%**. Both are recorded
+> because neither alone is the comparison.
+
+**The short components agree well and the long ones do not**, monotonically:
+at 2.5 D we are +8.6% on strain and −2.7% on moment; by 20 D we are −15 to
+−25% on strain and −28 to −34% on moment. Whatever the mechanism is, it
+scales with how many roller spans the component covers — 2.5 D is a tenth of
+a span, 40 D is nearly two.
+
+**Our moment is low and increasingly so.** That is the reverse of
+TABLE XXI, where moment agreed to a few percent across all nine cases and
+the strains did not. The two tables differ in exactly one thing: TABLE XXI's
+components are all 1000 mm (≈2.5 D), the length at which this table also
+agrees. So the good moment agreement recorded in §2 is **specific to short
+components** and must not be read as general.
+
+That also changes what §7's local-strain-reporting hypothesis can explain.
+It accounts for a strain that reads high while the moment is right — which
+is TABLE XXI, TABLE XI, and the 2.5 D row here. It does **not** account for
+a moment that reads 47% low, so the long-component disagreement needs a
+second, different explanation, most likely in how a long stiff body makes
+and breaks contact across multiple rollers.
 
 ### TABLE XXVI — two components, spacing — NOT RUN
 
@@ -402,7 +467,7 @@ travel on the current contact surface and its values are lower bounds.
 | **X** plain pipe by stinger config | 3 | **done** — +16.8 / +6.1 / −7.7% |
 | **XI** diameter and tension | 6 | **done** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
 | **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −3.3 to +6.2%** |
-| **XXIII / XXIV** thick pipe length | 6 | not run — strain saturates at 40 D while BM does not |
+| **XXIII / XXIV** thick pipe length | 6 | **done** — short lengths agree; **the double-roller saturation is not reproduced** |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
 | **XXXII / XXXIII** shroud L1 and L2 | — | not run — L1 ≥ 25 D regime change is the part worth having |
@@ -411,7 +476,7 @@ travel on the current contact surface and its values are lower bounds.
 | **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
-**38 of 50 published cases have a rebuild number.**
+**44 of 50 published cases have a rebuild number.**
 
 ## 7. What is not settled
 
@@ -441,6 +506,20 @@ travel on the current contact surface and its values are lower bounds.
    capability regression from that change, undiagnosed.
 6. **X2 holds one element at 2 × OD** in most shroud cases, including the
    closest agreements in §3.
+7. **The double-roller saturation is not reproduced** (§2, TABLE XXIII/XXIV)
+   and it fails in both directions — strain that keeps climbing where the
+   paper's flattens, a moment that flattens where the paper's climbs. The
+   likeliest place to look is how a long stiff body makes and breaks contact
+   across more than one roller.
+8. **The 40 D case's peak rises again over the last five positions** as the
+   component nears the excluded-zone boundary, which the 20 D case does not
+   do. Possibly an artefact of where the reporting zone is cut rather than a
+   strain the pipe carries. Until settled, the least trustworthy number in
+   the file.
+9. **TABLE XXI's good moment agreement is specific to short components.**
+   Its nine cases are all ≈2.5 D, the one length at which TABLE XXIII also
+   agrees; by 20 D our moment is 28–34% low. §2 says so, but it is easy to
+   quote the −3.3/+6.2% range out of that context.
 
 ---
 
