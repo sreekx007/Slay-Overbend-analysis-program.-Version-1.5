@@ -291,24 +291,78 @@ spread of cases* — the band was never the right target, and two successive
 and carried no tension label. Those are not Series 4 numbers and must not
 be read against 0.70%.
 
-### C.1 The rest of Series 4 — NOT RUN
+### C.1 The whole V sweep — all 12 published cases, TABLE XXXI
 
-| Config | V | L1 | L2 | Paper 1 X2 | ours |
+*Measured 6 Oct 2026, 9 m spacing, 2 × OD mesh (the paper's own density),
+`tools/emit_profile.py --archetype ILS-SH --V … --L1 … --L2 …`.*
+
+| Config | V | ours X2 | Paper 1 | delta | peak region |
 |---|---|---|---|---|---|
-| R=70, T=120 MT | 1.0 / 1.5 / 2.0 D | 5 D | 2.5 D | 0.808 / 0.970 / 1.15% | — |
-| R=70, T=100 MT | 1.0 / 1.5 / 2.0 D | 10 D | 5 D | 0.76 / 1.03 / 1.23% | — |
-| R=85, T=100 MT | 0.75 D | 10 D | 2.5 D | 0.62% | — |
-| R=85, T=100 MT | **1.0 D** | **10 D** | **2.5 D** | **0.70%** | **0.6318%** (§C) |
-| R=85, T=100 MT | 1.5 / 2.0 / 2.5 / 3.0 D | 10 D | 2.5 D | 0.95 / 1.20 / 1.51 / 1.80% | — |
+| R=85, T=100 MT | 0.75 D | 0.5347% | 0.62% | −13.8% | X2 ✓ |
+| L1=10D, L2=2.5D | 1.00 D | 0.6318% | 0.70% | **−9.7%** | X2 ✓ |
+| | 1.50 D | 0.7917% | 0.95% | −16.7% | X2 ✓ |
+| | 2.00 D | 0.9636% | 1.20% | −19.7% | X2 ✓ |
+| | 2.50 D | 1.1421% | 1.51% | −24.4% | X2 ✓ |
+| | 3.00 D | 1.3163% | 1.80% | −26.9% | X2 ✓ |
+| R=70, T=120 MT | 1.00 D | 0.8466% | 0.808% | **+4.8%** | **X1** |
+| L1=5D, L2=2.5D | 1.50 D | 1.0015% | 0.970% | **+3.2%** | **X1** |
+| | 2.00 D | 0.8592% | 1.15% | −25.3% | **X1** |
+| R=70, T=100 MT | 1.00 D | 0.7399% | 0.76% | **−2.6%** | **X1** |
+| L1=10D, L2=5D | 1.50 D | 0.6704% | 1.03% | −34.9% | **X1** |
+| | 2.00 D | 0.7510% | 1.23% | −38.9% | **X1** |
 
-This is the **cheapest** outstanding validation in the ledger, and the V
-series is the one that would show whether we track the paper's *trend* and
-not just its one point. It is not quite free: `emit_profile.py` passes
-EA-SB's dimensions through (`P_l1`, `P_l2`, `P_v`, `kB_ratio`) but **not the
-shroud's `V`, `L1`, `L2`**, so three names have to join that passthrough
-first. The mechanism is already there and already edits the archetype's own
-definition rather than constructing geometry (G7) — it is a list to extend,
-then a sweep.
+**Reproduced: X2 rises monotonically with V, and X2 governs at R = 85.**
+Offset depth is the dominant parameter, which is Series 4's whole finding.
+
+**Three disagreements, all of them structural rather than scatter.**
+
+*We under-amplify with depth.* At R = 85 our X2 is linear in V at a constant
+0.35% per diameter; the paper's slope *rises* — 0.32, 0.50, 0.50, 0.62,
+0.58. So the delta grows steadily with V, from −13.8% at 0.75 D to −26.9% at
+3.0 D. Agreement is best at the shallow end and the trend is the finding,
+not any single row.
+
+*At R = 70 the peak sits on the taper, not the deep section.* X1 exceeds X2
+in all six R = 70 cases, and the run records the peak as landing on the
+shroud footprint, so this is the **taper** and not the plain pipe that X1
+also contains. Paper 1 says X2 governs in every case it ran. Our X1 peaks
+are 0.8641 / 1.0766 / 1.2204% and 0.7864 / 0.8792 / 1.0000% — compare those
+against the published X2 and the first two R = 70 / 120 MT rows land within
+5%, which is suggestive but is a different region and is not claimed as
+agreement.
+
+*X3 and X4 collapse past a depth threshold.* At R = 85 they track the paper
+up to V = 1.5 D and then fall off a cliff: X3 goes 0.5790 → 0.4074% and X4
+0.5043 → 0.2356% between 1.5 D and 2.0 D, while the paper has X3 *rising*
+(0.75 → 0.88%) and X4 *plateauing* (0.58 → 0.58%). At R = 70 the same break
+happens between 1.0 D and 1.5 D. A plateau and a collapse are different
+mechanisms:
+
+| V | our X3 | paper X3 | our X4 | paper X4 |
+|---|---|---|---|---|
+| 0.75 D | 0.4703% | 0.42% | 0.4397% | 0.35% |
+| 1.0 D | 0.5053% | 0.55% | 0.4550% | 0.43% |
+| 1.5 D | 0.5790% | 0.75% | 0.5043% | 0.58% |
+| **2.0 D** | **0.4074%** | 0.88% | **0.2356%** | 0.58% |
+| 2.5 D | 0.4366% | 1.07% | 0.2421% | 0.62% |
+| 3.0 D | 0.4631% | 1.20% | 0.2469% | 0.67% |
+
+The reading this points at, stated as a hypothesis and not a result: beyond
+a threshold depth our deep section lifts clear of the rollers altogether, so
+the midspan and vessel thirds unload while the catenary-side edge takes
+everything. That is consistent with X2 continuing to rise while X3 and X4
+drop, with the peak migrating onto the taper at the tighter radius, and with
+our under-amplification — a bridged deep section cannot transmit the
+curvature the paper's contact does. **It is not verified.** The check is the
+station contact state at V = 1.5 D against V = 2.0 D, which the profile
+artifacts already hold.
+
+*Caveat on all 12.* The paper marks every Series 4 case **Ph2** — the
+elastic bend-unload cycle over the mid-stinger rollers, carrying residual
+plastic curvature from Phase 1. Our envelope lands at step 3–5 of the
+passage. Whether those are the same mechanical state is the open question
+under this whole section, and it is the first thing to settle before
+reading any of these deltas as physics.
 
 ---
 
@@ -419,7 +473,7 @@ that envelope is a **lower bound**.
 | Rebuild vs Paper 1, plain pipe, 3 radii | +17.9 / +5.6 / −8.1%, R-trend divergence, documented |
 | `run_slay` vs Paper 1, GD-TP, 9 values | Within 6% at R = 85/100; +19–26% at R = 70 |
 | Rebuild vs Paper 1, GD-TP | **9 of 9 values**, +3.1% to +17.7%, all high |
-| Rebuild vs Paper 1, GD-SH | **1 of 13 cases**, three regions — X2 +2.3%, X3 −0.2%, X4 +19.0% at 0.5 × OD |
+| Rebuild vs Paper 1, GD-SH | **12 of 12 V-sweep cases.** X2 monotonic in V as published; −38.9% to +4.8%, and three structural disagreements (§C.1) |
 | Rebuild vs Paper 1, Series 5 | **No comparison exists** — no region columns for `ILS-SHTP` |
 | Rebuild vs Paper 2, EA F1/F2 | 6 cases. **Ordering reproduced in all 6**; magnitudes open |
 | Rebuild vs Paper 2, EA F1D/F2D | Refused under G9 — needs the `D` active set |
@@ -445,19 +499,28 @@ Written down rather than fixed, so the next session starts from them.
    configuration does not merely leave a reader guessing, it silently
    recruits the wrong run into a comparison and the comparison still reads
    plausibly.
-3. **Still no rebuild column:** 12 of 13 Series 4 cases, both Series 5
-   cases, and Series 3's Study 2 (length variation, TABLE XXIII, six values
-   at L = 2.5 D to 40 D) and Study 3 (spacing, TABLE XXVI). Series 3 Study 1
-   is now done (§B.2). Series 4's V sweep is the cheapest — three names
-   added to `emit_profile.py`'s dimension passthrough, then a sweep. Study 2
-   is the most interesting, because the paper reports peak strain
-   *saturating* at 40 D as the component spans two rollers, which is a
-   behaviour change rather than a number.
+3. **Still no rebuild column:** both Series 5 cases, Series 3's Study 2
+   (length, TABLE XXIII, six values at L = 2.5 D to 40 D) and Study 3
+   (spacing, TABLE XXVI), and Series 4's L1 and L2 studies (TABLE XXXII,
+   XXXIII). Series 3 Study 1 (§B.2) and Series 4's V sweep (§C.1) are done.
+   Study 2 is the most interesting of what is left, because the paper
+   reports peak strain *saturating* at 40 D as the component spans two
+   rollers — a behaviour change rather than a number, and the same class of
+   thing as the X3/X4 collapse §C.1 found.
 4. **We report extreme-fibre strain per element; the papers report
    "nominal strains at element integration points."** These are expected to
    coincide for a B31 beam in pure bending but this has **never been
    checked against the kernel**. It is a systematic offset candidate
    sitting under *every* row of this file.
+5. **The deep-section lift-off hypothesis in §C.1 is unverified** and it is
+   now the largest single unexplained item here: one mechanism would account
+   for the under-amplification with depth, the peak migrating onto the
+   taper, and the X3/X4 collapse at once. The station contact states are
+   already in the profile artifacts, so the check is cheap.
+6. **Whether our envelope and the paper's "Ph2" are the same mechanical
+   state** is unsettled, and it sits under every Series 4 and Series 5 row.
+   Phase 2 carries residual plastic curvature from Phase 1 over the
+   mid-stinger rollers; our envelope is a maximum over the travel we solve.
 
 ---
 

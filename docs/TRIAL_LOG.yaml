@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 37
+# entries: 38
 
 - id: T001
   date: 2026-09-21
@@ -1125,4 +1125,75 @@
     check -- we sit within 9.5 pct of it everywhere -- but it is not a
     like-for-like comparison against Paper 1 and must not be read as one.
   lesson: L094
+  refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
+
+- id: T038
+  date: 2026-10-06
+  goal: Run Paper 1's Series 4 V sweep -- all twelve published X2 values, the
+    largest block of comparison material in the paper.
+  action: >-
+    The generator could not express the sweep: `_extra` carried GD-SB's four
+    dimensions and none of GD-SH's, so V, L1 and L2 were unreachable from the
+    command line. Added them under component_spec's own names, with tests
+    that separate parsing from reaching the built geometry (the distinction
+    L094 was about). Then ran the twelve cases at 2xOD, the paper's own mesh
+    density, and read every region from the saved profile artifacts rather
+    than from stdout.
+  case: ILS-SH, 9 m spacing, 2xOD mesh, 406.4x21; R=85/T=100MT/L1=10D/L2=2.5D
+    at V=0.75..3.0D, R=70/T=120MT/L1=5D/L2=2.5D and R=70/T=100MT/L1=10D/L2=5D
+    at V=1.0/1.5/2.0D
+  outcome: partial
+  evidence: |-
+    X2 against paper TABLE XXXI:
+
+      R=85 T=100  0.75D 0.5347 (-13.8)  1.0D 0.6318 ( -9.7)  1.5D 0.7917 (-16.7)
+                  2.0D  0.9636 (-19.7)  2.5D 1.1421 (-24.4)  3.0D 1.3163 (-26.9)
+      R=70 T=120  1.0D  0.8466 ( +4.8)  1.5D 1.0015 ( +3.2)  2.0D 0.8592 (-25.3)
+      R=70 T=100  1.0D  0.7399 ( -2.6)  1.5D 0.6704 (-34.9)  2.0D 0.7510 (-38.9)
+
+    Per-region peaks, R=85 series, showing the break between 1.5D and 2.0D:
+
+      V      X1       X2       X3       X4     peak
+      0.75  0.5163   0.5347   0.4703   0.4397   X2
+      1.0   0.6086   0.6318   0.5053   0.4550   X2
+      1.5   0.7272   0.7917   0.5790   0.5043   X2
+      2.0   0.8500   0.9636   0.4074   0.2356   X2
+      2.5   0.9781   1.1421   0.4366   0.2421   X2
+      3.0   1.1106   1.3163   0.4631   0.2469   X2
+
+    At R=70 X1 exceeds X2 in all six cases, on the shroud footprint, so the
+    peak is on the TAPER: 0.8641 / 1.0766 / 1.2204 and 0.7864 / 0.8792 /
+    1.0000 pct. Paper says X2 governs in every case it ran.
+
+    dX2/dV ours (R=85): 0.388 0.320 0.344 0.357 0.348 -- constant.
+    dX2/dV paper:       0.320 0.500 0.500 0.620 0.580 -- rising.
+  verdict: >-
+    REPRODUCED: X2 rises monotonically with V and X2 governs at R = 85, which
+    is Series 4's actual finding -- offset depth is the dominant parameter.
+
+    THREE STRUCTURAL DISAGREEMENTS, not scatter. We under-amplify with depth:
+    our X2 is linear in V at a constant 0.35 pct per diameter while the
+    paper's slope rises, so the delta grows steadily from -13.8 pct at 0.75 D
+    to -26.9 pct at 3.0 D. At R = 70 the peak sits on the taper rather than
+    the deep section. And X3/X4 do not plateau, they COLLAPSE past a depth
+    threshold -- X3 0.5790 -> 0.4074 and X4 0.5043 -> 0.2356 between 1.5 D and
+    2.0 D, where the paper has X3 rising and X4 plateauing. A plateau and a
+    collapse are different mechanisms.
+
+    ONE HYPOTHESIS WOULD ACCOUNT FOR ALL THREE and is recorded as a
+    hypothesis, not a result: beyond a threshold depth our deep section lifts
+    clear of the rollers, so the midspan and vessel thirds unload while the
+    catenary-side edge takes everything. That fits X2 rising while X3 and X4
+    drop, the peak migrating to the taper at the tighter radius, and the
+    under-amplification -- a bridged deep section cannot transmit the
+    curvature the paper's contact does. The check is the station contact
+    state at V=1.5D against V=2.0D, and the profile artifacts already hold
+    it. Not done.
+
+    Caveat on all twelve: the paper marks every Series 4 case Ph2, the
+    elastic bend-unload cycle over the mid-stinger rollers carrying residual
+    plastic curvature from Phase 1. Our envelope lands at step 3-5 of the
+    passage. Whether those are the same mechanical state is unsettled and is
+    the first thing to resolve before reading any of these deltas as physics.
+  lesson: '-'
   refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
