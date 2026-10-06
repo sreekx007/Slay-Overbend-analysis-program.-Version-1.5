@@ -185,6 +185,43 @@ midspan / roller below midspan"), with the pipeline's own maximum beside it.*
 | 85 m | 20 D | 53 mm | 1.861% | 1.4016% | −24.7% | 1977 kN·m | 1414 kN·m | −28.5% | 1393 |
 | 85 m | 40 D | 53 mm | 1.914% | 3.1043% | **+62.2%** | 2883 kN·m | 1518 kN·m | **−47.3%** | 1472 |
 
+**Drawn at the governing step**, both cases, from the profile artifacts:
+`docs/diagrams/tp_L20D_R85_maxBM.png` and `tp_L40D_R85_maxBM.png` — the step
+at which the **component body** carries its maximum moment, which is what
+TABLE XXIV reports.
+
+| | 20 D, step 9 | 40 D, step 43 |
+|---|---|---|
+| shift | 2.845 m | 16.256 m — *exactly the component's own length* |
+| body moment | 1414 kN·m | 1518 kN·m |
+| peak strain | 1.4008% | 3.1043% |
+| component spans | x −10.8 … −2.7, over SR2 | x −24.0 … −8.1, over **SR2 and SR3** |
+| lift just outboard of its catenary end | 148 mm | **608 mm** |
+| lift on the component itself | −43 … 130 mm | −77 … **583 mm** |
+
+**At 40 D the component's leading end is bridging.** It sits mid-span
+between SR3 and SR4 with the pipe **608 mm above the roller arc** — it has
+not reached SR4 and is cantilevering off the stiff body. The strain peak,
+3.1%, is exactly at that junction. At 20 D the same feature is 148 mm.
+
+That is the opposite of the mechanism Paper 1 credits for the saturation:
+the long component engaging a further roller and **sharing** load. Ours
+spans SR2 and SR3 and then bridges past SR4 rather than settling onto it,
+which is the same story the 3% body-to-pipeline separation tells from the
+other side.
+
+*Two cautions on reading it that way.* It is one step of one case, and
+whether the bridge persists across the passage or is particular to
+shift = L is unchecked. And 608 mm of lift-off is physically possible in
+overbend but it is large — one-sided rollers cannot pull, so once the pipe
+lifts nothing in the model restores contact. Whether the reference's model
+would have made contact there is not something these figures can settle.
+
+*One thing they do settle:* the 40 D maximum moment and maximum strain fall
+at the **same** step, which argues the late rise flagged in §7 is a real
+structural event rather than purely an artefact of where the reporting zone
+is cut.
+
 **The body carries only 1–3% more than the pipeline here, and that is itself
 a finding.** On a 2.5 D component the gap is 1.0%; at 40 D it is 3.1%. If
 the component were doing what the paper's saturation describes — spanning
