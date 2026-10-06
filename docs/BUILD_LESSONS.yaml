@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 93
+# entries: 94
 
 - id: L001
   area: kernel
@@ -2072,4 +2072,30 @@
     claim at the REFINED mesh, not the ruled one, before relying on it.
   detect: test_the_header_count_matches
   refs: [docs/VALIDATION.md, docs/modules/T9_physics_sequence.md, rebuild/tests/test_build_lessons.py]
+  date: 2026-10-06
+
+- id: L094
+  area: process
+  class: defect
+  symptom: >-
+    Nine Series 3 cases ran to convergence at the paper's configuration,
+    wrote nine profile artifacts and reported nine peak strains. They were
+    three numbers repeated three times -- 0.7132 / 0.5546 / 0.4214 pct at
+    R = 70 / 85 / 100 for every wall thickness. --t-ratio and --L-OD had
+    been silently dropped by emit_profile's command line for weeks.
+  cause: >-
+    `emit` picks between two builders by asking whether any EA dimension was
+    supplied: any(v is not None for v in (P_c1, kT, L_top, system, extra)).
+    `main` always built `extra` as a dict of four Nones, and a dict of Nones
+    is TRUTHY, so the EA branch won on every invocation and the plain
+    component branch -- the only one that reads t_ratio and L_OD -- was
+    unreachable from the CLI. Every run used the archetype's default 42 mm
+    wall.
+  rule: >-
+    A FLAG IS PART OF THE MODEL, so it gets a test like any other part of
+    the model. And never let an emptiness test turn on a container's
+    truthiness when the container is always constructed: collapse an
+    all-None mapping to None at the boundary, where the decision is made.
+  detect: test_no_EA_flags_means_None_not_a_dict_of_Nones, test_t_ratio_reaches_the_built_component, test_three_wall_thicknesses_build_three_different_stiffnesses
+  refs: [tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
   date: 2026-10-06

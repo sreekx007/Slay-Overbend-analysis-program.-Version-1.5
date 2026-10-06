@@ -88,6 +88,11 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     definition, so `ils_builder` stays the author of what the component IS
     (G7) rather than geometry being constructed here.
     """
+    # An all-None `extra` means "nothing was asked for", not "an EA structure
+    # was asked for with no dimensions". The CLI used to hand down a dict of
+    # four Nones, which is truthy, so this test always took the EA branch and
+    # silently dropped --t-ratio and --L-OD -- see L094.
+    extra = {k: v for k, v in (extra or {}).items() if v is not None} or None
     ils = _ea_ils(arch_id, P_c1, kT, L_top, system, extra) if any(
         v is not None for v in (P_c1, kT, L_top, system, extra)) \
         else gen.build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
@@ -152,6 +157,25 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
                 columns=rg.case_columns(geom, rpk))
 
 
+EA_DIMS = ('P_l1', 'P_l2', 'P_v', 'kB_ratio')
+
+
+def _extra(argv=None):
+    """EA-SB's own dimensions from the command line, or None if none given.
+
+    Returning None rather than a dict of Nones is the whole point: `emit`
+    decides which builder to use by whether anything was asked for, and a
+    dict of four Nones is truthy (L094).
+    """
+    argv = sys.argv if argv is None else argv
+    out = {}
+    for k in EA_DIMS:
+        flag = f'--{k.replace("_", "-")}'
+        if flag in argv:
+            out[k] = float(argv[argv.index(flag) + 1])
+    return out or None
+
+
 def main() -> int:
     def arg(flag, cast=float, default=None):
         if flag in sys.argv:
@@ -169,8 +193,7 @@ def main() -> int:
                case_id=arg('--case-id', str),
                P_c1=arg('--P-c1', float), kT=arg('--kT', float),
                L_top=arg('--L-top', float), system=arg('--system', str),
-               extra={k: arg(f'--{k.replace("_", "-")}', float, None)
-                      for k in ('P_l1', 'P_l2', 'P_v', 'kB_ratio')})
+               extra=_extra())
     env = res['envelope']
     print(f'\n=== {aid} -> profile artifact ===')
     for t, s in res['summary'].items():

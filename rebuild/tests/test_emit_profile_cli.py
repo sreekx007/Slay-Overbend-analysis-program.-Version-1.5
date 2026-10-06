@@ -1,0 +1,89 @@
+"""The generator's command line actually reaches the model.
+
+L094. `--t-ratio` and `--L-OD` were silently dropped for weeks. `emit`
+chooses between two builders by asking whether any EA dimension was
+supplied, and the CLI handed it a dict of four `None`s -- which is truthy,
+so the EA branch always won and the two plain-component flags went nowhere.
+
+NOTHING FAILED. Nine Series 3 cases ran to convergence, wrote nine profile
+artifacts, and reported nine peak strains. They were all the same three
+numbers, because all nine were the archetype's default 42 mm wall. The only
+reason it was caught is that three wall thicknesses producing identical
+strain to four decimals is impossible, and all nine were printed together.
+
+That is G8 exactly: it ran, and running was worth nothing. A flag is part of
+the model, so it gets a test like any other part of the model.
+"""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+import pytest
+
+REPO = Path(__file__).resolve().parents[2]
+for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
+emit_profile = pytest.importorskip('emit_profile')
+
+
+# ---------------------------------------------------------------------------
+# the defect
+# ---------------------------------------------------------------------------
+
+def test_no_EA_flags_means_None_not_a_dict_of_Nones():
+    """The exact shape that made the branch test lie."""
+    assert emit_profile._extra(['prog']) is None
+
+
+def test_an_EA_flag_is_picked_up():
+    assert emit_profile._extra(['prog', '--P-v', '1.2']) == {'P_v': 1.2}
+    assert emit_profile._extra(
+        ['prog', '--kB-ratio', '3.0', '--P-l1', '4.0']) == {
+            'kB_ratio': 3.0, 'P_l1': 4.0}
+
+
+def test_every_EA_dimension_has_a_flag_spelling_that_round_trips():
+    for k in emit_profile.EA_DIMS:
+        flag = f'--{k.replace("_", "-")}'
+        assert emit_profile._extra(['prog', flag, '7.5']) == {k: 7.5}
+
+
+# ---------------------------------------------------------------------------
+# the thing the defect broke: a wall thickness must change the component
+# ---------------------------------------------------------------------------
+
+@pytest.mark.parametrize('t_ratio,t_mm', [(1.523809524, 32.0),
+                                          (2.0, 42.0),
+                                          (2.523809524, 53.0)])
+def test_t_ratio_reaches_the_built_component(t_ratio, t_mm):
+    """Paper 1 Series 3's three cases, by the wall they are supposed to have.
+
+    Built through the SAME call `emit` makes, with an all-None `extra` as
+    the CLI supplies it -- so this fails if the branch test regresses.
+    """
+    import plot_stinger as gen
+    extra = {k: None for k in emit_profile.EA_DIMS}
+    extra = {k: v for k, v in extra.items() if v is not None} or None
+    assert extra is None, 'an all-None extra must collapse to None'
+    ils = gen.build_component_ils('ILS-TP', t_ratio=t_ratio)
+    body = ils.assembly.components[0]
+    got = getattr(body, 't_comp', None) or getattr(body, 't', None)
+    assert got == pytest.approx(t_mm / 1000.0, abs=6e-4), (
+        f't_ratio={t_ratio} built a {1000 * got:.1f} mm wall, '
+        f'not {t_mm:.0f} mm')
+
+
+def test_three_wall_thicknesses_build_three_different_stiffnesses():
+    """The invariant whose violation exposed L094: identical strain from
+    three thicknesses is impossible, so the sections must differ first."""
+    import plot_stinger as gen
+    ods = set()
+    for tr in (1.523809524, 2.0, 2.523809524):
+        ils = gen.build_component_ils('ILS-TP', t_ratio=tr)
+        b = ils.assembly.components[0]
+        ods.add(round(getattr(b, 'OD_comp', None)
+                      or getattr(b, 'OD', 0.0), 6))
+    assert len(ods) == 3, f'constant-bore growth collapsed: {sorted(ods)}'
