@@ -10,10 +10,23 @@
 > constraint at all**. On the 40 D case that is 19 of 21 nodes.
 >
 > **The component bridged because it structurally could not engage a
-> roller.** Every GD-TP, GD-SH+TP and EA number in §2, §3 and §4 was
-> computed that way. Plain pipe (§1) is unaffected — it has no in-line body
-> — and so is the Paper 2 comparison in §5 only insofar as those archetypes
-> carry no section-stepping body.
+> roller.**
+>
+> **Which results this touches, measured rather than assumed** — the test is
+> whether the old filter left a gap in the node chain longer than an element:
+>
+> | Section | Gap | Element | |
+> |---|---|---|---|
+> | §2 TABLE XX/XXI, GD-TP | 1.000 m | 0.800 m | **affected** |
+> | §2 TABLE XXIII/XXIV, length | 1.016 – 16.256 m | ~0.80 m | **affected** |
+> | §4 TABLE XXXIX, shroud + thick pipe | 2.032 – 4.064 m | 0.800 m | **affected** |
+> | §3 TABLE XXXI/XXXIV, shroud | 0.863 m | 0.800 m | unaffected |
+> | §5 Paper 2, EA | 0.812 m | 0.722 m | unaffected |
+> | §1 plain pipe | — | — | unaffected |
+>
+> A shroud steps no section — the pipe runs straight through it — so there
+> is no hole, and an EA frame has its own line. **17 cases need re-running,
+> not the whole ledger.**
 >
 > This also removes the basis for several conclusions recorded below, which
 > are left in place **unedited** until the re-run replaces them so that the
@@ -24,7 +37,9 @@
 >   which this model could not do;
 > * that the body-to-pipeline **moment separation stays at 3%** (§2);
 > * the **608 mm bridging** reading and the figures drawn from it (§2);
-> * that **long-component moments read 28–47% low** (§2).
+> * that **long-component moments read 28–47% low** (§2);
+> * §4's amplification figures, which are measured against a shroud-only
+>   baseline that is itself unaffected — so only the combined rows move.
 >
 > What is *not* in doubt: the short-component agreement in §2 (TABLE XX/XXI,
 > all nine cases ≈2.5 D) sat at the one length where the bracket error was
