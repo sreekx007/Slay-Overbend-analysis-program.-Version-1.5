@@ -555,8 +555,8 @@ travel on the current contact surface and its values are lower bounds.
 | **XXIII / XXIV** thick pipe length | 6 | **done** — moment −7.7 … +12.8% across all lengths; saturation reproduced in character, strain still −32% at 20 D |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
-| **XXXII / XXXIII** shroud L1 and L2 | — | not run — L1 ≥ 25 D regime change is the part worth having |
-| **XXXIX** shroud + thick pipe length | 2 | **done** — amplification +37.9% against the paper's +36% |
+| **XXXII / XXXIII** shroud L1 and L2 | 7 | not run — **S2-7 and S2-8 are a second dual-roller transition**, in a case L100 never touched |
+| **XXXIX** shroud + thick pipe length | 2 | **done** — amplification +37.6% against the paper's +36% |
 | **XLI** shroud + thick pipe location | 3 | not run — three runs, archetype already supports it |
 | **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
