@@ -1506,5 +1506,23 @@
     over the last five positions while the 20 D case decays. A long body
     re-rising as it nears the cut of the reported region may be an artefact
     of where that cut is, not a strain the pipe carries.
+    WHICH MEMBER THE MOMENT IS ON was asked after the fact and one of the two
+    tables had it wrong. TABLE XXI's moments had been taken with
+    owner == 'pipeline', which EXCLUDES the component's own elements -- the
+    opposite of what the paper reports, since its location column says "near
+    component midspan". Corrected to the body: -2.4 to +6.7 pct against the
+    -3.3 to +6.2 first recorded, slightly better at R = 70 and 85, conclusion
+    unchanged. This table's numbers took an UNFILTERED maximum, which lands
+    on the body because a locally stiffer section carries more moment, so
+    they were right by coincidence rather than by construction; the tool now
+    splits the two and prints both.
+
+    AND THE SPLIT IS ITSELF EVIDENCE. The body carries only 1.0 pct more
+    than the pipeline at 2.5 D, rising to 3.1 pct at 40 D. If the component
+    were doing what the paper's saturation describes -- spanning two rollers
+    and taking the extra stiffness into its own section -- the body would be
+    pulling away from the pipeline as it lengthens, far more than that. It
+    barely separates, which is the same story the moment deltas tell from the
+    other side and is the first positive evidence for where to look.
   lesson: '-'
   refs: [tools/study_table_xxiii.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]

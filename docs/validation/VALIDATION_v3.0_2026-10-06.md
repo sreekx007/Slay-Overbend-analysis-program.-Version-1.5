@@ -173,14 +173,25 @@ across radii** — TABLE XXII specifies 65 mm (3.1×) at R = 70 and 53 mm
 (2.5×) at R = 85, so the two radii are different components, not one
 component at two radii. All six converged.*
 
-| R | Length | t | Paper strain | ours | Δ | Paper BM | ours BM | Δ |
-|---|---|---|---|---|---|---|---|---|
-| 70 m | 2.5 D | 65 mm | 0.780% | 0.8471% | **+8.6%** | 1384 kN·m | 1347 kN·m | **−2.7%** |
-| 70 m | 10 D | 65 mm | 1.499% | 1.4583% | **−2.7%** | 1650 kN·m | 1423 kN·m | −13.8% |
-| 70 m | 20 D | 65 mm | 2.514% | 2.1340% | −15.1% | 2223 kN·m | 1472 kN·m | −33.8% |
-| 85 m | 10 D | 53 mm | 1.104% | 0.9541% | −13.6% | 1581 kN·m | 1350 kN·m | −14.6% |
-| 85 m | 20 D | 53 mm | 1.861% | 1.4016% | −24.7% | 1977 kN·m | 1414 kN·m | −28.5% |
-| 85 m | 40 D | 53 mm | 1.914% | 3.1043% | **+62.2%** | 2883 kN·m | 1518 kN·m | **−47.3%** |
+*Moment on the **component body**, as TABLE XXIV reports it ("component
+midspan / roller below midspan"), with the pipeline's own maximum beside it.*
+
+| R | Length | t | Paper strain | ours | Δ | Paper BM | ours, body | Δ | ours, pipe |
+|---|---|---|---|---|---|---|---|---|---|
+| 70 m | 2.5 D | 65 mm | 0.780% | 0.8471% | **+8.6%** | 1384 kN·m | 1347 kN·m | **−2.7%** | 1333 |
+| 70 m | 10 D | 65 mm | 1.499% | 1.4583% | **−2.7%** | 1650 kN·m | 1423 kN·m | −13.8% | 1397 |
+| 70 m | 20 D | 65 mm | 2.514% | 2.1340% | −15.1% | 2223 kN·m | 1472 kN·m | −33.8% | 1436 |
+| 85 m | 10 D | 53 mm | 1.104% | 0.9541% | −13.6% | 1581 kN·m | 1350 kN·m | −14.6% | 1348 |
+| 85 m | 20 D | 53 mm | 1.861% | 1.4016% | −24.7% | 1977 kN·m | 1414 kN·m | −28.5% | 1393 |
+| 85 m | 40 D | 53 mm | 1.914% | 3.1043% | **+62.2%** | 2883 kN·m | 1518 kN·m | **−47.3%** | 1472 |
+
+**The body carries only 1–3% more than the pipeline here, and that is itself
+a finding.** On a 2.5 D component the gap is 1.0%; at 40 D it is 3.1%. If
+the component were doing what the paper's saturation describes — spanning
+two rollers and taking the extra stiffness into its own section — the body
+would be pulling away from the pipeline as it lengthens, far more than this.
+It barely separates, which is the same story the moment deltas tell from the
+other side.
 
 > ### The double-roller saturation is NOT reproduced — on any reporting basis
 >
