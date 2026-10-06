@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 43
+# entries: 44
 
 - id: T001
   date: 2026-09-21
@@ -1526,3 +1526,76 @@
     other side and is the first positive evidence for where to look.
   lesson: '-'
   refs: [tools/study_table_xxiii.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]
+
+- id: T044
+  date: 2026-10-06
+  goal: Re-run every case L100 invalidated, and establish what the fix moved.
+  action: >-
+    Measured which cases were actually affected rather than assuming, by
+    testing whether the old owner-filter left a gap in the node chain longer
+    than one element. GD-TP cases and the combined shroud-plus-thick-pipe
+    cases were; the shroud V sweep and the Paper 2 EA cases were NOT, because
+    a shroud steps no section and an EA frame has its own line. 17 cases, not
+    the whole ledger.
+  case: ILS-TP at t=32/42/53mm (TABLE XX/XXI) and L=2.5D..40D (TABLE
+    XXIII/XXIV), ILS-SHTP at 5D and 10D (TABLE XXXIX); R and tension per
+    table, 9 m spacing, 2xOD mesh
+  outcome: success
+  evidence: |-
+    TABLE XXIII / XXIV, before -> after, against the paper:
+
+      R    L      strain before   after    moment before   after
+      70   2.5D   +8.6            +8.6      -2.7           -2.3
+      70   10D    -2.7            -5.5     -13.8           -2.8
+      70   20D   -15.1           -21.4     -33.8           -7.7
+      85   10D   -13.6           -16.1     -14.6           -5.5
+      85   20D   -24.7           -31.6     -28.5           -6.5
+      85   40D   +62.2           -14.2     -47.3          +12.8
+
+    TABLE XX / XXI: strain identical to four decimals, moment within 0.1 pct.
+    TABLE XXXIX: moments -6.5/-12.1 -> -5.3/-3.2 pct, strains moved under
+    1.5 pct.
+
+    Saturation, 20 D -> 40 D at R = 85:
+      paper          strain + 2.8 pct   moment +45.8 pct
+      before L100    strain +121.5      moment + 7.4
+      after L100     strain + 29.0      moment +76.0
+  verdict: >-
+    THE MOMENT DISAGREEMENT WAS THE DEFECT. Across the length range it goes
+    from -2.3 to -47.3 pct down to -7.7 to +12.8. The conclusion recorded
+    earlier -- that long-component moments read 28 to 47 pct low -- is
+    withdrawn, and so is the related claim that TABLE XXI's good moment
+    agreement was SPECIFIC TO SHORT COMPONENTS. It was specific to components
+    whose contact worked.
+
+    THE SATURATION INVERSION IS GONE. Before the fix strain rose seventeen
+    times faster than moment; the paper has moment rising sixteen times
+    faster than strain. Now moment rises 2.6 times faster than strain --
+    the paper's qualitative behaviour. That it moved this way is itself
+    evidence: the paper attributes the saturation to a component ENGAGING A
+    SECOND ROLLER, which is precisely the mechanism header_nodes denied the
+    model, so fixing the cause moved the symptom. A tuned parameter cannot
+    produce that kind of agreement between diagnosis and correction.
+    Reproduced in character, not in degree: our strain still rises 29 pct
+    where the paper's rises 2.8.
+
+    TABLE XX / XXI DID NOT MOVE AT ALL, and that is the strongest check on
+    the diagnosis rather than a disappointment. Its nine cases are all about
+    2.5 D, where the old bracket was 1.25x an element -- there was almost
+    nothing to fix. The error scaled with length, 20x an element at 40 D, and
+    so did the correction.
+
+    WHAT IS LEFT IS STRAIN-ONLY AND ONE-SIDED LOW: -5.5 pct at 10 D to -31.6
+    at 20 D with the moments inside 7.7 pct. An envelope cannot read low, so
+    that offset is eliminated. A section force that is right while the
+    extreme-fibre strain derived from it is 20-30 pct low over long stiff
+    bodies is what a strain-recovery convention mismatch looks like, which
+    makes checking our recovery against the kernel the single open item that
+    would explain the most rows.
+
+    One new question: the 40 D moment now OVERSHOOTS at +12.8 pct where every
+    other length reads low. That body spans nearly two full roller bays, and
+    whether the overshoot is our contact engaging too readily or the
+    reference's letting go is not settled here.
+  lesson: L100
+  refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, rebuild/slay/physics/contact.py, rebuild/tests/test_inline_body_contact.py]
