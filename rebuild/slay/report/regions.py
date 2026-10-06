@@ -115,10 +115,25 @@ class OffsetGeometry:
 def offset_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
     """Measure the offset body's shape, or None if there is not one.
 
-    Returns None for plain pipe and for a section-changing component: a body
-    that steps the section is reported at its junctions, and giving it
-    regions too would put the same strain in two schemes and invite them to
+    Returns None for plain pipe and for a component that ONLY steps the
+    section: a thick body is reported at its junctions, and giving it regions
+    as well would put the same strain in two schemes and invite them to
     disagree.
+
+    A COMBINED ASSEMBLY GETS BOTH, and that is not a relaxation of the rule
+    above. Until 6 Oct this returned None as soon as any section stepped,
+    which took `ILS-SHTP` -- a shroud with a thick body inside it -- out of
+    region reporting entirely and left it uncomparable against Paper 1's
+    TABLE XXXIX. But the paper reports that case in BOTH schemes at once, and
+    says so in as many words: Case 2's peak is at "pipe-to-component junction
+    at X2".
+
+    The two schemes answer different questions and do not compete. The
+    regions say WHERE ALONG THE OFFSET the strain is -- which third of the
+    deep section -- and the junctions say WHICH FEATURE it is on. Reporting
+    only junctions loses the first; reporting only regions loses the second.
+    What the original rule rightly forbids is giving a body regions it has no
+    offset to define, which is still what happens for a thick pipe alone.
     """
     if ils is None:
         return None
@@ -127,19 +142,40 @@ def offset_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
     half = OD / 2.0
 
     xs = [lo_x + (hi_x - lo_x) * k / (n - 1) for k in range(n)]
-    lift, owner = [], None
-    section_steps = False
+    lift, owners, steps = [], [], []
     for x in xs:
         con = ils.assembly.contact_at(x)
         sec = ils.assembly.section_at(x)
-        if sec is not None and getattr(sec, 'owner', 'pipe') != 'pipe':
-            section_steps = True
         y = getattr(con, 'y', half) if con else half
         own = getattr(con, 'owner', 'pipe') if con else 'pipe'
         lift.append(y - half)
-        if own != 'pipe' and owner is None:
-            owner = own
-    if section_steps or owner is None:
+        owners.append(own)
+        steps.append(getattr(sec, 'owner', 'pipe') if sec is not None
+                     else 'pipe')
+
+    # DOES THE BODY HOLDING THE PIPE UP ALSO STEP ITS SECTION THERE?
+    #
+    # That is the whole test, and it is a comparison of two OWNERS rather
+    # than a flag, because the flag version does not survive the case it was
+    # written for. A thick pipe alone makes `lift` positive by itself -- its
+    # OD is larger, so its bottom surface IS lower -- but that is a
+    # consequence of its wall, not a deliberate elevation, and it has no deep
+    # section to divide into thirds: there the contact owner and the section
+    # owner are the SAME body, and the answer is no regions.
+    #
+    # On a shroud with a thick pipe inside it they are DIFFERENT bodies --
+    # the shroud holds the pipe up, the thick body stiffens it -- and Paper 1
+    # reports exactly that case in both schemes at once ("pipe-to-component
+    # junction at X2", TABLE XXXIX).
+    #
+    # Keyed instead on "does any section step at the deepest sample", this
+    # worked at a 5 D thick body and returned None at 10 D, because at 10 D
+    # the body fills the whole deep section and the deepest sample lands on
+    # it. Which sample wins a tie is not something the answer may depend on
+    # (6 Oct 2026).
+    k_deep = max(range(len(lift)), key=lambda k: lift[k])
+    owner = owners[k_deep]
+    if owner == 'pipe' or owner == steps[k_deep]:
         return None
     lift_max = max(lift)
     if lift_max <= FLAT_TOL:
