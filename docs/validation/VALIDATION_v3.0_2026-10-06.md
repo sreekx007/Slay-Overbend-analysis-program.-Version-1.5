@@ -126,19 +126,25 @@ paper's own convention; our 53 mm case computes OD 470.4 mm and I/Ip = 3.248
 against its stated 471 mm and ~3.2×. Paper's peak location: pipe-to-component
 junction at the 2nd stinger roller, Phase 1.*
 
-| Case | t | R | Paper strain | ours | Δ | Paper BM | ours BM | Δ |
-|---|---|---|---|---|---|---|---|---|
-| A1 | 32 mm | 70 m | 0.562% | 0.6298% | +12.1% | 1311 kN·m | 1289 kN·m | **−1.7%** |
-| A1 | | 85 m | 0.473% | 0.4815% | **+1.8%** | 1251 kN·m | 1238 kN·m | **−1.1%** |
-| A1 | | 100 m | 0.339% | 0.3779% | +11.5% | 1131 kN·m | 1175 kN·m | +3.9% |
-| A2 | 42 mm | 70 m | 0.647% | 0.7002% | +8.2% | 1347 kN·m | 1306 kN·m | −3.1% |
-| A2 | | 85 m | 0.508% | 0.5476% | +7.8% | 1288 kN·m | 1264 kN·m | **−1.9%** |
-| A2 | | 100 m | 0.358% | 0.4188% | +17.0% | 1144 kN·m | 1205 kN·m | +5.3% |
-| A3 | 53 mm | 70 m | 0.727% | 0.7709% | **+6.0%** | 1366 kN·m | 1320 kN·m | −3.3% |
-| A3 | | 85 m | 0.556% | 0.6153% | +10.7% | 1311 kN·m | 1284 kN·m | **−2.0%** |
-| A3 | | 100 m | 0.425% | 0.4489% | **+5.6%** | 1150 kN·m | 1221 kN·m | +6.2% |
+**Bending moment is read ON THE COMPONENT BODY**, which is where TABLE XXI
+reports it — its location column says "near component midspan, at the
+instant a roller is below midspan". The pipeline's own maximum is given
+beside it because the two are close and it is the quantity an unqualified
+"peak moment" would return.
 
-**Bending moment agrees far better than strain: −3.3% to +6.2%, against
+| Case | t | R | Paper strain | ours | Δ | Paper BM | ours, body | Δ | ours, pipe |
+|---|---|---|---|---|---|---|---|---|---|
+| A1 | 32 mm | 70 m | 0.562% | 0.6298% | +12.1% | 1311 kN·m | 1298 kN·m | **−1.0%** | 1289 |
+| A1 | | 85 m | 0.473% | 0.4815% | **+1.8%** | 1251 kN·m | 1242 kN·m | **−0.7%** | 1238 |
+| A1 | | 100 m | 0.339% | 0.3779% | +11.5% | 1131 kN·m | 1177 kN·m | +4.1% | 1175 |
+| A2 | 42 mm | 70 m | 0.647% | 0.7002% | +8.2% | 1347 kN·m | 1317 kN·m | −2.2% | 1306 |
+| A2 | | 85 m | 0.508% | 0.5476% | +7.8% | 1288 kN·m | 1270 kN·m | **−1.4%** | 1264 |
+| A2 | | 100 m | 0.358% | 0.4188% | +17.0% | 1144 kN·m | 1209 kN·m | +5.7% | 1205 |
+| A3 | 53 mm | 70 m | 0.727% | 0.7709% | **+6.0%** | 1366 kN·m | 1333 kN·m | −2.4% | 1320 |
+| A3 | | 85 m | 0.556% | 0.6153% | +10.7% | 1311 kN·m | 1293 kN·m | **−1.4%** | 1284 |
+| A3 | | 100 m | 0.425% | 0.4489% | **+5.6%** | 1150 kN·m | 1228 kN·m | +6.7% | 1221 |
+
+**Bending moment agrees far better than strain: −2.4% to +6.7%, against
 +1.8% to +17.0%.** That is the most useful single result in this file.
 
 Moment is a section force — an integral over the section, set by the
@@ -152,6 +158,13 @@ reads high".
 The moment delta also flips sign with radius — negative at R = 70 and 85,
 positive at R = 100 — which is the R-trend divergence again, visible in a
 quantity that is otherwise in good agreement.
+
+*The component body carries 0.3 to 1.0% more moment than the pipeline
+either side of it, consistently, which is what a locally stiffer section in
+a displacement-controlled bend should do. The distinction is small here and
+is kept because it is not small everywhere: on the long components of
+TABLE XXIII it is the difference between answering the paper's question and
+a different one.*
 
 ### TABLE XXIII and XXIV — component length
 
@@ -466,7 +479,7 @@ travel on the current contact surface and its values are lower bounds.
 |---|---|---|
 | **X** plain pipe by stinger config | 3 | **done** — +16.8 / +6.1 / −7.7% |
 | **XI** diameter and tension | 6 | **done** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
-| **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −3.3 to +6.2%** |
+| **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −2.4 to +6.7%** (component body) |
 | **XXIII / XXIV** thick pipe length | 6 | **done** — short lengths agree; **the double-roller saturation is not reproduced** |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
@@ -490,7 +503,7 @@ travel on the current contact surface and its values are lower bounds.
    beam in pure bending, **never checked against the kernel**. This is now
    the single most promising open item, because three independent lines
    point at it: §2's bending moments agree to a few percent while its
-   strains disagree by 10–17%; §1's TABLE XI shows our excess over pure
+   strains disagree by 10–17% on the same nine runs; §1's TABLE XI shows our excess over pure
    bending running at roughly twice Abaqus's, measured against arithmetic
    rather than another model; and every strain disagreement in this file is
    one-sided high. All three are what a local-peak reporting offset would

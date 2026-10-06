@@ -61,16 +61,50 @@ CASES = (
 )
 
 
+def _component_elements(problems):
+    """Element indices belonging to the COMPONENT, not the pipeline.
+
+    `slide.passage` hands the problems back alongside the positions -- the
+    element table lives there, not on a `Position`, which carries only the
+    solved result. Reaching for it on the position silently returned an
+    empty set and reported the component's moment as 0.0, which is L097's
+    lesson in a third place: an absence that prints as a number.
+    """
+    for prob in problems or ():
+        if prob is not None and getattr(prob, 'elements', None):
+            return {i for (i, _a, _b, o, _l) in prob.elements
+                    if o != 'pipeline'}
+    return set()
+
+
 def run_case(c, spacing, step_OD):
     ils = gen.build_component_ils('ILS-TP', L_OD=c['L_OD'],
                                   t_ratio=c['t_mm'] / 1000.0 / T_PIPE)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        sc, L_comp, _recs, _junc, _probs, positions = slide.passage(
+        sc, L_comp, _recs, _junc, probs, positions = slide.passage(
             arch_id='none', ils=ils, R=c['R'], spacing=spacing,
             tension_mt=100.0, step=step_OD * D, verbose=False)
     s_max, _label = rp.zone(sc)
-    peak, at_s, bm, n_ok = 0.0, None, 0.0, 0
+    # WHICH MEMBER THE MOMENT IS ON is the whole question for this table.
+    # TABLE XXIV's location column says "Component midspan / roller below
+    # midspan" and TABLE XXI's says "Near component midspan", so the paper
+    # reports the moment carried by the COMPONENT BODY. A maximum taken over
+    # everything in the band answers a different question, and a maximum
+    # taken over the pipeline alone answers the opposite one -- which is
+    # what an earlier pass did, understating these by about 0.7 pct on a
+    # short component and reporting the wrong member (6 Oct 2026).
+    #
+    # The component's own elements are a separate owner in the model, so
+    # they can be told apart without guessing from position.
+    comp_elems = _component_elements(probs)
+    if not comp_elems:
+        raise ValueError(
+            'no component elements found -- the body moment would report as '
+            '0.0, which reads as a measurement rather than a lookup failure')
+    peak, at_s, n_ok = 0.0, None, 0
+    bm = dict(comp=0.0, pipe=0.0)
+    bm_at = dict(comp=None, pipe=None)
     for pos in positions:
         if not pos.converged:
             continue
@@ -78,11 +112,15 @@ def run_case(c, spacing, step_OD):
         for (_i, s, e) in pos.result.strains:
             if s + pos.shift < s_max and abs(e) > peak:
                 peak, at_s = abs(e), s + pos.shift
-        for (_i, s, m) in getattr(pos.result, 'moments', ()):
-            if s + pos.shift < s_max:
-                bm = max(bm, abs(m))
-    return dict(c=c, peak=peak, at_s=at_s, bm=bm, L=L_comp,
-                n_ok=n_ok, n=len(positions))
+        for (i, s, m) in getattr(pos.result, 'moments', ()):
+            if s + pos.shift >= s_max:
+                continue
+            key = 'comp' if i in comp_elems else 'pipe'
+            if abs(m) > bm[key]:
+                bm[key], bm_at[key] = abs(m), s + pos.shift
+    return dict(c=c, peak=peak, at_s=at_s, bm=bm['comp'], bm_pipe=bm['pipe'],
+                bm_at=bm_at['comp'], L=L_comp, n_ok=n_ok, n=len(positions),
+                n_comp=len(comp_elems))
 
 
 def main() -> int:
@@ -98,7 +136,8 @@ def main() -> int:
           f'{spacing:.0f} m spacing\n')
     print(f'{"case":5s} {"R":>4s} {"L":>6s} {"t":>5s}  '
           f'{"ours eps":>9s} {"paper":>7s} {"d%":>7s}   '
-          f'{"ours BM":>8s} {"paper":>7s} {"d%":>7s}  {"at s":>6s}  conv')
+          f'{"BM body":>8s} {"paper":>7s} {"d%":>7s} {"BM pipe":>8s}  '
+          f'{"at s":>6s}  conv')
     out = []
     for c in CASES:
         if only and c['case'] != only:
@@ -112,8 +151,8 @@ def main() -> int:
         at = '    --' if r['at_s'] is None else f'{r["at_s"]:6.2f}'
         print(f'{c["case"]:5s} {c["R"]:4.0f} {c["L_OD"]:5.0f}D {c["t_mm"]:4d}mm  '
               f'{eps:8.4f}% {c["eps"]:6.3f}% {de}   '
-              f'{bmk:8.1f} {c["bm"]:7d} {dm}  {at}  '
-              f'{r["n_ok"]}/{r["n"]}', flush=True)
+              f'{bmk:8.1f} {c["bm"]:7d} {dm} {r["bm_pipe"] / 1000:8.1f}  '
+              f'{at}  {r["n_ok"]}/{r["n"]}', flush=True)
 
     # THE SATURATION IS THE RESULT, so it is computed rather than left to a
     # reader comparing two rows by eye.
