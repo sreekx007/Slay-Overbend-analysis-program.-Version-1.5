@@ -2270,3 +2270,50 @@
   detect: test_no_bracket_spans_more_than_an_element, test_a_roller_ON_the_body_brackets_within_the_body, test_the_header_chain_runs_through_an_in_line_body
   refs: [rebuild/slay/physics/contact.py, rebuild/slay/report/profile.py, rebuild/tests/test_inline_body_contact.py]
   date: 2026-10-06
+
+- id: L101
+  area: study
+  class: defect
+  symptom: >-
+    Five of the seven TABLE XXXII / XXXIII shroud cases never finished the
+    passage, and the results were tabulated and compared against the paper
+    anyway. Measured, as "fraction of the shroud that actually crossed SR2
+    before the sweep stopped": S2-1 100%, S2-4 100%, S2-2 38.4%, S2-7 25.4%,
+    S2-3 16.9%, S2-6 6.9%, S2-8 6.3%. The sweep is sized at
+    L_comp + 1 m + 1 m, so S2-8 needed 23.946 m of travel and got 2.438 m.
+    The two cases that DID complete are the two that agree with the paper
+    (+9.8% and +15.1%); every case that disagrees is a case that stopped
+    early. Spotted by eye from the S2-6 figure -- the shroud is drawn still
+    sitting short of SR2 -- not by any check.
+  cause: >-
+    `study.sweep.run` breaks out of the position loop on the first
+    non-converged position, which is right: mode A chains state, so every
+    later position would start from a diverged one. The defect is downstream.
+    `report.profile` WRITES the diverged position, exactly as its schema
+    says it should, but it is the only row carrying `converged=false` and
+    nothing above it looks. `tools/study_table_xxxii.py` reads the sections
+    table filtered on `in_band`, which the diverged position fails, so the
+    truncation was invisible in the very table built to judge the case. The
+    envelope is then a maximum over a partial passage and is reported with
+    no mark distinguishing it from one taken over a complete one.
+  rule: >-
+    A study tool must assert the passage COMPLETED before it compares an
+    envelope to anything. "It ran and produced numbers" is not verification
+    (G8), and a partial passage produces numbers that look entirely ordinary
+    -- same columns, same magnitudes, plausible bending moments within a
+    2.1% band across all seven cases. The check is cheap and arithmetic:
+    max(shift over converged positions) must equal
+    sweep_length(L_comp) = L_comp + clear_before + clear_after, and any
+    shortfall is reported as a shortfall, not absorbed into a percentage
+    difference against a published table.
+  rule_detail: >-
+    This supersedes, for TABLE XXXII, the region-classification reading
+    recorded alongside the S2-6 figure in commit d07b07a. That observation
+    stands on its own -- the S2-6 peak at s_material 7.225 does sit inside
+    the shroud footprint and is still labelled X1 -- but it is not what
+    drives the disagreement with the paper, and attributing the gap to it
+    was wrong. The shroud had travelled 1.626 m of a required 10.128 m when
+    that peak was recorded.
+  detect: pending
+  refs: [rebuild/slay/study/sweep.py, tools/study_table_xxxii.py, docs/diagrams/xxxii_S2-6_peak.png]
+  date: 2026-10-06
