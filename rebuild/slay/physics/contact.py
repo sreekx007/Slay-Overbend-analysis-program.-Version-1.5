@@ -211,16 +211,35 @@ def _bracket(nodes_s, s: float):
 
 
 def header_nodes(model):
-    """(index, s) for the pipeline's own nodes, ascending in s.
+    """(index, s) for the nodes on the PIPELINE LINE, ascending in s.
 
     The HEADER, not every node at y = 0. On ILS-EASB the structure's top
     chord lies on the centreline too, and a connector's `C-P` node sits
     exactly on the pipe -- coincident and deliberately distinct. A roller
-    bears on the pipe, so the pipe's own elements are what say which node
-    that is.
+    bears on the pipe, so the pipe's own line is what says which node that
+    is.
+
+    KEYED ON `line_id`, NOT ON `owner`, and the difference is not cosmetic.
+    An in-line body REPLACES a length of pipe: GD-TP's elements carry
+    `owner='TP'` because they are a different section, but `line_id`
+    'pipeline' because they ARE the pipeline there -- the run is continuous
+    through them. A frame or a connector has its own line and is correctly
+    excluded either way.
+
+    FILTERED ON `owner` INSTEAD, this returned a chain with a HOLE in it
+    exactly where a component sat, and `_bracket` spanned the hole. Measured
+    on a 20 D thick pipe: SR2 bearing at s_material 6.208 was bracketed by
+    the component's END nodes 8.128 m apart, its target applied as a
+    weighted blend of two points four metres either side of the roller,
+    while the body's nine interior nodes were held by NO CONTACT AT ALL. The
+    component could not engage a roller it was sitting on, so it bridged --
+    and the error grew with length, which is why 2.5 D components agreed
+    with the reference to a few percent and 40 D ones did not (L100).
     """
     at = {n.index: n for n in model.nodes}
-    ids = {i for e in model.elements if e.owner == 'pipeline'
+    ids = {i for e in model.elements
+           if getattr(e, 'connector', None) is None
+           and getattr(e, 'line_id', e.owner) == 'pipeline'
            for i in (e.n1, e.n2)}
     return sorted(((i, at[i].s) for i in ids), key=lambda p: p[1])
 

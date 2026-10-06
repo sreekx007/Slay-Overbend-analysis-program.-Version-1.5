@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 99
+# entries: 100
 
 - id: L001
   area: kernel
@@ -2239,4 +2239,34 @@
     is not a translation and would bend the pipe.
   detect: test_the_schema_declares_the_contact_offset, test_the_arc_columns_are_documented_as_the_AXLE_locus, test_differing_roller_radii_are_refused_not_averaged, test_the_contact_targets_still_carry_the_radius_through_curvature
   refs: [rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, tools/plot_from_schema.py, rebuild/tests/test_contact_datum.py]
+  date: 2026-10-06
+
+- id: L100
+  area: physics
+  class: defect
+  symptom: >-
+    A roller sitting on an in-line component could not bear on it. Measured
+    on a 20 D thick pipe at R = 85: SR2 bearing at s_material 6.208 was
+    bracketed by the component's END nodes 8.128 m apart, so its contact
+    target was applied as a weighted blend of two points four metres either
+    side of the roller, and the body's nine interior nodes were held by NO
+    CONTACT CONSTRAINT AT ALL. The component bridged.
+  cause: >-
+    `contact.header_nodes` chose the nodes a roller may bear on by
+    `e.owner == 'pipeline'`. An in-line body REPLACES a length of pipe: GD-TP's
+    elements carry owner 'TP' because the SECTION differs, but line_id
+    'pipeline' because the run is continuous through them. Filtered on owner
+    the chain had a hole exactly where the component sat, and `_bracket`
+    spanned the hole. Frames and connectors have their own line_id and were
+    correctly excluded either way, which is what the docstring always said
+    the function meant.
+  rule: >-
+    Ask what a node IS PART OF, not who owns it. `line_id` says which
+    continuous run a node belongs to; `owner` says which part supplies its
+    section, and they differ precisely for the bodies that matter. Found
+    from a FIGURE -- the drawn component was a straight chord between its
+    junctions, which is the same filter in the reporting path -- after the
+    numbers had been believed for weeks.
+  detect: test_no_bracket_spans_more_than_an_element, test_a_roller_ON_the_body_brackets_within_the_body, test_the_header_chain_runs_through_an_in_line_body
+  refs: [rebuild/slay/physics/contact.py, rebuild/slay/report/profile.py, rebuild/tests/test_inline_body_contact.py]
   date: 2026-10-06

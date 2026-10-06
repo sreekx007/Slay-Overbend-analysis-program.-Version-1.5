@@ -69,8 +69,15 @@ def _world(s_station, y, us, uy):
 
 def _pipe_nodes(model, ms, U, shift):
     """(s_material, x, y) per pipeline node, ordered along the pipe."""
+    # The PIPELINE LINE, which an in-line body is part of. Keyed on owner
+    # this skipped a thick component's interior nodes, so the drawn
+    # centreline jumped its two junctions and `np.interp` spanned the body
+    # as a straight chord -- 113 mm flatter than the real shape on a 40 D
+    # component (L100).
     at = {n.index: n for n in model.nodes}
-    ids = sorted({i for e in model.elements if e.owner == 'pipeline'
+    ids = sorted({i for e in model.elements
+                  if getattr(e, 'connector', None) is None
+                  and getattr(e, 'line_id', e.owner) == 'pipeline'
                   for i in (e.n1, e.n2)}, key=lambda i: at[i].s)
     out = []
     for i in ids:

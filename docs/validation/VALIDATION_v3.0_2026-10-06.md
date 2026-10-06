@@ -1,5 +1,36 @@
 # SLAY Overbend — Validation ledger v3.0
 
+> ## ⚠ EVERY COMPONENT RESULT BELOW IS SUPERSEDED — re-run in progress
+>
+> **6 Oct 2026, L100.** A roller sitting on an in-line component could not
+> bear on it. `contact.header_nodes` chose the nodes a roller may bear on by
+> `owner == 'pipeline'`, and a thick component's elements carry `owner='TP'`
+> — so the node chain had a hole exactly where the body sat, `_bracket`
+> spanned the hole, and the body's interior nodes were held by **no contact
+> constraint at all**. On the 40 D case that is 19 of 21 nodes.
+>
+> **The component bridged because it structurally could not engage a
+> roller.** Every GD-TP, GD-SH+TP and EA number in §2, §3 and §4 was
+> computed that way. Plain pipe (§1) is unaffected — it has no in-line body
+> — and so is the Paper 2 comparison in §5 only insofar as those archetypes
+> carry no section-stepping body.
+>
+> This also removes the basis for several conclusions recorded below, which
+> are left in place **unedited** until the re-run replaces them so that the
+> two can be compared:
+>
+> * that the double-roller **saturation is not reproduced** (§2) — the
+>   mechanism the paper credits is a component engaging a second roller,
+>   which this model could not do;
+> * that the body-to-pipeline **moment separation stays at 3%** (§2);
+> * the **608 mm bridging** reading and the figures drawn from it (§2);
+> * that **long-component moments read 28–47% low** (§2).
+>
+> What is *not* in doubt: the short-component agreement in §2 (TABLE XX/XXI,
+> all nine cases ≈2.5 D) sat at the one length where the bracket error was
+> small — 1.25× an element rather than 20× — which is itself the strongest
+> corroboration that this is the root cause.
+
 **The rebuild against the published results, table by table.**
 
 Organised on the **papers' own table numbering**, so a row here can be
