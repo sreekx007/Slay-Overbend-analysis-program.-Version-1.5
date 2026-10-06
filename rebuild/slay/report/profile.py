@@ -94,6 +94,37 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
     a shroud moves the second and not the first, and keeping them as separate
     columns is what stops a shroud being drawn as a stiffener (L073).
     """
+
+    # THE PIPE RIDES ON THE ROLLER TOPS, not through the axles.
+    #
+    # `LayPath.R` is measured to the roller CENTRELINE, so `path.position` is
+    # where the axles are. A pipe resting on a roller has its centreline
+    # `r_roller + OD/2` further out -- 0.5032 m at the standard 0.3 m roller.
+    # Until 6 Oct this table reported the solved centreline against the axle
+    # locus and called the difference `off_arc`, so a pipe sitting correctly
+    # on every roller read as ~0 off the arc and DREW THROUGH THE ROLLERS.
+    #
+    # WHY THIS IS A REPORTING FIX AND NOT A PHYSICS CHANGE. The offset is the
+    # same at every station -- deck rollers hold the pipe up by exactly as
+    # much as stinger rollers -- so applying it to the whole pipe is a RIGID
+    # TRANSLATION, and a rigid translation produces no strain. That is the
+    # same argument `physics.contact` makes for keeping the roller radius out
+    # of the targets and in the radius, and it is why the solve is untouched
+    # here: curvature already enters through `R_eff`, and what was missing
+    # was only the datum the result is reported against.
+    #
+    # IT STOPS BEING A TRANSLATION IF THE RADII DIFFER, so that is checked
+    # rather than assumed.
+    radii = {st.radius for st in scene.stations
+             if getattr(st, 'radius', None)}
+    if len(radii) > 1:
+        raise ValueError(
+            f'stations have different roller radii {sorted(radii)}, so the '
+            f'contact offset is not uniform and lifting the reported pipe by '
+            f'a single value would bend it. Report per station instead.')
+    r_roller = radii.pop() if radii else 0.0
+    contact_offset = r_roller + OD / 2.0
+
     nodes = _pipe_nodes(model, ms, U, shift)
     s_nodes = np.array([r[0] for r in nodes])
     x_nodes = np.array([r[1] for r in nodes])
@@ -102,13 +133,15 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
     s_dense = np.linspace(s_nodes.min(), s_nodes.max(), n)
     xs = np.interp(s_dense, s_nodes, x_nodes)
     ys = np.interp(s_dense, s_nodes, y_nodes)
-
     rows = []
     for k, s_mat in enumerate(s_dense):
         s_sta = float(s_mat) + shift
         ax, ay = scene.path.position(s_sta)
         nx, ny = scene.path.normal(s_sta)
-        px, py = float(xs[k]), float(ys[k])
+        # The solved centreline, lifted onto the roller tops. `normal` points
+        # from the roller toward the pipe, so this is a + and not a -.
+        px = float(xs[k]) + contact_offset * nx
+        py = float(ys[k]) + contact_offset * ny
         x_local = s_centre - float(s_mat)
         sec = ils.assembly.section_at(x_local) if ils is not None else None
         con = ils.assembly.contact_at(x_local) if ils is not None else None
@@ -118,7 +151,10 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
             sample=k, s_material=float(s_mat), s_station=s_sta,
             x=px, y=py, arc_x=float(ax), arc_y=float(ay),
             normal_x=float(nx), normal_y=float(ny),
-            off_arc=(px - ax) * nx + (py - ay) * ny,
+            contact_offset=contact_offset,
+            # measured above the CONTACT locus, so 0 is sitting on the
+            # rollers rather than impaled on their axles
+            off_arc=((px - ax) * nx + (py - ay) * ny) - contact_offset,
             OD_section=float(getattr(sec, 'OD', OD)) if sec else OD,
             t_section=float(getattr(sec, 't', 0.0) or 0.0) if sec else 0.0,
             y_contact=(float(getattr(con, 'y', OD / 2.0)) if con

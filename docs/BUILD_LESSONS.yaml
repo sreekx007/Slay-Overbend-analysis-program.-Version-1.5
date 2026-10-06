@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 98
+# entries: 99
 
 - id: L001
   area: kernel
@@ -2206,4 +2206,37 @@
     position the previous one reached comfortably.
   detect: '-'
   refs: [docs/validation/VALIDATION_v2.0_2026-10-06.md, tools/slide.py]
+  date: 2026-10-06
+
+- id: L099
+  area: measure
+  class: defect
+  symptom: >-
+    The stinger figures drew the pipe centreline passing through the roller
+    axles. Spotted by eye from the plot, not by any check. Measured: the
+    solved centreline sat 18 to 72 mm off the roller-centre arc where it
+    should sit 503 mm above it, and `off_arc` -- the column whose schema says
+    "0 means sitting on the rollers" -- read about 0 for a pipe that was
+    sitting on them.
+  cause: >-
+    `LayPath.R` is measured to the roller CENTRELINE, so `path.position` is
+    where the axles are. `report.profile` compared the solved centreline
+    against that locus and called the difference `off_arc`. The pipe rests on
+    the roller TOPS, r_roller + OD/2 further out, and nothing added it back.
+    The analysis was never wrong: contact targets deepen by exactly
+    R_eff / R = 1.00592, so curvature carries the roller radius as
+    `physics.contact` documents. What was missing was the DATUM the result is
+    reported against.
+  rule: >-
+    A reported geometry must be one a reader can check against the physical
+    object. The strain was right and the picture was impossible, and only the
+    picture could reveal it -- no numeric test compares an elevation to
+    anything. Fixed in reporting, NOT in the solve: every station carries the
+    same roller radius, so lifting the pipe by r_roller + OD/2 is a RIGID
+    TRANSLATION and produces no strain, which is the same argument
+    physics.contact makes for keeping the radius in the curvature. The
+    translation is guarded -- differing station radii raise, because then it
+    is not a translation and would bend the pipe.
+  detect: test_the_schema_declares_the_contact_offset, test_the_arc_columns_are_documented_as_the_AXLE_locus, test_differing_roller_radii_are_refused_not_averaged, test_the_contact_targets_still_carry_the_radius_through_curvature
+  refs: [rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, tools/plot_from_schema.py, rebuild/tests/test_contact_datum.py]
   date: 2026-10-06

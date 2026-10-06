@@ -633,7 +633,7 @@ def plot_profile(prof, out, step=None):
             label='pipe centreline, SOLVED')
     ex.plot(col(g, 'arc_x')[lo:hi + 1], col(g, 'arc_y')[lo:hi + 1],
             color='#b9c2cb', lw=1.0, ls='--', zorder=1,
-            label='roller-centreline locus')
+            label='roller-centre locus (axles, NOT where the pipe sits)')
 
     if sp_sec:                       # a body that REPLACES the pipe section
         a, b = sp_sec
@@ -672,9 +672,15 @@ def plot_profile(prof, out, step=None):
     ymid = 0.5 * (qy.min() + qy.max())
     span = max(qy.max() - qy.min(), 1e-6)
     ex.set_ylim(ymid + 0.62 * span + OD, ymid - 0.62 * span - OD)
-    ex.set_aspect('auto')
-    ex.set_title('CLOSE-UP -- the vertical is EXAGGERATED, so the rollers '
-                 'draw as ellipses and no radius may be read off this panel',
+    # TRUE SCALE. This panel used to stretch the vertical to make the pipe
+    # wall visible, which drew every roller as a flat ellipse and made the
+    # pipe appear to pass through the roller axles -- a picture nobody can
+    # check a geometry against. Equal aspect costs the wall thickness in a
+    # 20 m window and buys a figure where a roller is a circle of its stated
+    # radius and the pipe visibly rests on top of it (6 Oct 2026).
+    ex.set_aspect('equal', adjustable='datalim')
+    ex.set_title('CLOSE-UP -- TRUE SCALE, equal aspect: a roller is a circle '
+                 'of its real radius and the pipe rests on top of it',
                  fontsize=9.5, loc='left')
     ex.set_ylabel('y (m), down')
     ex.grid(alpha=0.18)
@@ -687,16 +693,18 @@ def plot_profile(prof, out, step=None):
         lift = max(col(g, 'y_contact')) - OD / 2.0
         if lift > 1e-6:
             dx.axhline(lift * 1e3, color='#8a5a00', lw=0.9, ls=':')
-            dx.annotate(f'contact lift at a roller: {lift * 1e3:.1f} mm',
+            dx.annotate(f'extra lift where a deeper surface contacts: '
+                        f'{lift * 1e3:.1f} mm',
                         (px.min(), lift * 1e3), textcoords='offset points',
                         xytext=(8, -12), fontsize=8, color='#8a5a00',
                         ha='left')
     for r in sta:
         dx.axvline(float(r['x']), color='#cfd8dc', lw=0.7, zorder=0)
-    dx.set_ylabel('off the arc (mm)')
-    dx.set_title('THE DEFORMED SHAPE, measured normal to the '
-                 'roller-centreline locus -- zero means sitting on the '
-                 'rollers, positive means held off them',
+    dx.set_ylabel('off the rollers (mm)')
+    off0 = (col(g, 'contact_offset') or [0.0])[0]
+    dx.set_title(f'THE DEFORMED SHAPE, normal to the CONTACT locus -- the '
+                 f'roller-centre arc + {off0 * 1e3:.0f} mm (r_roller + OD/2). '
+                 f'Zero means sitting on the rollers',
                  fontsize=9.5, loc='left')
     dx.grid(alpha=0.2)
 

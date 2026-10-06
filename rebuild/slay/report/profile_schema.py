@@ -61,7 +61,7 @@ import re
 
 from slay.report.schema import IDX, M, NM, NONE, Field
 
-PROFILE_SCHEMA_VERSION = '1.3.0'
+PROFILE_SCHEMA_VERSION = '1.4.0'
 # 1.3.0  `owner` on the sections table: which BODY the element belongs to,
 #        as distinct from `section_owner`, which is whose SECTION it
 #        carries. An EA frame's elements carry the pipe's section but are
@@ -193,19 +193,30 @@ GEOMETRY = _identity('geometry') + CONTEXT + POSITION + [
     Field('y', 'float', M, 'length', 'value',
           'WORLD y of the solved centreline, +y DOWN', per='sample'),
     Field('arc_x', 'float', M, 'length', 'value',
-          'WORLD x of the roller-centreline locus at this s_station -- where '
-          'the pipe would sit if it lay on every roller', per='sample'),
+          'WORLD x of the ROLLER-CENTRE locus at this s_station -- the arc '
+          'LayPath.R is measured to, which is where the roller AXLES are and '
+          'NOT where the pipe sits. The pipe rests on the roller TOPS, '
+          '`contact_offset` above this', per='sample'),
     Field('arc_y', 'float', M, 'length', 'value',
-          'WORLD y of that locus', per='sample'),
+          'WORLD y of the roller-centre locus', per='sample'),
+    Field('contact_offset', 'float', M, 'length', 'value',
+          'r_roller + OD/2 -- how far above the roller-centre locus the pipe '
+          'CENTRELINE rides when it is sitting on the rollers. 0.5032 m at '
+          'the standard 0.3 m roller and 406.4 mm pipe. Carried per sample '
+          'because a plotter cannot ask the Scene for the roller radius, and '
+          'because without it `off_arc` reads 0.5 m everywhere and a reader '
+          'cannot tell contact from half a metre of lift-off (6 Oct 2026)',
+          per='sample'),
     Field('normal_x', 'float', NONE, 'direction', 'value',
           'unit normal of the LOCUS at this s_station, world frame. Carried '
           'because a plotter cannot ask the Scene for it', per='sample'),
     Field('normal_y', 'float', NONE, 'direction', 'value',
           'unit normal of the locus, world frame', per='sample'),
     Field('off_arc', 'float', M, 'length', 'value',
-          'signed distance of the solved centreline off the locus, ALONG '
-          'THE NORMAL: 0 means sitting on the rollers, positive means held '
-          'off them. Not a vertical gap -- the two differ by cos(theta), '
+          'signed distance of the solved centreline above the CONTACT locus '
+          '(the roller-centre locus plus `contact_offset`), ALONG THE '
+          'NORMAL: 0 means sitting on the rollers, positive means held off '
+          'them. Not a vertical gap -- the two differ by cos(theta), '
           'which is 20% at SR7. THIS IS THE ONLY PANEL A SHROUD IS VISIBLE '
           'ON: GD-SH lifts the pipe 203 mm and adds no stiffness, which on a '
           'panel spanning 20 m of stinger drop is a third of a pixel',

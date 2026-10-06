@@ -56,6 +56,12 @@ def test_the_plotter_imports_nothing_from_slay():
 R = 85.0
 OD = 0.4064
 T_WALL = 0.0210
+R_ROLLER = 0.30
+# Where the pipe centreline sits when it is resting on the rollers: the
+# roller-centre locus plus the roller radius plus the pipe radius. 0.5032 m,
+# which is larger than most of the lift-off this fixture models -- the whole
+# reason `off_arc` is reported relative to it rather than to the axles.
+CONTACT_OFFSET = R_ROLLER + OD / 2.0
 N = 160
 S_MAX = 40.0
 S_LO, S_HI = 16.0, 22.0        # the component's material span
@@ -97,13 +103,17 @@ def _geometry(step, shift, shroud=False):
         th = s_sta / R
         nx, ny = math.sin(th), -math.cos(th)
         lift = 0.02 * math.exp(-((s - 19.0) / 3.0) ** 2)
-        px, py = ax - lift * nx, ay - lift * ny
+        # The pipe rides on the roller TOPS, `CONTACT_OFFSET` above the
+        # roller-centre locus, with `lift` the extra it is held off by.
+        px = ax + (CONTACT_OFFSET + lift) * nx
+        py = ay + (CONTACT_OFFSET + lift) * ny
         inside = S_LO <= s <= S_HI
         r = {k_: v for k_, v in ctx.items() if k_ in ps.header('geometry')}
         r.update(table='geometry', step=step, shift=shift, converged=True,
                  sample=k, s_material=s, s_station=s_sta, x=px, y=py,
                  arc_x=ax, arc_y=ay, normal_x=nx, normal_y=ny,
-                 off_arc=(px - ax) * nx + (py - ay) * ny,
+                 contact_offset=CONTACT_OFFSET,
+                 off_arc=((px - ax) * nx + (py - ay) * ny) - CONTACT_OFFSET,
                  OD_section=(0.49 if (inside and not shroud) else OD),
                  t_section=T_WALL,
                  y_contact=(OD / 2.0 + 0.2 if (inside and shroud)

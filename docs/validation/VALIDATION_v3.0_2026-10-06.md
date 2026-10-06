@@ -185,6 +185,11 @@ midspan / roller below midspan"), with the pipeline's own maximum beside it.*
 | 85 m | 20 D | 53 mm | 1.861% | 1.4016% | −24.7% | 1977 kN·m | 1414 kN·m | −28.5% | 1393 |
 | 85 m | 40 D | 53 mm | 1.914% | 3.1043% | **+62.2%** | 2883 kN·m | 1518 kN·m | **−47.3%** | 1472 |
 
+*Figures redrawn 6 Oct at profile schema 1.4.0, which put the reported pipe
+on the roller TOPS rather than through the axles (L099). The strain and
+moment are unchanged — the lift is a rigid translation — and so is every
+`off_arc` figure below, which was always measured relative to contact.*
+
 **Drawn at the governing step**, both cases, from the profile artifacts:
 `docs/diagrams/tp_L20D_R85_maxBM.png` and `tp_L40D_R85_maxBM.png` — the step
 at which the **component body** carries its maximum moment, which is what
