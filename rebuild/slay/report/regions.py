@@ -253,7 +253,26 @@ def region_peaks(positions, problem, geom, zone_s_max, shift_of=None) -> dict:
             m = abs(moments.get(idx, 0.0))
             if m > r['peak_moment']:
                 r['peak_moment'] = m
-    x2 = out.get('X2', {}).get('peak_strain', 0.0)
+    # A REGION WITH NO ELEMENTS REPORTED 0.0000%, which is the same defect
+    # `body_peaks` was written to fix, in a different place: a zero reads as
+    # "nothing happening here" and nobody checks a quiet number.
+    #
+    # It is reachable whenever a third of the deep section is SHORTER THAN
+    # ONE ELEMENT, so no element midpoint lands in it. Measured at Paper 1's
+    # Series 4 R = 70 / T = 120 MT config: L1 = 5 D = 2.032 m, thirds of
+    # 0.677 m, elements of 0.813 m at the ruled 2 x OD density -- X3 held
+    # ZERO elements and read 0.0000% while X2 and X4 either side read 0.85%
+    # and 0.68% (6 Oct 2026).
+    #
+    # `peak_strain` is left at 0.0 because the caller may be writing a
+    # numeric column, but `measured` says whether that zero is a
+    # measurement, and `n_elements` says why it is not. Readers must not
+    # print an unmeasured region as a number.
+    for r in out.values():
+        r['measured'] = r['n_elements'] > 0 and r['step'] >= 0
+
+    x2r = out.get('X2', {})
+    x2 = x2r.get('peak_strain', 0.0) if x2r.get('measured') else 0.0
     for r in out.values():
         r['frac_of_x2'] = (r['peak_strain'] / x2) if x2 > 0 else 0.0
         # X1 and X5 each lump together a TAPER and the plain pipe beyond it.

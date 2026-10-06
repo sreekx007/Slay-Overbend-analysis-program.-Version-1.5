@@ -233,11 +233,21 @@ def main() -> int:
             r = rpk[name]
             lo = '  -inf' if r['s_lo'] == float('-inf') else f'{r["s_lo"]:6.3f}'
             hi = '  +inf' if r['s_hi'] == float('inf') else f'{r["s_hi"]:6.3f}'
+            # An unmeasured region prints as a dash, never as 0.0000%.
+            eps = (f'{100 * r["peak_strain"]:11.4f}%' if r.get('measured')
+                   else f'{"--":>11s} ')
+            frac = (f'{r["frac_of_x2"]:7.3f}' if r.get('measured')
+                    else f'{"--":>7s}')
             print(f'  {name:6s} {lo:>10s} .. {hi:>9s} {r["n_elements"]:6d} '
-                  f'{100 * r["peak_strain"]:11.4f}% {r["frac_of_x2"]:7.3f} '
+                  f'{eps} {frac} '
                   f'{r["step"]:5d} {"yes" if r["peak_on_shroud"] else "-":>8s}'
                   f'  {rg.ABOUT[name].split(" -- ")[0]}')
-        thin = [n for n in rg.REGIONS if rpk[n]['n_elements'] <= 2]
+        empty = [n for n in rg.REGIONS if not rpk[n].get('measured')]
+        if empty:
+            print(f'  EMPTY: {", ".join(empty)} hold NO elements at this mesh '
+                  f'-- a third of the deep section is shorter than one '
+                  f'element. Those regions are not measured, not zero.')
+        thin = [n for n in rg.REGIONS if 0 < rpk[n]['n_elements'] <= 2]
         if thin:
             print(f'  NOTE: {", ".join(thin)} hold 2 elements or fewer at '
                   f'this mesh -- those ratios are reporting a mesh, not a '
