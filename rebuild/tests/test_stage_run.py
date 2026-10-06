@@ -62,11 +62,30 @@ def test_it_reproduces_the_reference_program(staged):
 
     0.3884% against `run_slay`'s 0.3937% at R = 85, J2, 8 m -- 1.3% apart.
     The tolerance here is on OUR number; the reference's is a constant.
+
+    ON THE SURFACE THE REFERENCE RUNS. `run_slay` drives the pipe CENTRELINE
+    onto the R arc, so the like-for-like comparison is made there explicitly
+    rather than inheriting whatever this repo's default happens to be. The
+    default moved to 'bottom' on 6 Oct 2026 and the number barely followed --
+    0.38848 against 0.38839, 0.02% -- which is itself worth pinning, because
+    the radius changes by 0.59% and a reader would reasonably expect more.
+    The reason is that the peak MOVES with the slots: it sits at s = 8.06 m
+    under 'centreline' and 8.22 m under 'bottom', so the two numbers are the
+    peak of a field sampled in slightly different places, not the same
+    quantity scaled.
     """
     sc, out, _state = staged
     s_max, _zone = stage_run.report_zone(sc)
     s_pk, eps = stage_run.peak_in_zone(out[-1][2], s_max)
-    assert 100 * eps == pytest.approx(0.38839, abs=5e-5)
+    assert 100 * eps == pytest.approx(0.38848, abs=5e-5)
+
+    legacy = stage_run.run(R=85.0, tension_mt=120.0, spacing=8.0,
+                           verbose=False, contact_surface='centreline')
+    lsc, lout, _ls = legacy
+    _lpk, leps = stage_run.peak_in_zone(lout[-1][2],
+                                        stage_run.report_zone(lsc)[0])
+    assert 100 * leps == pytest.approx(0.38839, abs=5e-5)
+    assert abs(100 * leps / REFERENCE_J2[85.0] - 1.0) < 0.02
     assert abs(100 * eps / REFERENCE_J2[85.0] - 1.0) < 0.02
     assert sc.by_name('SR2').s_arc == pytest.approx(8.0)
     assert 8.0 <= s_pk < 16.0, 'the peak is in the SR2-SR3 span, as it is ' \
@@ -111,7 +130,12 @@ def test_staged_and_single_solve_agree_at_the_same_metric(staged):
     from slay.solve.passage import solve
     from slay.scene.scene import build_scene
 
-    sc = build_scene(R=85.0, spacing=8.0, elastic_length=16.0)
+    from slay.physics.contact import material_margin
+    # The stinger end must hold the terminal slot and no more -- see
+    # `sweep.run`'s hard-pair check for what a mismatch costs.
+    _probe = build_scene(R=85.0, spacing=8.0, elastic_length=16.0)
+    sc = build_scene(R=85.0, spacing=8.0, elastic_length=16.0,
+                     margin_stinger=material_margin(_probe))
     r, _state = solve(build_problem(
         build_model(sc, None), sc, material=material('j2'),
         gravity=True, tension=120.0 * 9806.65))

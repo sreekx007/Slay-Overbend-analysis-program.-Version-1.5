@@ -34,7 +34,7 @@ from dataclasses import dataclass, field, asdict
 
 import config
 
-from slay.physics.contact import contact_targets
+from slay.physics.contact import DEFAULT_SURFACE, contact_targets
 from slay.physics.loads import (boundary_conditions, lay_tension,
                                 point_mass_loads, self_weight)
 from slay.physics.sections import bind_material, bind_sections
@@ -101,7 +101,7 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                   OD: float = None, t_wall: float = None,
                   E: float = None, vertical_at=(),
                   elastic_spans=(),
-                  contact_surface: str = 'centreline') -> Problem:
+                  contact_surface: str = DEFAULT_SURFACE) -> Problem:
     """Pose one lay position.
 
     `shift` is an ARGUMENT, not a range. There is no loop over shifts in this

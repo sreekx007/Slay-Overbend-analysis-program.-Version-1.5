@@ -67,8 +67,16 @@ def test_schedule_always_includes_the_total():
 # -- the buffer ------------------------------------------------------------
 
 def test_the_swept_length_is_added_at_the_vessel_end_only(plain):
-    """Material LEAVES the model at the stinger end and needs nothing
-    there; it is the vessel end that runs dry."""
+    """Material LEAVES the model at the stinger end and needs no SWEEP
+    buffer there; it is the vessel end that runs dry.
+
+    The stinger end does grow, by a different and much smaller quantity:
+    the contact correction `(R_eff - R) * theta`, which puts a slot outboard
+    of its station under the default contact surface. That is not sweep
+    buffer and it does not scale with the component, which is what the two
+    separate assertions below say (6 Oct 2026).
+    """
+    from slay.physics.contact import material_margin
     L = 4.0
     buffered = sweep.scene_for(R=85.0, spacing=8.0, L_comp=L,
                                elastic_length=16.0)
@@ -76,7 +84,16 @@ def test_the_swept_length_is_added_at_the_vessel_end_only(plain):
     # `test_the_buffer_is_the_sweep_plus_tail_clearance` for why.
     added = sweep.buffer_length(L)
     assert plain.extent[0] - buffered.extent[0] == pytest.approx(added)
-    assert buffered.extent[1] == pytest.approx(plain.extent[1])
+
+    # the stinger end grows by the contact correction and nothing else
+    grew = buffered.extent[1] - plain.extent[1]
+    assert grew == pytest.approx(material_margin(plain))
+    assert grew < 0.5, 'and it is a third of a metre, not a sweep buffer'
+    longer = sweep.scene_for(R=85.0, spacing=8.0, L_comp=4 * L,
+                             elastic_length=16.0)
+    assert longer.extent[1] == pytest.approx(buffered.extent[1]), \
+        'it does not scale with the component -- only the vessel end does'
+
     assert [s.s_arc for s in buffered.stations] == \
         [s.s_arc for s in plain.stations], 'stations do not move'
 

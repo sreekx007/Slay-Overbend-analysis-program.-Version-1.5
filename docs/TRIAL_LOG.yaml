@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 38
+# entries: 39
 
 - id: T001
   date: 2026-09-21
@@ -1197,3 +1197,58 @@
     the first thing to resolve before reading any of these deltas as physics.
   lesson: '-'
   refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
+
+- id: T039
+  date: 2026-10-06
+  goal: Put the pipeline contact surface at the BOTTOM of the pipe OD by
+    default, so the stinger radius carries the roller offset r_roller + OD/2,
+    and measure what it does to the plain pipe case.
+  action: >-
+    Confirmed first that ils_builder already owns the contact surface either
+    side of a component: assembly.contact_at(x) returns y = OD/2 with owner
+    'pipe' outside the component extent, lift exactly 0.0, and the
+    component's own surface takes over inside it -- one continuous
+    bottom-surface profile, no second implementation. effective_radius was
+    then found to already compute R + r_roller + OD/2 for 'bottom', so both
+    requested changes are one switch. Set DEFAULT_SURFACE = 'bottom' in
+    physics.contact and wired it through problem, sweep, stage_run and slide.
+  case: plain pipe 406.4x21, R=70/85/105 m, 120 MT, 8 m and 9 m spacing,
+    staged four-step J2; plus the 6 in / 12 m / 160 MT seeding corner
+  outcome: partial
+  evidence: |-
+    Peak in zone, centreline -> bottom, and where the peak sits:
+
+      sp=8  R= 70  0.5179 -> 0.5197  +0.36 pct   s 8.06 -> 8.26
+      sp=8  R= 85  0.3884 -> 0.3885  +0.02 pct   s 8.06 -> 8.22
+      sp=8  R=105  0.2879 -> 0.2877  -0.10 pct   s 8.06 -> 8.19
+      sp=9  R= 70  0.5423 -> 0.5373  -0.91 pct   s 8.99 -> 9.57
+      sp=9  R= 85  0.4014 -> 0.4032  +0.45 pct   s 8.99 -> 9.53
+      sp=9  R=105  0.2942 -> 0.2954  +0.42 pct   s 8.99 -> 9.49
+
+    All twelve converge. An earlier version of this table read -0.8 to
+    -1.5 pct at every radius and was WRONG -- it was measured before L095
+    was found, with SR7's slot clamped onto the wrong node.
+  verdict: >-
+    The switch is small and NOT a uniform reduction: -0.91 to +0.45 pct,
+    inside mesh noise. The naive expectation is -0.59 pct everywhere, since
+    R_eff/R = 1.00592 and strain goes as 1/R. It does not happen because the
+    PEAK MOVES with the slots -- 0.2 m at 8 m spacing, 0.6 m at 9 m -- so the
+    two numbers are the peak of a field sampled in different places, not the
+    same quantity scaled. Reported as measured rather than as expected.
+
+    TWO DEFECTS THE SWITCH EXPOSED, both of which were invisible under
+    'centreline' because s_material IS s_arc there. L095: the terminal slot
+    fell 0.32 m off the end of the mesh and `_bracket` clamped it silently,
+    on the station that bears the lay tension. L096: the margin that fixes
+    L095 is a hard pair with the OD, and TOO MUCH room is worse than too
+    little -- a 6 in passage given a 16 in margin has unconstrained pipe past
+    the last contact, which is the free cantilever D6 removed, and it took
+    the seeding corner from 7/7 converged to failing at lam=0.0000. Both now
+    refuse rather than approximate.
+
+    The reference comparison stays on 'centreline' explicitly, because
+    run_slay runs that surface; at R = 85 / 8 m the two differ by 0.02 pct
+    (0.38839 against 0.38848), so M1's 1.3 pct agreement is unaffected
+    either way.
+  lesson: L095, L096
+  refs: [rebuild/slay/physics/contact.py, rebuild/slay/study/sweep.py, rebuild/slay/scene/scene.py, tools/stage_run.py]

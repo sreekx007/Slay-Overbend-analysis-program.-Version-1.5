@@ -104,6 +104,7 @@ def build_scene(R: float = None,
                 radii: dict = None,
                 margin: float = 0.0,
                 margin_vessel: float = 0.0,
+                margin_stinger: float = 0.0,
                 elastic_length: float = None) -> Scene:
     """Assemble a Scene from a lay configuration.
 
@@ -111,6 +112,15 @@ def build_scene(R: float = None,
     It defaults to zero and a caller asks for it explicitly.
 
     `margin_vessel` extends the VESSEL end only, and it is the sweep buffer.
+
+    `margin_stinger` extends the STINGER end only. It exists because a
+    contact slot does not sit at its station's arc position under every
+    contact surface: riding the pipe at `R + r_roller + OD/2` puts the slot
+    `(R_eff - R) * theta` outboard, 0.32 m at SR7 for R = 85, and a slot
+    past the last node is applied to the wrong material. This layer cannot
+    compute that -- it is a contact property and `physics` sits above
+    `scene` -- so the number is passed in. `physics.contact.material_margin`
+    produces it and returns 0.0 for 'centreline'.
     As the pipeline advances by `sigma`, material that began at `s_lo` ends
     up at `s_lo + sigma`, so a station at arc `s_arc` reads material from
     `s_arc - sigma` (`physics.contact_targets`). Without extra material on
@@ -135,12 +145,15 @@ def build_scene(R: float = None,
 
     if margin < 0:
         raise ValueError(f'margin must not be negative, got {margin}')
+    if margin_stinger < 0:
+        raise ValueError(
+            f'margin_stinger must not be negative, got {margin_stinger}')
     if margin_vessel < 0:
         raise ValueError(
             f'margin_vessel must not be negative, got {margin_vessel}')
 
     s_lo = min(st.s_arc for st in stations) - margin - margin_vessel
-    s_hi = max(st.s_arc for st in stations) + margin
+    s_hi = max(st.s_arc for st in stations) + margin + margin_stinger
     extent = (s_lo, s_hi)
 
     if elastic_length < 0:

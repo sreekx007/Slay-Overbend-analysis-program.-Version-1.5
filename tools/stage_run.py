@@ -54,6 +54,8 @@ from slay.model.assemble import build_model                # noqa: E402
 from slay.physics.problem import build_problem             # noqa: E402
 from slay.scene.rollers import roller_stations             # noqa: E402
 from slay.scene.scene import Scene, build_scene            # noqa: E402
+from slay.physics.contact import (DEFAULT_SURFACE,          # noqa: E402
+                                  material_margin)
 from slay.solve.passage import solve                       # noqa: E402
 
 TON = 9806.65
@@ -99,9 +101,19 @@ def station_profile(scene, result):
     return out
 
 
-def run(R=85.0, tension_mt=120.0, spacing=None, elastic=16.0, verbose=True):
+def run(R=85.0, tension_mt=120.0, spacing=None, elastic=16.0, verbose=True,
+        contact_surface=None):
     """The four steps. Returns (scene, [(label, Problem, Result)], state)."""
-    sc = build_scene(R=R, spacing=spacing, elastic_length=elastic)
+    # None means "whatever the library rules", so this tool follows the
+    # ruling in `physics.contact` rather than carrying its own copy of it.
+    if contact_surface is None:
+        contact_surface = DEFAULT_SURFACE
+    # Built twice on purpose: once to measure the material correction this
+    # contact surface demands at the stinger end, once with room for it.
+    _probe = build_scene(R=R, spacing=spacing, elastic_length=elastic)
+    sc = build_scene(R=R, spacing=spacing, elastic_length=elastic,
+                     margin_stinger=material_margin(_probe,
+                                                    contact_surface=contact_surface))
     held = all_bidirectional(sc)
     m = build_model(sc)
     T = tension_mt * TON
@@ -109,25 +121,28 @@ def run(R=85.0, tension_mt=120.0, spacing=None, elastic=16.0, verbose=True):
     steps = [
         # Every roller held, elastic, nothing but the targets acting.
         ('1  displacements, elastic, all held',
-         build_problem(m, held, material=None, gravity=False, tension=0.0)),
+         build_problem(m, held, material=None, gravity=False, tension=0.0,
+                       contact_surface=contact_surface)),
         # The ruled one-sided set takes over AND gravity arrives. Both
         # belong to this step: lift-off is what gravity is resisted by.
         ('2  + gravity, lift-off active',
-         build_problem(m, sc, material=None, gravity=True, tension=0.0)),
+         build_problem(m, sc, material=None, gravity=True, tension=0.0,
+                       contact_surface=contact_surface)),
         # Full tension on iteration 1 -- the kernel does not scale loads by
         # `lam` (L050), so "apply tension" is a step, not a ramp.
         ('3  + tension at SR7',
-         build_problem(m, sc, material=None, gravity=True, tension=T)),
+         build_problem(m, sc, material=None, gravity=True, tension=T,
+                       contact_surface=contact_surface)),
         ('4  + plasticity (J2)',
          build_problem(m, sc, material=material('j2'), gravity=True,
-                       tension=T)),
+                       tension=T, contact_surface=contact_surface)),
     ]
 
     s_max, zone = report_zone(sc)
     if verbose:
         print(f'R = {R:.0f} m   T = {tension_mt:.0f} MT   '
-              f'spacing = {sc.spacing:.0f} m   zone: s < {s_max:.1f} m '
-              f'({zone})')
+              f'spacing = {sc.spacing:.0f} m   surface = {contact_surface}   '
+              f'zone: s < {s_max:.1f} m ({zone})')
         print(f'  {"step":38s}{"status":>24}{"act":>7}'
               f'{"peak in zone":>14}{"at s":>8}')
 

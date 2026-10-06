@@ -26,6 +26,7 @@ pytest.importorskip('nlfea_v4')
 from slay.data.materials import material            # noqa: E402
 from slay.model.assemble import build_model         # noqa: E402
 from slay.physics.problem import build_problem      # noqa: E402
+from slay.physics.contact import material_margin    # noqa: E402
 from slay.scene.path import LayPath                 # noqa: E402
 from slay.scene.rollers import roller_stations      # noqa: E402
 from slay.scene.scene import Scene                  # noqa: E402
@@ -35,10 +36,22 @@ from slay.solve.kernel import dof, mesh_of_problem  # noqa: E402
 
 
 def _scene(R=85.0, one_sided=None, n_sr=6, n_vr=3, spacing=8.0, elastic=16.0):
+    """A hand-rolled Scene, spanning exactly its stations PLUS the contact
+    correction at the stinger end.
+
+    That last term is not decoration. A slot riding at `R + r_roller + OD/2`
+    sits `(R_eff - R) * theta` outboard of its station -- 0.28 m at SR7 here
+    -- and `contact_targets` refuses a slot past the last node rather than
+    letting `_bracket` clamp it onto the wrong steel (6 Oct 2026).
+    """
     path = LayPath(R=R)
     st = roller_stations(path, n_sr=n_sr, n_vr=n_vr, spacing=spacing,
                          one_sided=one_sided)
     lo, hi = min(s.s_arc for s in st), max(s.s_arc for s in st)
+    bare = Scene(path=path, stations=tuple(st), extent=(lo, hi),
+                 elastic_zones=((lo, lo + elastic), (hi - elastic, hi)),
+                 spacing=spacing)
+    hi += material_margin(bare)
     return Scene(path=path, stations=tuple(st), extent=(lo, hi),
                  elastic_zones=((lo, lo + elastic), (hi - elastic, hi)),
                  spacing=spacing)
@@ -76,7 +89,10 @@ def test_every_contact_target_is_met_exactly(arc_case):
     for s in slots:
         assert abs(s.dn - s.u_out(r.U)) < 1e-11, s.name
     assert min(abs(s.dn) for s in slots) == 0.0, 'the deck asks for nothing'
-    assert max(abs(s.dn) for s in slots) == pytest.approx(12.49145, abs=5e-5)
+    # 12.49145 under 'centreline'. The default rides the pipe centreline
+    # `r_roller + OD/2` further out, which deepens every arc target by
+    # exactly R_eff / R = 1.00592 (6 Oct 2026).
+    assert max(abs(s.dn) for s in slots) == pytest.approx(12.565397, abs=5e-5)
 
 
 def test_nothing_lifts_off_when_nothing_may(arc_case):
@@ -110,13 +126,30 @@ def test_there_is_no_unconstrained_overhang(arc_case):
     constraint and there is no such stretch left. The zone argument survives
     the change and is why `peak_strain(s_min=...)` still takes one: the
     DECK end carries a restraint artefact from where the model was cut.
+
+    Restated 6 Oct 2026, when 'bottom' became the default contact surface.
+    The arrangement is unchanged but the arithmetic is: a slot sits
+    `(R_eff - R) * theta` outboard of its station, so the terminal slot's
+    MATERIAL position is 48.284 m where the station's own ARC is 48.000.
+    The model ends at the slot, and the tension is applied at the header
+    node nearest the load station -- which is that same last node. Comparing
+    `load.s_arc` against the model end therefore compares two different
+    coordinates; what has to hold is that the tension and the terminal slot
+    land on ONE node, and that is asserted directly.
     """
     sc, p, r, _st, _ms = arc_case
     last = max(t.s_material for t in p.contacts)
     assert last == pytest.approx(max(sc.extent)), 'model ends on a constraint'
     assert not [s for (_i, s, _e) in r.strains if s > last + 1e-9], \
         'no element lies beyond the last contact station'
-    assert sc.load.s_arc == pytest.approx(last), 'and it bears the tension'
+
+    tip = max(p.contacts, key=lambda t: t.s_material)
+    assert tip.station == sc.load.name, 'the terminal slot IS the load station'
+    tension = [l for l in p.loads if str(getattr(l, 'source', '')).startswith(
+        'tension:')]
+    if tension:
+        assert tension[0].node in (tip.n_lo, tip.n_hi), \
+            'the tension must be borne by the terminal slot, not beyond it'
 
 
 def test_slots_constrain_the_normal_only(arc_case):
@@ -145,8 +178,17 @@ def test_the_material_point_lands_on_its_own_arc_station(arc_case):
     model DOFs (L048): 2.21 m at SR6 with every target met to 1e-13. What is
     left is real -- discrete supports 8 m apart let the pipe sag a couple of
     millimetres between them, and it is bounded by span, not by R.
+
+    THE ARC IS THE ONE THE PIPE RIDES, not the roller arc. `scene.path` has
+    radius R, measured to the roller centreline; under the default contact
+    surface the pipe CENTRELINE rides at `R + r_roller + OD/2`, so the
+    reference position is on a path of that radius. Checked against the
+    roller arc instead, the miss reads 0.0089 m at SR3 -- which is the
+    0.5 m radius difference, not a defect (6 Oct 2026).
     """
     sc, p, r, _st, ms = arc_case
+    R_eff = max(t.R_eff for t in p.contacts)
+    ridden = LayPath(R=R_eff)
     worst = 0.0
     for t in p.contacts:
         s_mat = t.s_material
@@ -155,7 +197,7 @@ def test_the_material_point_lands_on_its_own_arc_station(arc_case):
         uy = sum(w * r.U[dof(ms, i, 1)]
                  for i, w in ((t.n_lo, t.w_lo), (t.n_hi, t.w_hi)))
         x, y = -(s_mat + us), uy
-        ax, ay = sc.path.position(s_mat)
+        ax, ay = ridden.position(s_mat)
         miss = math.hypot(x - ax, y - ay)
         assert miss < 5e-3, f'{t.station}: {miss:.4f} m off its own arc point'
         worst = max(worst, miss)

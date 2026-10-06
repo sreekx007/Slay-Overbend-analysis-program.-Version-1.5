@@ -16,6 +16,7 @@ pytest.importorskip('matplotlib')
 
 import plot_stinger as ps                                    # noqa: E402
 
+from slay.scene.path import LayPath # noqa: E402
 from slay.model.assemble import build_model                  # noqa: E402
 from slay.physics.problem import build_problem               # noqa: E402
 from slay.solve.kernel import mesh_of_problem                # noqa: E402
@@ -46,15 +47,33 @@ def swept():
 
 def test_the_drawn_material_sits_under_its_own_roller(swept):
     """THE REGRESSION. Each contact station holds a material point; drawn in
-    world coordinates that point must be at the roller, not a shift away."""
+    world coordinates that point must be at the roller, not a shift away.
+
+    THE REFERENCE IS THE PIPE'S OWN ARC, not the roller centreline arc.
+    `scene.path` has radius R, measured to the roller centres; the pipe
+    CENTRELINE rides at `R + r_roller + OD/2` under the default contact
+    surface, and a point on a larger arc at the same angle is further along
+    in x -- 0.053 m at SR2 rising to 0.299 m at SR7. Compared against the
+    roller centre instead, this reads 0.319 m and looks exactly like the
+    missing-shift bug it was written to catch. It is geometry (6 Oct 2026).
+
+    The regression it guards is unaffected: a dropped shift is 0.8 m here,
+    which `test_omitting_the_shift_is_what_breaks_it` still demonstrates.
+    """
+    from slay.physics.contact import station_material
     sc, m, p, pos, ms = swept
     fx = ps.s_to_x(m, ms, pos.result.U, pos.shift)
+    slot = station_material(sc)          # shift-independent, like s_station
     worst = 0.0
     for t in p.contacts:
         if not t.station.startswith('SR'):
             continue
-        roller_x = sc.path.position(t.s_station)[0]
-        worst = max(worst, abs(fx(t.s_material) - roller_x))
+        # The STATION's own place on the arc the pipe rides. `t.s_material`
+        # is that minus the shift -- which material is there now -- so the
+        # reference has to be the slot, or the shift is counted twice and
+        # this reads as the very bug it guards.
+        here = LayPath(R=t.R_eff).position(slot[t.station])[0]
+        worst = max(worst, abs(fx(t.s_material) - here))
     assert worst < 0.15, (
         f'the drawn pipe is {worst:.3f} m from the rollers holding it; '
         f'the shift ({pos.shift:.3f} m) is missing from the world mapping')

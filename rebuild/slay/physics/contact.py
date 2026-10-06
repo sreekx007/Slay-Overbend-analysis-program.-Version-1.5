@@ -142,9 +142,17 @@ class ContactTarget:
 
 SURFACES = ('centreline', 'bottom')
 
+# RULED 6 Oct 2026: 'bottom' is the default. `R` is measured to the roller
+# CENTRELINE, the roller top is `r_roller` above that, and the pipe's bottom
+# surface rests on it -- so the pipe centreline really rides at
+# `R + r_roller + OD/2`, and that is the geometry the rig has. 'centreline'
+# remains available and remains BITWISE exact, because every number recorded
+# before this date was computed with it.
+DEFAULT_SURFACE = 'bottom'
+
 
 def effective_radius(R: float, r_roller: float, OD: float,
-                     contact_surface: str = 'centreline') -> float:
+                     contact_surface: str = DEFAULT_SURFACE) -> float:
     """Radius the pipe CENTRELINE rides at.
 
     `R` for 'centreline'; `R + r_roller + OD/2` for 'bottom', because `R` is
@@ -217,7 +225,7 @@ def header_nodes(model):
     return sorted(((i, at[i].s) for i in ids), key=lambda p: p[1])
 
 
-def station_material(scene, contact_surface: str = 'centreline',
+def station_material(scene, contact_surface: str = DEFAULT_SURFACE,
                      OD: float = None) -> dict:
     """{station name: pipe-arc position of the material under it at shift 0}.
 
@@ -242,9 +250,34 @@ def station_material(scene, contact_surface: str = 'centreline',
     return out
 
 
+# A slot exactly ON the last node is fine; this is float slack, not licence.
+_SLOT_TOL = 1e-9
+
+
+def material_margin(scene, OD: float = None,
+                    contact_surface: str = DEFAULT_SURFACE) -> float:
+    """Extra pipe the stinger end needs so every slot lands inside the mesh.
+
+    `build_scene`'s own comment says the stinger end "needs nothing, because
+    material LEAVES the model there", and under 'centreline' that is exactly
+    right -- s_material IS s_arc. Under a surface that rides the pipe further
+    out it is wrong, by the largest material correction any contact station
+    asks for. Returns 0.0 for 'centreline', so passing it always is safe.
+    """
+    OD = config.OD_PIPE_DEF if OD is None else OD
+    worst = 0.0
+    for st in scene.stations:
+        if st.role is not StationRole.CONTACT:
+            continue
+        theta = scene.path.theta(st.s_arc)
+        R_eff = effective_radius(scene.path.R, st.radius, OD, contact_surface)
+        worst = max(worst, (R_eff - scene.path.R) * theta)
+    return worst
+
+
 def contact_targets(model, scene, assembly=None, shift: float = 0.0,
                     s_centre: float = 0.0, OD: float = None,
-                    contact_surface: str = 'centreline') -> list:
+                    contact_surface: str = DEFAULT_SURFACE) -> list:
     """One `ContactTarget` per CONTACT station, in station order.
 
     `shift` is the arc distance the pipeline has advanced toward the stinger.
@@ -290,6 +323,30 @@ def contact_targets(model, scene, assembly=None, shift: float = 0.0,
         if assembly is not None:
             c = assembly.contact_at(s_centre - s_mat)
             lift, owner = c.y - OD / 2.0, c.owner
+
+        # THE SLOT MUST BE INSIDE THE MESH. `_bracket` clamps at the ends, so
+        # a material position past the last node silently returns the last
+        # node's pair and the target is applied to the WRONG STEEL -- the
+        # L048 class of error, and it converges just as happily.
+        #
+        # This cannot happen under 'centreline', where s_material == s_arc and
+        # the model is built to span exactly the stations. Under 'bottom' the
+        # correction `(R_eff - R) * theta` pushes the stinger-end slots
+        # outboard -- 0.32 m at SR7 for R = 85 -- so the mesh has to be longer
+        # than the station span by at least that much. Found 6 Oct 2026 when
+        # 'bottom' became the default: SR7 asked for 54.3197 m of a model that
+        # ended at 54.0000 m, and SR7 is the station that BEARS THE TENSION.
+        s_first, s_last = nodes_s[0][1], nodes_s[-1][1]
+        if not (s_first - _SLOT_TOL <= s_mat <= s_last + _SLOT_TOL):
+            over = max(s_mat - s_last, s_first - s_mat)
+            raise ValueError(
+                f'{st.name} contacts the pipe at s_material = {s_mat:.4f} m, '
+                f'which is {over:.4f} m outside the meshed span '
+                f'[{s_first:.4f}, {s_last:.4f}] -- the target would be '
+                f'applied to the wrong material. Under contact_surface='
+                f'{contact_surface!r} a slot sits (R_eff - R) * theta outboard '
+                f'of its station, so the scene needs that much extra margin '
+                f'at the stinger end: see `material_margin`.')
 
         i_lo, i_hi, w_lo, w_hi = _bracket(nodes_s, s_mat)
         out.append(ContactTarget(

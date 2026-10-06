@@ -66,6 +66,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from slay.model.assemble import build_model
+from slay.physics.contact import DEFAULT_SURFACE, material_margin
 from slay.physics.problem import build_problem
 from slay.scene.scene import all_bidirectional
 from slay.solve.passage import solve
@@ -149,7 +150,7 @@ def schedule(total: float, step: float, include=()) -> tuple:
 
 
 def critical_shifts(scene, L_comp: float, s_centre: float,
-                    contact_surface: str = 'centreline',
+                    contact_surface: str = DEFAULT_SURFACE,
                     OD: float = None) -> tuple:
     """Travels at which a component EDGE sits exactly on a contact station.
 
@@ -205,13 +206,29 @@ def buffer_length(L_comp: float,
 
 def scene_for(R=None, spacing=None, L_comp=0.0,
               clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER,
-              tail_clear=TAIL_CLEAR, **kw):
-    """A Scene whose vessel-side buffer is sized for this exact passage."""
+              tail_clear=TAIL_CLEAR, contact_surface=None, OD=None, **kw):
+    """A Scene whose buffers are sized for this exact passage.
+
+    BOTH ends are sized here. The vessel side carries the sweep buffer, as
+    it always has. The stinger side carries the material correction the
+    contact surface demands: a slot riding at `R + r_roller + OD/2` sits
+    `(R_eff - R) * theta` outboard of its station, and a slot past the last
+    node is applied to the wrong material (6 Oct 2026).
+
+    Measured, not derived twice: the scene is built once to find the worst
+    correction and once more with the room for it. Two cheap constructions
+    beat a closed form that has to be kept in step with `station_material`.
+    """
+    from slay.physics.contact import DEFAULT_SURFACE, material_margin, material_margin
     from slay.scene.scene import build_scene
-    return build_scene(R=R, spacing=spacing,
-                       margin_vessel=buffer_length(L_comp, clear_before,
-                                                   clear_after, tail_clear),
-                       **kw)
+    surf = DEFAULT_SURFACE if contact_surface is None else contact_surface
+    base = dict(R=R, spacing=spacing,
+                margin_vessel=buffer_length(L_comp, clear_before,
+                                            clear_after, tail_clear),
+                **kw)
+    probe = build_scene(**base)
+    return build_scene(margin_stinger=material_margin(probe, OD, surf),
+                       **base)
 
 
 def buffer_span(scene) -> tuple:
@@ -365,10 +382,41 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     # `s_centre` is a MATERIAL coordinate and does not move with the sweep.
     # The component stays where it is in the pipe; `shift` is what carries
     # the pipe past the rollers.
+    # THE STINGER MARGIN AND THE OD ARE A HARD PAIR, and getting them out of
+    # step does not fail loudly -- it brings back the M1 divergence.
+    #
+    # The margin exists to hold the terminal slot, which sits
+    # `(r_roller + OD/2) * theta` outboard of its station. Size it with a
+    # different OD than the targets use and the model ends somewhere other
+    # than on that slot. TOO LITTLE and `contact_targets` refuses outright.
+    # TOO MUCH is the dangerous one: the surplus is unconstrained pipe past
+    # the last contact, which is exactly the free cantilever D6 removed, and
+    # 160 MT on it diverges at lam=0.0000 (L050, L051). Measured: a 6 in
+    # passage given a 16 in margin -- 0.32 m allocated where 0.17 m was
+    # needed -- took the hard corner from 7/7 converged to failing at
+    # position 0, while the same case with a matched margin converges
+    # (6 Oct 2026).
+    #
+    # So this is checked here rather than trusted, because `scene_for` and
+    # `run` are called separately and nothing else pairs their arguments.
+    _surf = problem_kw.get('contact_surface', DEFAULT_SURFACE)
+    _need = material_margin(scene, problem_kw.get('OD'), _surf)
+    _have = max(scene.extent) - max(st.s_arc for st in scene.stations)
+    if abs(_have - _need) > 1e-6:
+        raise ValueError(
+            f'the scene has {_have:.4f} m of pipe past its last station but '
+            f'contact_surface={_surf!r} at this OD needs exactly '
+            f'{_need:.4f} m: too little and a slot falls off the mesh, too '
+            f'much and the surplus is unconstrained pipe past the terminal '
+            f'slot, which diverges. Build the scene with the SAME OD and '
+            f'surface, e.g. study.sweep.scene_for(..., OD=..., '
+            f'contact_surface=...).')
+
     # The schedule must cross edges where the SLOTS are, so it reads the same
     # contact surface the Problems are built with.
     crit = critical_shifts(scene, L_comp, s_centre,
-                           problem_kw.get('contact_surface', 'centreline'),
+                           problem_kw.get('contact_surface',
+                                          DEFAULT_SURFACE),
                            problem_kw.get('OD')) if include_critical else ()
     out, state = [], None
     for i, shift in enumerate(schedule(total, step, include=crit)):

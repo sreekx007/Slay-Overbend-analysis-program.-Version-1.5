@@ -47,7 +47,13 @@ def _passage(**kw):
     key = tuple(sorted(kw.items()))
     if key not in _CACHE:
         OD = kw['OD']
-        sc = sweep.scene_for(R=kw['R'], spacing=kw['spacing'], L_comp=0.0)
+        # OD goes to BOTH or neither: the stinger margin holds the terminal
+        # slot, whose offset scales with OD, and a margin sized for a
+        # different diameter leaves unconstrained pipe past the last contact
+        # (6 Oct 2026). `sweep.run` refuses the mismatch rather than
+        # diverging on it.
+        sc = sweep.scene_for(R=kw['R'], spacing=kw['spacing'], L_comp=0.0,
+                             OD=OD)
         _CACHE[key] = sweep.run(
             sc, None, L_comp=0.0, step=2.0 * OD,
             tension=kw['tension_mt'] * TON, material=material('j2'),
@@ -84,7 +90,8 @@ def test_the_hard_corner_fails_without_a_seed():
     """The defect, pinned. If this ever passes, the corner moved and the
     rest of this file is testing something that no longer happens."""
     OD = HARD['OD']
-    sc = sweep.scene_for(R=HARD['R'], spacing=HARD['spacing'], L_comp=0.0)
+    sc = sweep.scene_for(R=HARD['R'], spacing=HARD['spacing'], L_comp=0.0,
+                         OD=OD)
     out = sweep.run(sc, None, L_comp=0.0, step=2.0 * OD, seed=False,
                     tension=HARD['tension_mt'] * TON, material=material('j2'),
                     OD=OD, t_wall=HARD['t_wall'])
@@ -113,7 +120,8 @@ def test_a_case_that_converges_directly_is_untouched():
     """THE PROMISE. Seeding is a fallback, so an easy case must take the
     same path and reach the same number to the last bit."""
     OD = EASY['OD']
-    sc = sweep.scene_for(R=EASY['R'], spacing=EASY['spacing'], L_comp=0.0)
+    sc = sweep.scene_for(R=EASY['R'], spacing=EASY['spacing'], L_comp=0.0,
+                         OD=OD)
     common = dict(L_comp=0.0, step=2.0 * OD, OD=OD, t_wall=EASY['t_wall'],
                   tension=EASY['tension_mt'] * TON, material=material('j2'))
     with_seed = sweep.run(sc, None, seed=True, **common)
@@ -132,7 +140,8 @@ def test_a_case_that_converges_directly_is_untouched():
 
 def test_seed_state_returns_a_usable_state():
     OD = HARD['OD']
-    sc = sweep.scene_for(R=HARD['R'], spacing=HARD['spacing'], L_comp=0.0)
+    sc = sweep.scene_for(R=HARD['R'], spacing=HARD['spacing'], L_comp=0.0,
+                         OD=OD)
     s_centre = sweep.start_centre(sc, 0.0)
     m = build_model(sc, None, s_centre=s_centre,
                     extra_stations=sweep._required_stations(sc))

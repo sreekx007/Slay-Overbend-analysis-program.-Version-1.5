@@ -1,10 +1,15 @@
 """L4 -- the contact surface option, and the pairing it cannot break.
 
-WHAT THIS PINS. 'centreline' is the default and reproduces every validated
-number bit for bit; 'bottom' rides the pipe centreline at `R + r_roller +
-OD/2`; the offset enters through the RADIUS and never as a translation, so
-the deck is untouched; and the material position moves with the target,
-because nodes here are placed by arc length and the pipe does not stretch.
+WHAT THIS PINS. 'bottom' is the DEFAULT as of 6 Oct 2026 -- the pipe
+centreline rides at `R + r_roller + OD/2`, which is the geometry the rig
+actually has, since `R` is measured to the roller centreline and the pipe
+rests on the roller's top. 'centreline' remains available and remains
+BITWISE exact, because every number recorded before that date used it.
+
+Also pinned, and unchanged by the swap: the offset enters through the RADIUS
+and never as a translation, so the deck is untouched; and the material
+position moves with the target, because nodes here are placed by arc length
+and the pipe does not stretch.
 """
 
 import math
@@ -14,7 +19,9 @@ import pytest
 pytest.importorskip('numpy')
 
 from slay.model.assemble import build_model                   # noqa: E402
-from slay.physics.contact import (arc_target,                 # noqa: E402
+from slay.physics.contact import (DEFAULT_SURFACE,            # noqa: E402
+                                  arc_target,
+                                  material_margin,
                                   arc_target_by_projection,
                                   contact_targets,
                                   effective_radius)
@@ -26,9 +33,20 @@ OD = 0.4064
 R_ROLLER = 0.30
 
 
+def _scene(**kw):
+    """A scene with room for the contact correction at the stinger end.
+
+    Built twice, as `sweep.scene_for` does: a slot riding at
+    `R + r_roller + OD/2` sits outboard of its station, and a slot past the
+    last node is refused rather than silently applied to the wrong material.
+    """
+    probe = build_scene(**kw)
+    return build_scene(margin_stinger=material_margin(probe), **kw)
+
+
 @pytest.fixture(scope='module')
 def scene():
-    return build_scene(R=85.0, spacing=9.0)
+    return _scene(R=85.0, spacing=9.0)
 
 
 @pytest.fixture(scope='module')
@@ -45,9 +63,13 @@ def _sr(targets):
 def test_the_effective_radius_is_the_roller_and_pipe_radii():
     """`R` is to the roller CENTRELINE; the pipe's bottom rests on the
     roller's top, so the centreline rides `r_roller + OD/2` further out."""
-    assert effective_radius(85.0, R_ROLLER, OD) == 85.0, 'centreline default'
     assert effective_radius(85.0, R_ROLLER, OD, 'bottom') == \
         pytest.approx(85.0 + 0.30 + 0.2032)
+    assert effective_radius(85.0, R_ROLLER, OD, 'centreline') == 85.0
+    # and that is what you get WITHOUT asking, as of 6 Oct 2026
+    assert effective_radius(85.0, R_ROLLER, OD) == \
+        effective_radius(85.0, R_ROLLER, OD, 'bottom')
+    assert DEFAULT_SURFACE == 'bottom'
 
 
 def test_an_unknown_surface_is_refused():
@@ -56,17 +78,31 @@ def test_an_unknown_surface_is_refused():
         effective_radius(85.0, R_ROLLER, OD, 'botom')
 
 
-# -- the default moves nothing --------------------------------------------
+# -- the default, and the legacy mode it replaced -------------------------
 
-def test_the_default_reproduces_the_validated_targets_exactly(model, scene):
-    """Every number in docs/RESULTS.md was computed on 'centreline'. The
-    option is worthless if adopting it moves them, so the default is bitwise
-    identical -- not approximately."""
+def test_the_default_is_the_physical_surface(model, scene):
+    """RULED 6 Oct 2026. The rig has a roller of finite radius and a pipe of
+    finite diameter, so the centreline rides above the `R` arc by
+    `r_roller + OD/2` and asking for nothing must give that."""
     base = contact_targets(model, scene)
-    named = contact_targets(model, scene, contact_surface='centreline')
+    named = contact_targets(model, scene, contact_surface='bottom')
     for a, b in zip(base, named):
         assert a.dn == b.dn and a.s_material == b.s_material
-        assert a.R_eff == scene.path.R
+    assert base[0].R_eff == pytest.approx(
+        effective_radius(scene.path.R, R_ROLLER, OD, 'bottom'))
+
+
+def test_the_legacy_surface_is_still_BITWISE_exact(model, scene):
+    """Every number recorded before 6 Oct 2026 was computed on 'centreline',
+    and they stay reproducible to the bit -- not approximately. A ruling that
+    silently rewrote the back catalogue would make the whole of
+    docs/RESULTS.md unverifiable."""
+    cl = contact_targets(model, scene, contact_surface='centreline')
+    for t in cl:
+        assert t.R_eff == scene.path.R
+    # and it differs from the new default, or this test guards nothing
+    new = contact_targets(model, scene)
+    assert any(a.dn != b.dn for a, b in zip(cl, new))
 
 
 # -- it enters through the radius, never as a translation ------------------
@@ -89,9 +125,9 @@ def test_the_straight_deck_is_untouched(model, scene):
 def test_the_arc_targets_deepen_by_the_radius_ratio(model, scene):
     """`dn` is proportional to the radius at fixed angle, so every arc
     station must deepen by exactly `R_eff / R` -- one number, not seven."""
-    cl = {t.station: t for t in _sr(contact_targets(model, scene))}
-    bot = {t.station: t for t in
-           _sr(contact_targets(model, scene, contact_surface='bottom'))}
+    cl = {t.station: t for t in
+          _sr(contact_targets(model, scene, contact_surface='centreline'))}
+    bot = {t.station: t for t in _sr(contact_targets(model, scene))}
     ratio = effective_radius(85.0, R_ROLLER, OD, 'bottom') / 85.0
     on_arc = [n for n in cl if cl[n].theta > 0.0]
     assert on_arc
@@ -158,7 +194,8 @@ def test_zero_angle_gives_zero_whatever_the_radius():
 
 def test_two_problems_differing_only_in_surface_differ_only_in_contact(model, scene):
     """T4's DONE WHEN clause still holds, so a sweep may vary it freely."""
-    a = build_problem(model, scene, tension=1.0e6)
+    a = build_problem(model, scene, tension=1.0e6,
+                      contact_surface='centreline')
     b = build_problem(model, scene, tension=1.0e6, contact_surface='bottom')
     assert differs_only_in_contact(a, b)
     assert a.contacts != b.contacts, 'and it really did change something'
@@ -167,7 +204,7 @@ def test_two_problems_differing_only_in_surface_differ_only_in_contact(model, sc
 def test_the_roller_radius_is_now_read_not_merely_carried(model, scene):
     """It was written onto every target and read nowhere. Vary it and the
     effective radius must follow, or the option is not using it."""
-    wide = build_scene(R=85.0, spacing=9.0, radii={'SR3': 0.50})
+    wide = _scene(R=85.0, spacing=9.0, radii={'SR3': 0.50})
     t = [x for x in contact_targets(build_model(wide), wide,
                                     contact_surface='bottom')
          if x.station == 'SR3'][0]
@@ -190,8 +227,9 @@ def test_the_edge_crossings_follow_the_contact_surface(scene):
     from slay.study import sweep
 
     L, c = 1.0, 7.5
-    cl = sweep.critical_shifts(scene, L, c)
+    cl = sweep.critical_shifts(scene, L, c, 'centreline')
     bot = sweep.critical_shifts(scene, L, c, 'bottom')
+    assert bot == sweep.critical_shifts(scene, L, c), 'bottom is the default'
     assert cl != bot, 'the surface must move the crossings'
 
     lead = c + L / 2.0
@@ -210,7 +248,7 @@ def test_the_crossing_offset_is_the_material_correction(scene):
     L, c = 1.0, 7.5
     mat_cl = station_material(scene, 'centreline')
     mat_bot = station_material(scene, 'bottom')
-    a = sweep.critical_shifts(scene, L, c)
+    a = sweep.critical_shifts(scene, L, c, 'centreline')
     b = sweep.critical_shifts(scene, L, c, 'bottom')
     # SR2's leading-edge crossing, in each
     lead = c + L / 2.0
@@ -224,5 +262,6 @@ def test_the_crossing_offset_is_the_material_correction(scene):
 def test_a_plain_pipe_passage_has_no_crossings_under_either_surface(scene):
     """No edges, so nothing to cross, whatever radius the pipe rides."""
     from slay.study import sweep
-    assert sweep.critical_shifts(scene, 0.0, 0.0) == ()
+    assert sweep.critical_shifts(scene, 0.0, 0.0, 'centreline') == ()
     assert sweep.critical_shifts(scene, 0.0, 0.0, 'bottom') == ()
+    assert sweep.critical_shifts(scene, 0.0, 0.0) == ()

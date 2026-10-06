@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 94
+# entries: 96
 
 - id: L001
   area: kernel
@@ -2098,4 +2098,58 @@
     all-None mapping to None at the boundary, where the decision is made.
   detect: test_no_EA_flags_means_None_not_a_dict_of_Nones, test_t_ratio_reaches_the_built_component, test_three_wall_thicknesses_build_three_different_stiffnesses
   refs: [tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
+  date: 2026-10-06
+
+- id: L095
+  area: physics
+  class: defect
+  symptom: >-
+    With contact_surface='bottom' made the default, SR7's contact slot asked
+    for material at s = 54.3197 m in a model that ended at 54.0000 m.
+    `_bracket` clamps at the ends, so it returned the last node's pair and
+    the target was applied 0.32 m from the right steel. SR7 is the station
+    that BEARS THE LAY TENSION.
+  cause: >-
+    `build_scene`'s own comment says the stinger end "needs nothing, because
+    material LEAVES the model there", and under 'centreline' that is exactly
+    right -- s_material IS s_arc, and the model is built to span exactly the
+    stations. Under a surface that rides the pipe at R + r_roller + OD/2 the
+    slot sits (R_eff - R) * theta outboard of its station, so the mesh has
+    to be LONGER than the station span. Nothing enforced that, and clamping
+    is silent.
+  rule: >-
+    A constraint whose position is computed must be CHECKED against the mesh
+    it is applied to, not assumed inside it. `contact_targets` now refuses a
+    slot outside the meshed span and names the margin it needs.
+    `material_margin` sizes it, `build_scene` takes `margin_stinger`, and
+    the scene layer takes the number as an argument because it sits below
+    physics and cannot compute a contact property.
+  detect: test_the_default_is_the_physical_surface, test_there_is_no_unconstrained_overhang
+  refs: [rebuild/slay/physics/contact.py, rebuild/slay/scene/scene.py, rebuild/tests/test_contact_surface.py]
+  date: 2026-10-06
+
+- id: L096
+  area: solve
+  class: defect
+  symptom: >-
+    A 6 in passage (R = 70, 12 m, 160 MT) given a stinger margin sized for
+    16 in pipe -- 0.32 m allocated where 0.17 m was needed -- went from 7/7
+    positions converged to failing at position 0 with CUTBACK EXHAUSTED at
+    lam=0.0000. The same case with a matched margin converges.
+  cause: >-
+    The margin exists to hold the terminal slot. Size it with a different OD
+    than the targets use and the model no longer ends ON that slot. TOO
+    LITTLE is caught outright by L095's guard. TOO MUCH is the dangerous
+    one: the surplus is unconstrained pipe past the last contact, which is
+    exactly the free cantilever D6 removed, and lay tension on a free
+    cantilever is the original M1 divergence (L050, L051). It returns
+    silently, as a convergence failure that looks like a hard corner.
+  rule: >-
+    The stinger margin and the OD are a HARD PAIR, like dn and the material
+    position before them. `sweep.run` recomputes the required margin from the
+    OD and surface it is about to use and REFUSES a scene that does not
+    match, because `scene_for` and `run` are called separately and nothing
+    else pairs their arguments. Too much room is not the safe direction.
+  detect: test_the_hard_corner_converges_with_a_seed, test_the_swept_length_is_added_at_the_vessel_end_only
+  refs: [rebuild/slay/study/sweep.py, rebuild/tests/test_seed_state.py]
   date: 2026-10-06

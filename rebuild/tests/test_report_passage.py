@@ -165,10 +165,20 @@ def test_a_diverged_position_reports_a_miss_rather_than_raising(plain):
 
 def test_critical_shifts_are_the_edge_crossings(plain):
     """Where an edge sits exactly on a contact station. Both edges: a
-    section change over a roller is why the component is interesting."""
+    section change over a roller is why the component is interesting.
+
+    Against the SLOT, not the station's own arc. Under the default contact
+    surface a slot sits `(R_eff - R) * theta` outboard of its station, and
+    the crossing that matters is where the edge meets the pipe the roller
+    actually holds -- 9.0533 m at SR2, not 9.0000 (6 Oct 2026).
+    `physics.contact.station_material` owns that number for both the sweep
+    and the targets, so there is one answer and not two.
+    """
+    from slay.physics.contact import station_material
     L, c = 1.0, sweep.start_centre(plain, 1.0)
     crit = sweep.critical_shifts(plain, L, c)
-    sr2 = plain.by_name('SR2').s_arc
+    sr2 = station_material(plain)['SR2']
+    assert sr2 != plain.by_name('SR2').s_arc, 'or this guards nothing'
     assert pytest.approx(sr2 - (c + L / 2.0)) in crit, 'leading edge at SR2'
     assert pytest.approx(sr2 - (c - L / 2.0)) in crit, 'trailing edge at SR2'
     assert all(v > 0.0 for v in crit) and list(crit) == sorted(crit)

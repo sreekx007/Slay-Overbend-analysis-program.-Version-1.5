@@ -99,6 +99,7 @@ sys.path.insert(0, str(REPO))
 
 import ils_builder                                          # noqa: E402
 
+from slay.physics.contact import DEFAULT_SURFACE
 from slay.data.materials import material                    # noqa: E402
 from slay.report import junction as jr                      # noqa: E402
 from slay.report import passage as rp                       # noqa: E402
@@ -174,7 +175,7 @@ def _problem_at(scene, ils, pos, L_comp, **kw):
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
-            contact_surface='centreline', ils=None, verbose=True,
+            contact_surface=None, ils=None, verbose=True,
             emit_unenforced_conn_types=frozenset()):
     """Run one passage.
 
@@ -189,6 +190,11 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     the dataset runner varies component length and wall: those are fields of
     an ILS definition, not of a fixture name.
     """
+    # None means "whatever the library rules" -- this tool does not keep
+    # its own copy of the contact-surface ruling (6 Oct).
+    if contact_surface is None:
+        contact_surface = DEFAULT_SURFACE
+
     ils = archetype(arch_id) if ils is None else ils
     if ils is None:
         # No component, so no traverse to size the sweep from. Sweep a fixed
@@ -379,7 +385,7 @@ def main() -> int:
               tension_mt=opt('--tension', TENSION_MT_DEF, float),
               step=opt('--step', None, float),
               mode=opt('--mode', 'A'),
-              contact_surface=opt('--contact-surface', 'centreline'),
+              contact_surface=opt('--contact-surface', DEFAULT_SURFACE),
               elastic='--elastic' in a)
     csv_out = opt('--csv')
 

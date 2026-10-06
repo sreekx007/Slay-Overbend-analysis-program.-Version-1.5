@@ -42,7 +42,10 @@ from tests.test_edas_archetypes import _archetypes  # noqa: E402
 
 @pytest.fixture(scope='module')
 def scene():
-    return build_scene(R=85.0)
+    # margin_stinger: a 'bottom' slot sits outboard of its station, and a
+    # slot past the last node is refused (6 Oct 2026).
+    probe = build_scene(R=85.0)
+    return build_scene(R=85.0, margin_stinger=ct.material_margin(probe))
 
 
 @pytest.fixture(scope='module')
@@ -159,15 +162,27 @@ def test_the_closed_form_is_the_projection_it_claims_to_be(scene):
 
 
 def test_targets_match_the_closed_form_at_every_station(scene, plain):
-    """The card's VERIFY clause, at R = 85."""
+    """The card's VERIFY clause, at R = 85.
+
+    Against `R_eff`, not `R`, since 'bottom' became the default on 6 Oct
+    2026 -- the closed form is evaluated at the radius the CENTRELINE rides,
+    which is what each target carries as `R_eff`. Checked against the
+    station's own value rather than a recomputed one, so this fails if a
+    target and its radius ever stop agreeing.
+    """
     targets = ct.contact_targets(plain, scene)
     assert [c.station for c in targets] == \
         ['VR4', 'VR3', 'VR2', 'VR1', 'SR1', 'SR2', 'SR3', 'SR4', 'SR5',
          'SR6', 'SR7']
     for c in targets:
         assert c.dn == pytest.approx(
-            ct.arc_target(scene.path.R, c.theta), abs=1e-12)
+            ct.arc_target(c.R_eff, c.theta), abs=1e-12)
         assert c.lift == 0.0, 'plain pipe lifts the centreline nowhere'
+    # and the legacy surface still answers at R itself, exactly
+    for c in ct.contact_targets(plain, scene, contact_surface='centreline'):
+        assert c.R_eff == scene.path.R
+        assert c.dn == pytest.approx(
+            ct.arc_target(scene.path.R, c.theta), abs=1e-12)
 
 
 def test_the_deck_asks_for_nothing_and_the_arc_asks_downward(scene, plain):
@@ -180,7 +195,15 @@ def test_the_deck_asks_for_nothing_and_the_arc_asks_downward(scene, plain):
     arc = [targets[f'SR{i}'].dn for i in range(2, 7)]
     assert all(v < 0 for v in arc)
     assert arc == sorted(arc, reverse=True), 'monotone down the stinger'
-    assert targets['SR6'].dn == pytest.approx(-11.09002, abs=5e-5)
+    # -11.09002 under 'centreline'; the default rides the centreline
+    # `r_roller + OD/2` further out, which deepens every arc target by
+    # exactly R_eff / R = 1.00592.
+    assert targets['SR6'].dn == pytest.approx(-11.155675, abs=5e-5)
+    legacy = {c.station: c for c in
+              ct.contact_targets(plain, scene, contact_surface='centreline')}
+    assert legacy['SR6'].dn == pytest.approx(-11.09002, abs=5e-5)
+    assert targets['SR6'].dn / legacy['SR6'].dn == pytest.approx(
+        targets['SR6'].R_eff / scene.path.R, rel=1e-12)
 
 
 def test_the_target_takes_an_angle_not_an_arc_length(scene):

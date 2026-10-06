@@ -60,6 +60,25 @@ is unambiguously our defect. Rows that compare rebuild against `run_slay`
 are marked **like-for-like**; rows against a paper are not, and carry the
 reasons under each table.
 
+### A standing caveat on every number below
+
+**The default contact surface changed on 6 Oct 2026**, after the rows in
+this file were measured. Every result here was computed with
+`contact_surface='centreline'` — the pipe centreline driven onto the `R`
+arc. The default is now `'bottom'`: the centreline rides at
+`R + r_roller + OD/2`, because `R` is measured to the roller centreline and
+the pipe rests on the roller's top.
+
+On plain pipe the change is **−0.91% to +0.45%**, inside mesh noise, and it
+is *not* the uniform −0.59% that `R_eff / R = 1.00592` would suggest —
+because the peak moves outboard with the slots (0.2 m at 8 m spacing, 0.6 m
+at 9 m), so the two numbers sample the strain field in different places
+rather than scaling. Measured at all three radii and both spacings
+(`TRIAL_LOG` T039). It has **not** been re-measured on any component case.
+
+The `run_slay` comparison in §A.1 stays on `'centreline'` deliberately,
+because that is the surface the reference program runs.
+
 ### How to read a delta
 
 A paper delta is **not** an error bar. Three known offsets sit between us
