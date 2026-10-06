@@ -1597,5 +1597,22 @@
     other length reads low. That body spans nearly two full roller bays, and
     whether the overshoot is our contact engaging too readily or the
     reference's letting go is not settled here.
+
+    AND A READING FROM T043 IS WITHDRAWN AS EXACTLY BACKWARDS. The body was
+    carrying 1.0 to 3.1 pct more moment than the pipeline either side of it,
+    and that was recorded as "the first positive evidence" that our component
+    never engaged a second roller the way the reference's does. It was
+    evidence of the DEFECT that prevented it. Post-fix the separation is
+    +54.5 pct at 20 D and +141.0 pct at 40 D -- a stiffer section doing what
+    a stiffer section should in a displacement-controlled bend. The 608 mm
+    bridging figure goes with it: the leading-end lift is now 254 mm at 40 D,
+    and the component's own deflection off its chord, 292 mm, which the old
+    drawing could not show at all, is most of what that number was
+    measuring.
+
+    The lesson is not that the reading was wrong but that it was CONFIRMING.
+    It agreed with a conclusion already drawn from the deltas, and was
+    presented as independent support for it, when both came from the same
+    defect.
   lesson: L100
   refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, rebuild/slay/physics/contact.py, rebuild/tests/test_inline_body_contact.py]

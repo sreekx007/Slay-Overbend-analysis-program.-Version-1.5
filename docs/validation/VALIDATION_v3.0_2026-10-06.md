@@ -227,42 +227,39 @@ moment are unchanged — the lift is a rigid translation — and so is every
 **Drawn at the governing step**, both cases, from the profile artifacts:
 `docs/diagrams/tp_L20D_R85_maxBM.png` and `tp_L40D_R85_maxBM.png` — the step
 at which the **component body** carries its maximum moment, which is what
-TABLE XXIV reports.
+TABLE XXIV reports. *Post-L100; the governing step itself moved, from 9 to
+15 and from 43 to 49.*
 
-| | 20 D, step 9 | 40 D, step 43 |
+| | 20 D, step 15 | 40 D, step 49 |
 |---|---|---|
-| shift | 2.845 m | 16.256 m — *exactly the component's own length* |
-| body moment | 1414 kN·m | 1518 kN·m |
-| peak strain | 1.4008% | 3.1043% |
-| component spans | x −10.8 … −2.7, over SR2 | x −24.0 … −8.1, over **SR2 and SR3** |
-| lift just outboard of its catenary end | 148 mm | **608 mm** |
-| lift on the component itself | −43 … 130 mm | −77 … **583 mm** |
+| shift | 5.283 m | 18.256 m |
+| body moment | 1848 kN·m | 3253 kN·m |
+| pipeline moment at that step | 1196 kN·m | 1350 kN·m |
+| **body / pipeline** | **+54.5%** | **+141.0%** |
+| component spans | x −13.3 … −5.2 | x −26.0 … −10.1 |
+| lift outboard of its catenary end | 133 mm | 254 mm |
+| lift on the component | 31 … 122 mm | 2 … 240 mm |
+| its deflection off its own chord | −44 mm | −292 mm |
 
-**At 40 D the component's leading end is bridging.** It sits mid-span
-between SR3 and SR4 with the pipe **608 mm above the roller arc** — it has
-not reached SR4 and is cantilevering off the stiff body. The strain peak,
-3.1%, is exactly at that junction. At 20 D the same feature is 148 mm.
+**The body now takes the load into itself, and that is the whole finding.**
+Before L100 the component carried 1–3% more moment than the pipeline either
+side of it; it now carries 54% and 141% more. That is a stiffer section doing
+what a stiffer section should in a displacement-controlled bend, and it could
+not happen while the body's interior nodes were held by no contact.
 
-That is the opposite of the mechanism Paper 1 credits for the saturation:
-the long component engaging a further roller and **sharing** load. Ours
-spans SR2 and SR3 and then bridges past SR4 rather than settling onto it,
-which is the same story the 3% body-to-pipeline separation tells from the
-other side.
+**So the reading recorded here before is withdrawn, and it was exactly
+backwards.** The 1–3% separation was offered as "the first positive evidence"
+that our component never engaged a second roller the way the reference's
+does. It was evidence of the defect that prevented it. The 608 mm bridging
+figure goes with it: the leading-end lift is now 254 mm at 40 D, and the
+component's own deflection — 292 mm off its chord, which the old drawing
+could not show at all — is most of what that number was measuring.
 
-*Two cautions on reading it that way.* It is one step of one case, and
-whether the bridge persists across the passage or is particular to
-shift = L is unchecked. And 608 mm of lift-off is physically possible in
-overbend but it is large — one-sided rollers cannot pull, so once the pipe
-lifts nothing in the model restores contact. Whether the reference's model
-would have made contact there is not something these figures can settle.
+*What the figures are good for now:* the component visibly bends, rests on
+the rollers it spans, and separates from the pipeline in moment. What they
+are not: a settled account of the remaining strain shortfall, which is
+−14.2% at 40 D and −31.6% at 20 D with the moments inside 7.7%.
 
-*One thing they do settle:* the 40 D maximum moment and maximum strain fall
-at the **same** step, which argues the late rise flagged in §7 is a real
-structural event rather than purely an artefact of where the reporting zone
-is cut.
-
-**The body carries only 1–3% more than the pipeline here, and that is itself
-a finding.** On a 2.5 D component the gap is 1.0%; at 40 D it is 3.1%. If
 the component were doing what the paper's saturation describes — spanning
 two rollers and taking the extra stiffness into its own section — the body
 would be pulling away from the pipeline as it lengthens, far more than this.
