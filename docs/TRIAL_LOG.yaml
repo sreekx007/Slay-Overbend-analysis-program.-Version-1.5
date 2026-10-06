@@ -1049,7 +1049,8 @@
   outcome: measurement
   evidence: "NO consolidated table existed. Material sat in RESULTS.md 1.1    \ (rebuild vs run_slay), T5 5e (the same table again), T9_components_spec    \ 6b (run_slay vs Paper 1 on GD-TP), T9_physics_sequence (six EA cases vs    \ Paper 2), and two study tools that printed comparisons at runtime and    \ persisted nothing. The repo also called both papers \"the reference\"    \ and distinguished them nowhere.\n\nSeries 4, ILS-SH at 100 MT against    \ the published 0.70 pct:\n\n  2xOD (ruled)  X2 0.6318  -9.7 pct   X3/X2    \ 0.800\n  1xOD          X2 0.6625  -5.4 pct   X3/X2 0.770\n  0.5xOD        \    X2 0.7164  +2.3 pct   X3/X2 0.767\n\nRefinement carries X2 THROUGH    \ the published value, crossing it between 1xOD and 0.5xOD."
   verdict: >-
-    The ledger is docs/VALIDATION.md, one row per published case naming the
+    The ledger is docs/validation/VALIDATION_v1.0_2026-10-06.md,
+    one row per published case naming the
     program that produced each number. Assembling it established three
     things. The strongest result in the repo is rebuild against run_slay on
     plain pipe, within 1.7 pct at every radius. Three published series have
@@ -1075,7 +1076,7 @@
     in bending, never checked against the kernel, and a systematic offset
     candidate under EVERY row of the ledger.
   lesson: L093
-  refs: [docs/VALIDATION.md, docs/RESULTS.md, docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md]
+  refs: [docs/validation/VALIDATION_v1.0_2026-10-06.md, docs/RESULTS.md, docs/modules/T9_physics_sequence.md, docs/modules/T9_components_spec.md]
 
 - id: T037
   date: 2026-10-06
@@ -1125,7 +1126,7 @@
     check -- we sit within 9.5 pct of it everywhere -- but it is not a
     like-for-like comparison against Paper 1 and must not be read as one.
   lesson: L094
-  refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
+  refs: [docs/validation/VALIDATION_v1.0_2026-10-06.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
 
 - id: T038
   date: 2026-10-06
@@ -1196,7 +1197,7 @@
     passage. Whether those are the same mechanical state is unsettled and is
     the first thing to resolve before reading any of these deltas as physics.
   lesson: '-'
-  refs: [docs/VALIDATION.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
+  refs: [docs/validation/VALIDATION_v1.0_2026-10-06.md, tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
 
 - id: T039
   date: 2026-10-06

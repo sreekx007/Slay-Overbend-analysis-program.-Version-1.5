@@ -86,7 +86,8 @@ downstream taper.
 
 `ILS-SH` is **exactly** the R = 85 / V = 1.0 D row above — V = 0.4064 m,
 L1 = 4.064 m, L2 = 1.016 m against a published 0.70%. That comparison, and
-which of these 13 cases have been run, are in `docs/VALIDATION.md` §C.
+which of these 13 cases have been run, are in the current validation
+ledger (`docs/validation/`) §C.
 
 ## 5. Targets — Series 5, GD-TP + GD-SH (TABLE XXXIX), Phase 2
 

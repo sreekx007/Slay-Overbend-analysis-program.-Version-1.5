@@ -374,7 +374,7 @@ opposite sides of it. **The earlier claim of agreement with the band was an
 artefact of reading a 120 MT run against a 100 MT target.** The absolute X2
 column here is likewise not a Series 4 number. The comparison at the
 paper's own configuration — and the X2 trend, which brackets 0.70% under
-refinement — is in `docs/VALIDATION.md` §C.
+refinement — is in the current validation ledger (`docs/validation/`) §C.
 
 The standing rule, state R *and* tension *and* spacing beside every strain,
 was written after the same mistake in T5 §4; this is the second time it has
@@ -429,7 +429,8 @@ on the body's own edges and leave no under-structure pipe to argue over.
 ### What the EA cases say so far
 
 Measured at R = 85 m, 9 m spacing, 120 MT, against the reference's values.
-*These six rows also appear in `docs/VALIDATION.md` §E, beside every other
+*These six rows also appear in the current validation ledger
+(`docs/validation/`) §E, beside every other
 published case and with the deltas computed.*
 
 | case | X_c ours / ref | X_i ours / ref | X_e ours / ref |

@@ -156,7 +156,7 @@ sweeps.**
 | `BUILD_LESSONS.yaml` | what was **learned** — defects, findings, rulings | `test_build_lessons.py` |
 | `TRIAL_LOG.yaml` | what was **tried**, failures included | `test_trial_log.py` |
 | `RESULTS.md` | every measured result, with the program that produced it | — |
-| `VALIDATION.md` | the **consolidated comparison** against both source papers and the original toolchain, one row per published case | — |
+| `validation/VALIDATION_v<ver>_<date>.md` | the **consolidated comparison** against both source papers and the original toolchain, one row per published case. Versioned and dated, because a configuration ruling changes every number at once; `validation/README.md` names the current one and superseded files are never edited | — |
 
 Both YAML registers are schema-checked, their cross-references must resolve
 and their named tests must exist. A failed trial is never deleted.

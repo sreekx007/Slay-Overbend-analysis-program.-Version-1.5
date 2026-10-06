@@ -1,4 +1,27 @@
-# SLAY Overbend — Validation ledger
+# SLAY Overbend — Validation ledger v1.0
+
+> ## ⚠ SUPERSEDED — do not quote these numbers
+>
+> **Every rebuild result in this file was computed with
+> `contact_surface='centreline'`**, which stopped being the default on
+> 6 Oct 2026. The pipe centreline is now driven onto the
+> `R + r_roller + OD/2` arc, not the `R` arc.
+>
+> Kept unchanged, and deliberately: it is the record of what was measured,
+> and the successor is a *re-measurement* of the same cases rather than a
+> correction of them, so the two must be comparable. The difference between
+> them is the contact surface and nothing else.
+>
+> **Current version: `docs/validation/VALIDATION_v2.0_2026-10-06.md`.**
+>
+> Two sections of this file are NOT superseded and carry over unchanged,
+> because neither is a rebuild result on the new default:
+>
+> * **§A.1**, rebuild against `run_slay` — run on 'centreline' on purpose,
+>   because that is the surface the reference program runs. A like-for-like
+>   comparison has to follow the reference, not our default.
+> * **§B.1**, `run_slay` against Paper 1 — the original toolchain's own
+>   numbers, which this change does not touch.
 
 **Every published case we have a number for, in one table.**
 

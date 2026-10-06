@@ -6,7 +6,8 @@ Every number here was produced by running code in this repository on the
 date shown. Nothing is quoted from memory. Where a number is taken from the
 source paper it is labelled as such and is a TARGET, not a result.
 
-> **Comparing against the papers?** Go to **`docs/VALIDATION.md`** — the
+> **Comparing against the papers?** Go to
+> **`docs/validation/VALIDATION_v2.0_2026-10-06.md`** — the
 > consolidated ledger of every published case we have a number for, across
 > both source papers and the original toolchain, with one row per case and
 > the program that produced each. This file remains the full record of what

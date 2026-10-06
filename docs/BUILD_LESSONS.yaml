@@ -2071,7 +2071,7 @@
     comparison that still reads plausibly. Corollary: check a sensitivity
     claim at the REFINED mesh, not the ruled one, before relying on it.
   detect: test_the_header_count_matches
-  refs: [docs/VALIDATION.md, docs/modules/T9_physics_sequence.md, rebuild/tests/test_build_lessons.py]
+  refs: [docs/validation/VALIDATION_v1.0_2026-10-06.md, docs/modules/T9_physics_sequence.md, rebuild/tests/test_build_lessons.py]
   date: 2026-10-06
 
 - id: L094
