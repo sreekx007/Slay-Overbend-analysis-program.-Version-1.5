@@ -23,11 +23,28 @@ That asymmetry is the whole of L008. The earlier version enforced
 released it, let it separate, and never settled: four flips and a reported
 state that disagreed with the displacement it returned.
 
-WHAT IS NOT HERE. The co-rotating frame. `S` and `D` restrain one translation
-and not the other, so their rows belong in an axis that turns with the pipe
-slope; every rig solved so far is horizontal, where local IS global exactly.
-`Association.skewed` says which associations would notice. G9 keeps `S` and
-`D` out of `build_model`'s supported set until that lands.
+THE CO-ROTATING FRAME IS NOW HERE, in `solve.passage` -- see
+`skew_constraints` there. This paragraph described its absence and is kept
+because the reasoning still holds and says what the frame is for:
+
+    The co-rotating frame. `S` and `D` restrain one translation
+    and not the other, so their rows belong in an axis that turns with the
+    pipe slope; every rig solved so far is horizontal, where local IS global
+    exactly. `Association.skewed` says which associations would notice.
+
+Measured on the stinger the EA structures actually sweep, the lay path turns
+1.0 deg to 9.5 deg over the connectors' travel and 30 deg by the last
+roller, so a globally-aligned row leaks sin(theta) -- up to 16.5% of the
+restrained direction over that travel, and half of it further down. That is
+why `S` could not simply be let through.
+
+A SKEWED ROW IS NOT PER-COMPONENT. `constraint_rows` flattens a tie into one
+row per global component, which is right for F, W and P -- F and W tie
+everything, and P frees only rz, which no rotation of the frame changes. An
+`S` ties ONE direction and releases the perpendicular one, so it is a single
+row `n . (u_a - u_b) = 0` with `n` the local normal, and it cannot be
+expressed as a set of per-component rows at all. `skewed_rows` returns those
+separately for a caller that can apply a general linear constraint.
 """
 
 from __future__ import annotations
@@ -105,6 +122,23 @@ def constraint_rows(model, engaged=None, ties_override=None):
     """
     return constraint_rows_from(model.associations, model._part_index,
                                 engaged, ties_override)
+
+
+def skewed_rows(associations, part_index):
+    """[(node_a, node_b, ties)] for the associations needing a local frame.
+
+    Returned SEPARATELY from `constraint_rows_from`, which must not also
+    emit them -- a skewed tie is one row in a rotated axis, not a set of
+    per-component rows, so flattening it per component is exactly the error
+    the frame exists to prevent.
+    """
+    return [(part_index[a.node_a], part_index[a.node_b], a.conn_type, a.ties)
+            for a in associations if getattr(a, 'skewed', False)]
+
+
+def plain_associations(associations):
+    """The associations a per-component tie describes correctly."""
+    return [a for a in associations if not getattr(a, 'skewed', False)]
 
 
 def deadband_associations(model):

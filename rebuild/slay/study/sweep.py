@@ -311,7 +311,7 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
         clear_before=CLEAR_BEFORE, clear_after=CLEAR_AFTER,
         station=STATION, mode='A', s_centre=None,
         target_len=None, include_critical=True, seed=True, verbose=False,
-        **problem_kw) -> list:
+        emit_unenforced_conn_types=frozenset(), **problem_kw) -> list:
     """Solve the passage. Returns a list of `Position`, one per lay position.
 
     `mode='A'` carries state forward; `mode='B'` solves each position from
@@ -336,8 +336,14 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     # anchor node by coincidence; push the end back and the mesh grid no
     # longer lands on it. `extra_stations` is the documented route for a
     # point an outside layer requires a node at.
+    # `emit_unenforced_conn_types` is the mesher's NARROW opt-in: it emits a
+    # joint's geometry and its declared Association and enforces nothing,
+    # leaving the caller to enforce it in full. `solve.passage` now carries
+    # the co-rotating frame an `S` needs, so passing 'S' through here is
+    # taking that obligation on rather than evading it (G9).
     model = build_model(scene, ils, s_centre=s_centre,
                         extra_stations=_required_stations(scene),
+                        emit_unenforced_conn_types=emit_unenforced_conn_types,
                         **({} if target_len is None
                            else {'target_len': target_len}))
 

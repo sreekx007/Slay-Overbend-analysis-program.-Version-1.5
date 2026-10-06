@@ -138,13 +138,18 @@ def test_connector_stiffness_is_assembled():
         assert abs(k6).max() > 0.0
 
 
-def test_G9_a_non_F_connector_is_refused_not_approximated():
-    """The joint type selects which DOF is tied; substituting F ties all of
-    them and silently answers a different question."""
+def test_G9_an_unimplemented_connector_is_refused_not_approximated():
+    """The joint type selects which DOF is tied; substituting another ties
+    the wrong ones and silently answers a different question.
+
+    `P` and `S` were added when the co-rotating frame landed, so the example
+    here is `D` -- a deadband, which needs an ACTIVE SET as well as a frame
+    and would otherwise behave as an always-shut S.
+    """
     p, ms = _posed()
     bad = p.__class__(**{**p.__dict__,
                          'connectors': tuple(
-                             (i, a, b, 'P', ln, s)
+                             (i, a, b, 'D', ln, s)
                              for (i, a, b, _c, ln, s) in p.connectors)})
     with pytest.raises(ValueError, match='G9'):
         problem_connectors(bad, ms)

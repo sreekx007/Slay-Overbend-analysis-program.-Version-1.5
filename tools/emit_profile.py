@@ -99,6 +99,9 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L)
     s_centre = sweep.start_centre(sc, L)
     mesh_kw = {} if target_len is None else dict(target_len=target_len)
+    # An S connector is enforced by solve.passage's co-rotating frame, so
+    # the mesher's opt-in is taken on here rather than evaded (G9).
+    mesh_kw['emit_unenforced_conn_types'] = frozenset({'S'})
     positions = sweep.run(sc, ils, L_comp=L, step=step,
                           tension=tension_mt * TON, material=material('j2'),
                           **mesh_kw)

@@ -177,8 +177,10 @@ def solve(problem, state_in: SolveState = None, *,
     # the deadband active set belongs to `solve.newton`, and a D that
     # silently behaved as an F here would be the substitution G9 forbids --
     # `problem_connectors` refuses anything but F before this point.
-    tie_rows = cons.constraint_rows_from(problem.associations,
-                                         problem.part_index or {})
+    tie_rows = cons.constraint_rows_from(
+        cons.plain_associations(problem.associations),
+        problem.part_index or {})
+    skew = skew_constraints(problem, ms)
 
     slots = ctc.slots_from_targets(problem.contacts, ms)
     anchor_dofs = _anchor_dofs(problem, ms)
@@ -250,6 +252,14 @@ def solve(problem, state_in: SolveState = None, *,
                 if tie_rows:
                     pen.apply_constraints(Kl, R, U, tie_rows,
                                           lambda n, c: dof(ms, n, c))
+                # SKEWED TIES, IN A FRAME THAT TURNS WITH THE PIPE. Rebuilt
+                # from the CURRENT displacement every iteration, which is
+                # what makes it co-rotating rather than merely rotated once
+                # at the start: the slope at a connector changes as the pipe
+                # bends down onto the arc, and a frame fixed at iteration 1
+                # would be wrong by however far it then moved.
+                for _d, _c in skew_rows_now(skew, U):
+                    pen.apply_linear(Kl, R, U, _d, _c, 0.0, p_val)
                 for d in anchor_dofs:
                     Kl[d, d] += p_val
                     R[d] += p_val * (0.0 - U[d])
@@ -312,6 +322,86 @@ def solve(problem, state_in: SolveState = None, *,
 # ---------------------------------------------------------------------------
 # problem -> kernel inputs
 # ---------------------------------------------------------------------------
+
+def skew_constraints(problem, ms):
+    """What a skewed tie needs, resolved once: DOFs, and where its frame
+    comes from.
+
+    An `S` connector is a bolt in a slot: it slides along the slot and turns
+    in it, and restrains only the direction ACROSS the slot. That direction
+    is perpendicular to the pipe it is bolted to, so it turns as the pipe
+    turns -- 1.0 to 9.5 degrees over the travel of the EA structures, 30 by
+    the last roller. Enforced in global axes it would restrain a direction
+    that is not the one the slot restrains, leaking sin(theta) of the
+    released direction into the held one.
+
+    Returns [] for every model without one, which is all of them but a PS or
+    PSD layout, so this costs nothing where it does nothing.
+    """
+    rows = cons.skewed_rows(problem.associations, problem.part_index or {})
+    if not rows:
+        return []
+
+    # The frame is the PIPE's, not the connector's: a connector may have
+    # zero length (ILS-EASB's do), so its own chord cannot supply an axis.
+    s_of = {i: sv for (i, sv, _y) in problem.nodes}
+    pipe = sorted({n for (_i, a, b, o, _l) in problem.elements
+                   if o == 'pipeline' for n in (a, b)}, key=lambda i: s_of[i])
+    # Each connector's pipe-side node sits at a pipeline station; the two
+    # pipeline nodes bracketing it give the chord the tangent is read from.
+    # Keyed on the connector's EA-SIDE node, because that is what a skewed
+    # association names (`node_a` is the joint's own node, `node_b` the
+    # structure's). Taking any connector's chord instead of this one's would
+    # read a PS layout's S frame off its P -- a different station, and on an
+    # arc a different slope.
+    at_pipe = {}
+    for (_idx, n1, n2, _ct, _ln, _slot) in problem.connectors:
+        k = min(range(len(pipe)), key=lambda j: abs(s_of[pipe[j]] - s_of[n1]))
+        at_pipe[n2] = (pipe[max(0, k - 1)],
+                       pipe[min(len(pipe) - 1, k + 1)])
+
+    out = []
+    for (na, nb, ctype, ties) in rows:
+        # `ties` is (local_x, local_y, rz). An S ties local y alone; nothing
+        # else reaches here, and anything that did would need its own row
+        # shape rather than this one.
+        if tuple(ties) != (False, True, False):
+            raise ValueError(
+                f'a skewed {ctype!r} tie with pattern {tuple(ties)} has no '
+                f'row shape here. Only (False, True, False) -- restrain '
+                f'across the slot, release along it -- is implemented.')
+        if na not in at_pipe:
+            raise ValueError(
+                f'skewed {ctype!r} tie at node {na} matches no connector; '
+                f'its local frame has nothing to be read from')
+        lo, hi = at_pipe[na]
+        out.append(dict(dofs=[dof(ms, na, 0), dof(ms, na, 1),
+                              dof(ms, nb, 0), dof(ms, nb, 1)],
+                        lo=[dof(ms, lo, 0), dof(ms, lo, 1)],
+                        hi=[dof(ms, hi, 0), dof(ms, hi, 1)],
+                        base=(s_of[hi] - s_of[lo], 0.0)))
+    return out
+
+
+def skew_rows_now(skew, U):
+    """[(dofs, coeffs)] for the current displacement.
+
+    `n . (u_a - u_b) = 0`, with `n` perpendicular to the pipe chord in the
+    CURRENT configuration. The chord is the undeformed spacing plus the
+    displacement of its two ends, so the frame follows the solution.
+    """
+    out = []
+    for r in skew:
+        dx = r['base'][0] + (U[r['hi'][0]] - U[r['lo'][0]])
+        dy = r['base'][1] + (U[r['hi'][1]] - U[r['lo'][1]])
+        mag = math.hypot(dx, dy)
+        if mag < 1e-12:
+            continue                      # degenerate chord: no frame to read
+        tx, ty = dx / mag, dy / mag
+        nx, ny = -ty, tx                  # across the slot
+        out.append((r['dofs'], [nx, ny, -nx, -ny]))
+    return out
+
 
 def _anchor_dofs(problem, ms):
     from slay.solve.kernel import dof

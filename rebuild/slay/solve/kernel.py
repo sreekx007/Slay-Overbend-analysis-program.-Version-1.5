@@ -206,12 +206,19 @@ def problem_connectors(problem, ms, OD=None, t_wall=None, E=None):
     xy = {i: (sv, y) for (i, sv, y) in problem.nodes}
     out = []
     for (_idx, n1, n2, ctype, _length, slot) in problem.connectors:
-        kind = str(ctype).upper().lstrip('TYPE').strip() or str(ctype).upper()
-        if not kind.startswith('F'):
+        kind = str(ctype).upper().strip()
+        # F and W tie everything; P frees rz, which no rotation of the frame
+        # changes; S frees the translation along its slot and is enforced by
+        # `solve.passage`'s co-rotating rows. D is a deadband and needs an
+        # ACTIVE SET as well as a frame, which lives in `solve.newton` and
+        # not here -- so it is still refused rather than silently behaving
+        # as an always-shut S (G9).
+        if kind not in ('F', 'W', 'P', 'S'):
             raise ValueError(
-                f'connector at slot {slot} is type {ctype!r}; the solver '
-                f'implements F only and must refuse the rest rather than '
-                f'approximate it (G9)')
+                f'connector at slot {slot} is type {ctype!r}; this solver '
+                f'enforces F, W, P and S. A {ctype!r} must be refused rather '
+                f'than approximated -- the joint type selects which DOF is '
+                f'tied, and substituting another ties the wrong ones (G9)')
         (s1, y1), (s2, y2) = xy[n1], xy[n2]
         k6 = connector_k6(s2 - s1, y2 - y1, axis=NOMINAL_AXIS,
                           OD=OD, t_wall=t_wall, E=E)

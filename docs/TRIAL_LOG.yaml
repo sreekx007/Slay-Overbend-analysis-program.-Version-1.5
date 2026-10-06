@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 34
+# entries: 35
 
 - id: T001
   date: 2026-09-21
@@ -988,3 +988,48 @@
     the four is not.
   lesson: L089
   refs: [tools/study_f2.py, tools/study_easb_cases.py, rebuild/tests/test_regions.py]
+
+- id: T035
+  date: 2026-10-06
+  goal: >-
+    Run EA-ST and EA-SB with a PS connection -- a PIN and a ROLLER rather
+    than two fixed connectors.
+  action: >-
+    Found it blocked by a declared absence rather than a bug: an S releases
+    the translation along its slot, so its constraint belongs in an axis
+    that turns with the pipe, and no such frame existed. Measured the stakes
+    before building -- the lay path turns 1.0 to 9.5 deg over the EA
+    connectors' own travel and 30 deg by the last roller, so a global row
+    leaks sin(theta), up to 16.5 pct over that travel. Built the frame in
+    solve.passage as a single general constraint rebuilt from the current
+    displacement each iteration, let P and S through the solver, and took on
+    the mesher's opt-in for S rather than evading it.
+  case: 'ILS-EAST and ILS-EASB on PS, R=85, spacing 9 m, 120 MT, 406.4x21, step 1xOD'
+  outcome: success
+  evidence: >-
+    The joint behaves as a bolt in a slot: at the envelope the slot slides
+    10.3 mm ALONG itself and is held to -4.6e-15 m ACROSS it, with its axis
+    at 2.53 deg -- the local pipe slope, not a global axis. ILS-EAST PS runs
+    24/24 positions, ILS-EASB PS 9/10. Against the same archetypes on F2:
+
+      ILS-EAST  F2  X_c 0.607  X_i 0.062  X_e 0.483
+                PS  X_c 0.360  X_i 0.358  X_e 0.420
+      ILS-EASB  F2  X_c 1.185  X_i 0.142  X_e 2.082
+                PS  X_c 0.481  X_i 0.243  X_e 1.986
+
+    Peak strain is IDENTICAL to four decimals whether the frame co-rotates
+    or is forced to global axes, on both archetypes, even though the slot
+    reaches 8.2 deg off horizontal by the last position.
+  verdict: >-
+    PS RELIEVES THE CONNECTOR AND REMOVES THE SHIELDING, which is what a pin
+    and a roller should do. X_c falls by 41 pct on EA-ST and 59 pct on
+    EA-SB, because a statically determinate pair cannot restrain the pipe
+    the way two fixed connectors do. And X_i, an order of magnitude below
+    X_c under F2, rises to EQUAL it on EA-ST -- with the slot free to slide,
+    the frame can no longer hold the pipe it spans, so the shielding that is
+    F2's whole signature is gone. The frame itself buys correctness and not
+    a number (L092): it is required, because without it an S is an F in all
+    but name, but it moves neither archetype's peak. ILS-EASB PS truncates
+    at 9/10, so that envelope is a lower bound.
+  lesson: L091
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/constraints.py, rebuild/tests/test_skew_frame.py, docs/diagrams/east_ps.png]

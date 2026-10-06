@@ -148,10 +148,16 @@ def _problem_at(scene, ils, pos, L_comp, **kw):
     # Popped UNCONDITIONALLY: inside the ternary it short-circuits on plain
     # pipe and leaks a sweep argument into `build_problem`.
     cb = kw.pop('clear_before')
+    # Also popped unconditionally, and for the same reason: it belongs to
+    # `build_model`, not to `build_problem`, and the model here must be the
+    # SAME one the sweep meshed -- a connector the sweep emitted and this
+    # rebuild refused would renumber every element after it.
+    emit = kw.pop('emit_unenforced_conn_types', frozenset())
     c = sweep.start_centre(scene, L_comp, cb, sweep.STATION) \
         if L_comp > 0 else 0.0
     model = build_model(scene, ils, s_centre=c,
-                        extra_stations=sweep._required_stations(scene))
+                        extra_stations=sweep._required_stations(scene),
+                        emit_unenforced_conn_types=emit)
     lo, hi = sweep.buffer_span(scene)
     extra = {}
     if ils is not None:
@@ -168,7 +174,8 @@ def _problem_at(scene, ils, pos, L_comp, **kw):
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
-            contact_surface='centreline', ils=None, verbose=True):
+            contact_surface='centreline', ils=None, verbose=True,
+            emit_unenforced_conn_types=frozenset()):
     """Run one passage.
 
     Returns `(scene, L_comp, records, junction rows, problems, positions)`.
@@ -221,7 +228,9 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
 
     t0 = time.time()
     positions = sweep.run(sc, ils, L_comp=L_comp, step=step,
-                          clear_before=cb, clear_after=ca, mode=mode, **kw)
+                          clear_before=cb, clear_after=ca, mode=mode,
+                          emit_unenforced_conn_types=emit_unenforced_conn_types,
+                          **kw)
     records = rp.measure(positions, sc, L_comp=L_comp)
     junc, probs = [], []
     for pos in positions:
@@ -229,7 +238,9 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             junc.append({})
             probs.append(None)
             continue
-        pr = _problem_at(sc, ils, pos, L_comp, clear_before=cb, **kw)
+        pr = _problem_at(sc, ils, pos, L_comp, clear_before=cb,
+                         emit_unenforced_conn_types=emit_unenforced_conn_types,
+                         **kw)
         junc.append(jr.row(pos, pr, OD))
         # The Problems are returned too: the contact LIFT lives on their
         # targets, and re-posing them downstream would be a second answer to

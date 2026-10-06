@@ -1993,3 +1993,55 @@
   detect: '-'
   refs: [tools/study_f2.py]
   date: 2026-10-01
+
+- id: L091
+  area: solve
+  class: ruling
+  symptom: >-
+    A PS layout could not be run at all. The S connector was kept out of
+    build_model's supported set and refused by the passage solver, so EA-ST
+    and EA-SB were F-only.
+  cause: >-
+    Not an oversight -- a declared absence. constraints.py carried it as
+    "WHAT IS NOT HERE: the co-rotating frame", because an S restrains one
+    translation and releases the perpendicular one, so its row belongs in an
+    axis that turns with the pipe. Every rig solved before this was
+    horizontal, where local IS global exactly, and G9 kept S out until the
+    frame landed.
+  rule: >-
+    A joint that releases ONE translation needs a frame; one that ties
+    everything (F, W) or frees only rotation (P) does not. The row is a
+    single general constraint n.(u_a - u_b) = 0 along the local normal, NOT a
+    set of per-component rows -- flattening it per component is exactly the
+    error the frame exists to prevent, so skewed rows are produced
+    separately from constraint_rows. The frame is rebuilt from the current
+    displacement every Newton iteration: the undeformed pipe is straight, so
+    the slope is something the SOLUTION creates, and a frame computed once
+    from the mesh would be the identity.
+  detect: test_the_slot_slides_along_and_is_held_across, test_the_frame_follows_the_displacement, test_the_skewed_tie_is_one_row_not_three, test_a_deadband_is_still_refused
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/solve/constraints.py, rebuild/slay/solve/kernel.py, rebuild/tests/test_skew_frame.py]
+  date: 2026-10-06
+
+- id: L092
+  area: measure
+  class: finding
+  symptom: >-
+    The co-rotating frame was expected to move the answer, since the slot
+    sits up to 8.2 deg off horizontal by the last position and a global row
+    would misread sin(theta) = 14 pct of it. Peak strain is IDENTICAL to
+    four decimals with the frame and with global axes, on both archetypes.
+  cause: >-
+    The frame is necessary for the JOINT to behave as a joint -- measured,
+    the slot slides 10.3 mm along itself and is held to 5e-15 m across it --
+    but the S connector's misalignment does not propagate to the governing
+    pipe strain in these layouts. The P connector ties both translations and
+    carries the restraint that sets the peak.
+  rule: >-
+    Measure what a correctness fix BUYS, and report zero when that is the
+    answer. The frame is still required -- without it an S is an F in all
+    but name, which is what G9 forbids -- but claiming it changed the
+    numbers would have been false, and a reader deciding whether to trust
+    earlier F-only results deserves to know these two are unaffected.
+  detect: '-'
+  refs: [rebuild/slay/solve/passage.py, rebuild/tests/test_skew_frame.py]
+  date: 2026-10-06
