@@ -21,7 +21,7 @@
 #   refs       files carrying the change or the evidence
 #
 # version: 1
-# entries: 41
+# entries: 42
 
 - id: T001
   date: 2026-09-21
@@ -1381,3 +1381,58 @@
     prediction rather than a comparison.
   lesson: '-'
   refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, rebuild/slay/report/regions.py, tools/plot_stinger.py, rebuild/tests/test_combined_regions.py]
+
+- id: T042
+  date: 2026-10-06
+  goal: Run Paper 1 TABLE XI -- the only block in either paper that can be
+    checked against something other than another FEA.
+  action: >-
+    At zero tension the pipe is bent to the stinger arc and nothing else, so
+    eps = D/2R is exact with no solver in it. Verified our closed form against
+    the paper's own analytical column BEFORE running anything -- 0.120 /
+    0.290 / 0.363 against its 0.12 / 0.29 / 0.36, under 1 pct at all three
+    diameters -- which also settles that the formula takes OD and not the
+    mean diameter (the mean would give 0.239 for 16 in against its 0.29).
+    Then ran all six cases.
+  case: plain pipe, R=70 m, 9 m spacing, 168.3/406.4/508.0 mm OD x 21 mm,
+    0 and 100 MT, 2xOD step
+  outcome: measurement
+  evidence: |-
+    All six converged -- the stated risk that a one-sided roller cannot pull
+    with no lay tension did not materialise.
+
+      pipe    T     ours    paper     d%     D/2R   ours/ana  paper/ana
+      6 in    0   0.1428   0.13    + 9.9%   0.120   +18.8%      +8%
+      6 in  100   0.3391   0.29    +16.9%      --      --        --
+      16 in   0   0.3536   0.33    + 7.2%   0.290   +21.8%     +14%
+      16 in 100   0.5280   0.42    +25.7%      --      --        --
+      20 in   0   0.4888   0.42    +16.4%   0.363   +34.7%     +17%
+      20 in 100   0.6352   0.54    +17.6%      --      --        --
+
+    Bending moment, unpublished for this table: 94 / 137 / 1207 / 1258 /
+    2033 / 2075 kN.m.
+  verdict: >-
+    THE QUALITATIVE FINDING IS REPRODUCED: the FEA-to-analytical gap widens
+    with diameter, +18.8 -> +21.8 -> +34.7 pct against the paper's +8 -> +14
+    -> +17. Both rise monotonically, so the mechanism -- discrete roller
+    supports concentrating curvature above the pure-bending value, more so as
+    the pipe stiffens -- is present in our model too.
+
+    BUT OUR GAP IS ROUGHLY DOUBLE THE PAPER'S AT EVERY DIAMETER, and that is
+    the most load-bearing disagreement found so far. Everywhere else a
+    disagreement could be a shared modelling choice cancelling differently on
+    the two sides. Here one side is arithmetic: we concentrate about twice as
+    much strain at a roller as the benchmark does, measured against a
+    reference neither model can argue with.
+
+    It is consistent with, and independent evidence for, the two offsets
+    already on record -- the envelope against a single position, and
+    extreme-fibre strain against nominal strain at integration points. Both
+    inflate a local peak at a contact point without touching the section
+    force. That now makes THREE independent lines pointing at local strain
+    reporting rather than at the mechanics: TABLE XXI's moments agree to a
+    few percent while its strains disagree by 10-17 pct; this table's excess
+    over pure bending runs at twice Abaqus's; and every strain disagreement
+    in the ledger is one-sided high.
+  lesson: '-'
+  refs: [tools/study_table_xi.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]

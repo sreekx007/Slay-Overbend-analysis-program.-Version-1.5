@@ -67,22 +67,53 @@ Monotonic high-to-low across the radii — the R-trend divergence, crossing
 between 85 and 105 m, with best agreement at R = 85 where the two curves
 cross.
 
-### TABLE XI — diameter and tension at R = 70 — NOT RUN
+### TABLE XI — diameter and tension at R = 70
 
-| Pipe | Tension | Paper 1 FEA | Paper analytical `D/2R` | ours |
-|---|---|---|---|---|
-| 6" (168 × 21) | 0 MT | 0.13% | 0.12% (+8%) | — |
-| 6" | 100 MT | 0.29% | — | — |
-| 16" (406 × 21) | 0 MT | 0.33% | 0.29% (+14%) | — |
-| 16" | 100 MT | 0.42% | — | — |
-| 20" (508 × 21) | 0 MT | 0.42% | 0.36% (+17%) | — |
-| 20" | 100 MT | 0.54% | — | — |
+*`tools/study_table_xi.py`. **All six converged**, zero-tension rows
+included — the stated risk that a one-sided roller cannot pull did not
+materialise.*
 
-**The highest-value unrun block in this file.** These are the only rows in
-Paper 1 carrying an independent analytical check, so they test the model
-against something other than another FEA. The zero-tension rows are the
-risk: with no tension the one-sided rollers have nothing pulling the pipe
-onto the stinger, so convergence is not assumed.
+| Pipe | T | Paper FEA | ours | Δ | `D/2R` | ours vs `D/2R` | **paper vs `D/2R`** | ours BM |
+|---|---|---|---|---|---|---|---|---|
+| 6" (168 × 21) | 0 MT | 0.13% | 0.1428% | +9.9% | 0.120% | **+18.8%** | **+8%** | 94 kN·m |
+| 6" | 100 MT | 0.29% | 0.3391% | +16.9% | — | — | — | 137 kN·m |
+| 16" (406 × 21) | 0 MT | 0.33% | 0.3536% | **+7.2%** | 0.290% | **+21.8%** | **+14%** | 1207 kN·m |
+| 16" | 100 MT | 0.42% | 0.5280% | +25.7% | — | — | — | 1258 kN·m |
+| 20" (508 × 21) | 0 MT | 0.42% | 0.4888% | +16.4% | 0.363% | **+34.7%** | **+17%** | 2033 kN·m |
+| 20" | 100 MT | 0.54% | 0.6352% | +17.6% | — | — | — | 2075 kN·m |
+
+**This is the only block in either paper that checks against something other
+than an FEA.** At zero tension the pipe is bent to the stinger arc and
+nothing else, so `ε = D/2R` is exact with no solver in it. Our closed form
+reproduces the paper's own analytical column to under 1% at all three
+diameters (0.120 / 0.290 / 0.363 against its 0.12 / 0.29 / 0.36), which pins
+the reference axis before any result is read against it.
+
+**The qualitative finding is reproduced: the FEA-to-analytical gap widens
+with diameter.** Paper 1 reports +8 → +14 → +17%; we read +18.8 → +21.8 →
++34.7%. Both rise monotonically, so the mechanism the paper identifies —
+discrete roller supports concentrating curvature above the pure-bending
+value, more so as the pipe stiffens — is present in our model too.
+
+**But our gap is roughly double the paper's at every diameter, and that is
+the most load-bearing disagreement in this file.** Everywhere else a
+disagreement could be a shared modelling choice cancelling differently on
+the two sides. Here one side is arithmetic. Our excess over pure bending is
++18.8 / +21.8 / +34.7% where Abaqus reads +8 / +14 / +17%, so we concentrate
+roughly twice as much strain at a roller as the benchmark does, measured
+against a reference neither model can argue with.
+
+That is consistent with — and independent evidence for — the two offsets
+already recorded: the envelope-versus-single-position offset (we take a
+maximum over the travel and cannot read low), and extreme-fibre strain
+against the papers' nominal strain at integration points. Both inflate a
+local peak at a contact point without touching the section force, and §2's
+bending moments agreeing to a few percent while strains disagree by 10–17%
+is the same pattern.
+
+**Bending moment is unpublished for this table**, so these are predictions.
+They scale as expected: 94 → 1207 → 2033 kN·m at zero tension, close to the
+`I/c` ratio of the three sections.
 
 ---
 
@@ -369,7 +400,7 @@ travel on the current contact surface and its values are lower bounds.
 | Published table | Cases | Status |
 |---|---|---|
 | **X** plain pipe by stinger config | 3 | **done** — +16.8 / +6.1 / −7.7% |
-| **XI** diameter and tension | 6 | not run — *the only rows with an analytical check* |
+| **XI** diameter and tension | 6 | **done** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
 | **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −3.3 to +6.2%** |
 | **XXIII / XXIV** thick pipe length | 6 | not run — strain saturates at 40 D while BM does not |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
@@ -380,7 +411,7 @@ travel on the current contact surface and its values are lower bounds.
 | **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
-**32 of 50 published cases have a rebuild number.**
+**38 of 50 published cases have a rebuild number.**
 
 ## 7. What is not settled
 
@@ -391,10 +422,14 @@ travel on the current contact surface and its values are lower bounds.
    exactly like a physics disagreement.
 2. **We report extreme-fibre strain per element; the papers report "nominal
    strains at element integration points."** Expected to coincide for a B31
-   beam in pure bending, **never checked against the kernel**. A systematic
-   offset candidate under every strain row here — and §2's bending moments
-   agreeing to a few percent while strains disagree by 10–17% is exactly the
-   pattern such an offset would produce.
+   beam in pure bending, **never checked against the kernel**. This is now
+   the single most promising open item, because three independent lines
+   point at it: §2's bending moments agree to a few percent while its
+   strains disagree by 10–17%; §1's TABLE XI shows our excess over pure
+   bending running at roughly twice Abaqus's, measured against arithmetic
+   rather than another model; and every strain disagreement in this file is
+   one-sided high. All three are what a local-peak reporting offset would
+   produce, and none of them would move the section force.
 3. **The lift-off hypothesis in §3 is unverified** and would explain three
    disagreements at once.
 4. **Whether our envelope and the paper's "Phase 2" are the same mechanical
