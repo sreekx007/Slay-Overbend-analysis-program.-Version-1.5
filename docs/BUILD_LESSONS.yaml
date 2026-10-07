@@ -2518,6 +2518,27 @@
     node the old code picked -- so no single-position result changes, but
     EVERY SWEPT RESULT AT SHIFT > 0 DOES, and the whole validation ledger is
     stale until it is re-run.
-  detect: test_the_tension_node_moves_with_the_sweep, test_at_shift_zero_the_tension_lands_where_it_always_did, test_the_tension_lands_on_the_terminal_contact_not_past_it, test_the_passage_no_longer_dies_at_two_and_a_half_metres
-  refs: [rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/tests/test_passage_completion.py]
+  rule_detail_2: >-
+    TWO HALVES, and the second only shows in a chained sweep. Making the load
+    follow the station fixed every FRESH solve -- the convergence ladder goes
+    from a cliff at 2.3 m to the full 10.128 m sweep at R 70/85/120, tension
+    100/120/200 MT and spacing 6/9/12 m alike -- but the load was still
+    SNAPPED to the nearest node, so it jumped a whole element between
+    positions. `solve.passage` applies loads at full value from the first
+    Newton iteration and cutback scales only the contact targets, so a jump
+    of 100 MT across an element is unrampable by construction. It is now
+    interpolated across the bracketing nodes, through the same `_bracket` and
+    `header_nodes` the contact slots use, because there must be one
+    bracketing rule and not two (L048, L095).
+  rule_detail_3: >-
+    `differs_only_in_contact` had to be widened, and it is worth saying why
+    that is not a weakening. It asserted that two Problems at different
+    shifts share every load. Read as a rule about the LOAD VECTOR that is
+    what froze the tension; read as a rule about the MODEL it should always
+    have admitted the one load a STATION applies. The predicate now allows
+    the lay tension to move along the pipe, requires its RESULTANT to be
+    unchanged, and still requires every other load -- self weight, an ILS's
+    point masses -- to be identical.
+  detect: test_the_tension_node_moves_with_the_sweep, test_the_tension_slides_between_nodes_instead_of_jumping, test_at_shift_zero_the_tension_lands_where_it_always_did, test_the_tension_lands_on_the_terminal_contact_not_past_it, test_the_passage_no_longer_dies_at_two_and_a_half_metres
+  refs: [rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/slay/study/sweep.py, rebuild/tests/test_passage_completion.py]
   date: 2026-10-07

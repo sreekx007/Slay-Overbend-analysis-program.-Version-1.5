@@ -213,11 +213,24 @@ def _plain(R=70.0, spacing=9.0, L_comp=8.128):
                            vertical_at=(lo,), elastic_spans=((lo, hi),))
 
 
-def _tension_node(pr):
+def _tension_at(pr, s_of):
+    """Where the lay tension ACTS, as the material position of its centroid.
+
+    The load is interpolated across the two bracketing nodes, so there are
+    one or two of them and the single meaningful position is the weighted
+    mean -- the same quantity a contact slot's `s_material` names.
+    """
     ld = [l for l in pr.loads
-          if 'tension' in getattr(l, 'source', '')]
-    assert len(ld) == 1, 'exactly one lay-tension load'
-    return ld[0].node
+          if str(getattr(l, 'source', '')).startswith('tension:')]
+    assert 1 <= len(ld) <= 2, f'one or two lay-tension loads, got {len(ld)}'
+    tot = sum(abs(l.fx) + abs(l.fy) for l in ld)
+    return sum(s_of[l.node] * (abs(l.fx) + abs(l.fy)) for l in ld) / tot
+
+
+def _tension_resultant(pr):
+    ld = [l for l in pr.loads
+          if str(getattr(l, 'source', '')).startswith('tension:')]
+    return (sum(l.fx for l in ld), sum(l.fy for l in ld))
 
 
 def _s_of(model):
@@ -228,13 +241,39 @@ def test_the_tension_node_moves_with_the_sweep():
     """The load acts where the pipe leaves the stinger NOW."""
     sc, model, kw = _plain()
     s_of = _s_of(model)
-    seen = []
-    for sh in (0.0, 2.0, 4.0, 6.0):
-        pr = build_problem(model, sc, shift=sh, **kw)
-        seen.append(s_of[_tension_node(pr)])
-    # it walks inboard, roughly one metre of material per metre of travel
+    seen = [_tension_at(build_problem(model, sc, shift=sh, **kw), s_of)
+            for sh in (0.0, 2.0, 4.0, 6.0)]
+    # it walks inboard, one metre of material per metre of travel
     assert seen == sorted(seen, reverse=True), seen
-    assert seen[0] - seen[-1] == pytest.approx(6.0, abs=1.0), seen
+    assert seen[0] - seen[-1] == pytest.approx(6.0, abs=0.05), seen
+
+
+def test_the_tension_slides_between_nodes_instead_of_jumping():
+    """The second half of L105, and it only bites in a CHAINED sweep.
+
+    `solve.passage` applies loads at full value from the first Newton
+    iteration -- cutback scales the contact targets and cannot touch a load
+    -- so a tension that SNAPS from one node to the next moves 100 MT a
+    whole element in one unrampable step. Interpolated, the transfer is
+    continuous in `shift` and the resultant never changes.
+    """
+    sc, model, kw = _plain()
+    s_of = _s_of(model)
+    el = sorted(s_of.values())
+    el = el[1] - el[0]
+    prev = None
+    want = _tension_resultant(build_problem(model, sc, shift=0.0, **kw))
+    for k in range(25):
+        sh = k * el / 8.0
+        pr = build_problem(model, sc, shift=sh, **kw)
+        at = _tension_at(pr, s_of)
+        assert _tension_resultant(pr) == pytest.approx(want, rel=1e-12)
+        if prev is not None:
+            step = abs(at - prev)
+            assert step < 0.6 * el, (
+                f'the lay tension jumped {step:.3f} m -- more than half an '
+                f'element -- between shift {sh - el / 8:.3f} and {sh:.3f}')
+        prev = at
 
 
 def test_at_shift_zero_the_tension_lands_where_it_always_did():
@@ -243,7 +282,7 @@ def test_at_shift_zero_the_tension_lands_where_it_always_did():
     sc, model, kw = _plain()
     s_of = _s_of(model)
     pr = build_problem(model, sc, shift=0.0, **kw)
-    assert s_of[_tension_node(pr)] == pytest.approx(max(s_of.values()))
+    assert _tension_at(pr, s_of) == pytest.approx(max(s_of.values()))
 
 
 def test_the_tension_lands_on_the_terminal_contact_not_past_it():
@@ -255,8 +294,7 @@ def test_the_tension_lands_on_the_terminal_contact_not_past_it():
     for sh in (0.0, 1.0, 2.4, 4.0, 8.0, 10.128):
         pr = build_problem(model, sc, shift=sh, **kw)
         slot = max(c.s_material for c in pr.contacts)
-        node_s = s_of[_tension_node(pr)]
-        over = node_s - slot
+        over = _tension_at(pr, s_of) - slot
         assert abs(over) < 1.0, (
             f'at shift {sh} the lay tension sits {over:.3f} m outboard of '
             f'the terminal contact, on unconstrained pipe')

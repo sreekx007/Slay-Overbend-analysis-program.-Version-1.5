@@ -13,7 +13,9 @@ station position `s_m + sigma`, so a station at arc `s_arc` reads material
 from `s_arc - sigma`. That is exactly `physics.contact_targets(shift=...)`,
 and it is why nothing below L7 needs to know a sweep is happening: each
 position is an ordinary `Problem` built at its own shift, and
-`differs_only_in_contact` holds between any two of them.
+`differs_only_in_contact` holds between any two of them -- which since
+L105 admits the lay tension moving with the sweep, because the LOAD
+station is a place on the stinger and not a piece of pipe.
 
 SWEEP LENGTH IS DERIVED, NEVER GUESSED. It follows from the component's
 length and where the passage should start and finish:

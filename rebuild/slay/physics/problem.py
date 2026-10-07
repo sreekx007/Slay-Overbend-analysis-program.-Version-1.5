@@ -17,9 +17,19 @@ THREE THINGS IT MUST NOT CONTAIN, all of which leaked in the old code:
 
 THE ASSERTION THAT MAKES IT REAL is `differs_only_in_contact(a, b)`: two
 Problems built at different shifts share every node, every element, every
-section, every load and every restraint, and differ in their contact targets
-alone. T4's DONE WHEN clause is that assertion passing -- not the code
-running.
+section and every restraint, and differ in their contact targets alone --
+plus the LAY TENSION, which a station applies and which therefore has to
+travel with the sweep exactly as a contact target does. T4's DONE WHEN
+clause is that assertion passing -- not the code running.
+
+THE TENSION WAS THE EXCEPTION BEFORE IT WAS DECLARED ONE, which cost the
+whole shroud study. Reading "every load is identical" as a rule about the
+LOAD VECTOR rather than about the MODEL left the lay tension bolted to a
+fixed piece of steel while the stinger slid past it, and from the first
+position onward the model carried a free cantilever of travel-length with
+100 MT on its unsupported tip. See L105. The exception is narrow and
+checked: the tension may move along the pipe, its resultant may not change,
+and no other load may move at all.
 
 WHAT IS STILL MISSING, deliberately. The contact targets carry each roller's
 `one_sided` flag and its radius, but no penalty stiffness and no active set:
@@ -157,16 +167,43 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
     )
 
 
+def _tension_split(loads) -> tuple:
+    """(the lay-tension loads, everything else)."""
+    ten = tuple(l for l in loads
+                if str(getattr(l, 'source', '')).startswith('tension:'))
+    return ten, tuple(l for l in loads if l not in ten)
+
+
 def differs_only_in_contact(a: Problem, b: Problem) -> bool:
     """T4's DONE WHEN clause, as a function rather than a claim.
 
-    Every field except `contacts` must be identical. Mechanical on purpose:
-    "same nodes, same elements, same sections" is exactly the sort of thing
-    that stays true by inspection right up until it does not.
+    Every field except `contacts` must be identical -- and, since L105, the
+    lay tension, which is the one load a STATION applies and therefore the
+    one load that has to move with the sweep like a contact target does.
+    Mechanical on purpose: "same nodes, same elements, same sections" is
+    exactly the sort of thing that stays true by inspection right up until it
+    does not.
+
+    WHY THE EXCEPTION IS NARROW AND NOT A LOOPHOLE. The lay tension may move
+    along the pipe between two shifts; it may not change in magnitude or
+    direction, and nothing else in `loads` -- self weight, an ILS's point
+    masses -- may move at all. Both halves are checked. A rule that let the
+    whole load vector vary between positions would permit exactly the class
+    of error this predicate exists to catch; what L105 showed is that
+    FREEZING the tension was itself that class of error, applied to a load
+    that is a property of a station rather than of the steel.
     """
     for name in ('nodes', 'elements', 'sections', 'connectors',
-                 'associations', 'loads', 'restraints', 'elastic_zones',
+                 'associations', 'restraints', 'elastic_zones',
                  'elastic_spans', 'R'):
         if getattr(a, name) != getattr(b, name):
             return False
-    return True
+    ten_a, rest_a = _tension_split(a.loads)
+    ten_b, rest_b = _tension_split(b.loads)
+    if rest_a != rest_b:
+        return False
+    # The tension may slide between nodes; its RESULTANT may not change.
+    def _resultant(ten):
+        return (round(sum(l.fx for l in ten), 6),
+                round(sum(l.fy for l in ten), 6))
+    return _resultant(ten_a) == _resultant(ten_b)

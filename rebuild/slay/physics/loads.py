@@ -25,7 +25,8 @@ from dataclasses import dataclass
 
 import config
 
-from slay.physics.contact import DEFAULT_SURFACE, station_material
+from slay.physics.contact import (DEFAULT_SURFACE, _bracket,
+                                  header_nodes, station_material)
 from slay.physics.frame import to_model_frame
 from slay.scene.rollers import StationRole
 
@@ -152,12 +153,31 @@ def lay_tension(model, scene, tension: float, shift: float = 0.0,
                                                              st.s_arc)
     s_mat = s_ref - shift
     tx, ty = to_model_frame(scene.path.tangent(st.s_arc))
-    at = {n.index: n for n in model.nodes}
-    ids = {i for e in model.elements if e.owner == 'pipeline'
-           for i in (e.n1, e.n2)}
-    node = min(ids, key=lambda i: abs(at[i].s - s_mat))
-    return [NodalLoad(node=node, fx=tension * tx, fy=tension * ty,
-                      source=f'tension:{st.name}')]
+    # INTERPOLATED BETWEEN THE BRACKETING NODES, not snapped to the nearest.
+    #
+    # Snapping was the second half of L105 and it only shows in a CHAINED
+    # sweep. `solve.passage` ramps the contact targets by `lam` and applies
+    # the loads at FULL VALUE from the first Newton iteration -- "cutback
+    # cannot reduce a load", as its own docstring says. So a tension that
+    # jumps from one node to the next between positions moves 100 MT a whole
+    # element in one unrampable step, and the chained solve has no way to
+    # take it: mode B (every position from virgin state) swept the full
+    # 10.128 m while mode A still died at 2.4384 on the identical problem.
+    #
+    # Interpolating makes the transfer continuous in `shift`: the load slides
+    # across the element the way the contact slot above it does, and for the
+    # same reason. `_bracket` and `header_nodes` are imported rather than
+    # reimplemented because there must be ONE bracketing rule -- two is how
+    # L048 and L095 happened.
+    i_lo, i_hi, w_lo, w_hi = _bracket(header_nodes(model), s_mat)
+    out = []
+    for node, w in ((i_lo, w_lo), (i_hi, w_hi)):
+        if w == 0.0:
+            continue          # a slot exactly on a node gets one load, as before
+        out.append(NodalLoad(node=node, fx=tension * tx * w,
+                             fy=tension * ty * w,
+                             source=f'tension:{st.name}'))
+    return out
 
 
 def boundary_conditions(model, scene, tol: float = 1e-6,
