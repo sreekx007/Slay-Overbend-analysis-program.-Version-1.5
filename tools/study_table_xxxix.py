@@ -122,6 +122,7 @@ def main() -> int:
         print(f'{"case":20s} {"ours X2":>9s} {"paper":>7s} {"d%":>8s}  '
               f'{"overall":>9s} {"in":>4s}  {"ours X4":>9s} {"paper":>7s}  '
               f'{"BM body":>8s} {"paper":>7s} {"d%":>8s} {"swept":>6s}')
+        starred = False
         for label, L_tp, dx, p2, p4, pbm in cases:
             stem = out / f'{name.lower()}_{label.split()[0].lower()}'
             proc = emit(L_tp, dx, out, stem.name)
@@ -131,20 +132,42 @@ def main() -> int:
                 print(f'{label:20s} FAILED: {tail[-1][:60] if tail else "?"}')
                 continue
             st = d['status']
+            # L097: a region holding no elements must not print 0.0000,
+            # which reads as a measurement of zero strain. At 10 D the thick
+            # body's junction lands on our X1/X2 boundary and X2 empties.
+            def _cell(g):
+                return ('      --' if not d['el'].get(g)
+                        else f'{100 * d["peak"].get(g, 0.0):8.4f}%')
             x2 = 100 * d['peak'].get('X2', 0.0)
-            x4 = 100 * d['peak'].get('X4', 0.0)
+            has2 = bool(d['el'].get('X2'))
+            c2, c4 = _cell('X2'), _cell('X4')
             # No difference against the paper for a partial traverse (L101).
-            dd = (f'{100 * (x2 / p2 - 1):+7.1f}%' if st.complete is True
+            # WHERE OUR X2 IS EMPTY the paper's X2 value has no counterpart
+            # in our partition, and the OVERALL peak is the like-for-like
+            # number -- the same piece of pipe and the same mechanical
+            # feature, counted into a different region by a boundary that
+            # falls a few centimetres elsewhere. Compared on that, and said.
+            ref = x2 if has2 else 100 * d['top'][0]
+            dd = (f'{100 * (ref / p2 - 1):+7.1f}%' if st.complete is True
                   else '   VOID')
+            if not has2 and st.complete is True:
+                dd += '*'
+                starred = True
             body = d['bm']['body'] or d['bm']['pipe']
             dm = (f'{100 * (body / 1000.0 / pbm - 1):+7.1f}%'
                   if pbm and st.complete is True else '      --')
             f4 = f'{p4:6.2f}%' if p4 is not None else '     --'
             fbm = f'{pbm:7d}' if pbm else '     --'
-            print(f'{label:20s} {x2:8.4f}% {p2:6.3f}% {dd}  '
+            print(f'{label:20s} {c2:>9s} {p2:6.3f}% {dd:>9s}  '
                   f'{100 * d["top"][0]:8.4f}% {d["top"][1]:>4s}  '
-                  f'{x4:8.4f}% {f4}  {body / 1000:8.1f} {fbm} {dm} '
+                  f'{c4:>9s} {f4}  {body / 1000:8.1f} {fbm} {dm} '
                   f'{st.flag():>6s}', flush=True)
+        if starred:
+            print('\n  * our X2 holds NO ELEMENTS in that row, so the paper\'s '
+                  'X2 has no counterpart in our\n    partition and the '
+                  'difference is taken on the OVERALL peak instead. Same '
+                  'steel,\n    same feature; a boundary a few centimetres '
+                  'elsewhere.')
     return 0
 
 

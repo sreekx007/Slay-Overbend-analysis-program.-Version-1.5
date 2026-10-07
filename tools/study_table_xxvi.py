@@ -147,13 +147,21 @@ def main() -> int:
 
     # THE TREND IS THE RESULT, and the paper's is that there is none.
     if len(got) == len(CASES):
-        spread = (max(got) - min(got)) / max(got)
+        # PER CENT ON BOTH SIDES OF THE TEST. This compared a FRACTION
+        # against a percentage threshold -- 0.096 < 6.0 -- and printed
+        # AGREES for a spread of 9.6% against the paper's 2.6%. A verdict
+        # line that cannot be wrong in silence is the point of having one.
+        spread = 100.0 * (max(got) - min(got)) / max(got)
+        paper = 100.0 * (0.771 - 0.751) / 0.771
         print(f'\n  ours {got[0]:.3f} / {got[1]:.3f} / {got[2]:.3f}, '
-              f'spread {100 * spread:.1f}%')
-        print(f'  paper 0.771 / 0.760 / 0.751, spread 2.6% -- the paper calls '
-              f'the spacing NEGLIGIBLE')
-        print('  AGREES: no spacing dependence.' if spread < 6.0 else
-              '  DISAGREES: we find a spacing dependence the paper does not.')
+              f'spread {spread:.1f}%')
+        print(f'  paper 0.771 / 0.760 / 0.751, spread {paper:.1f}% -- the '
+              f'paper calls the spacing NEGLIGIBLE')
+        print(f'  both FALL with spacing, so the SIGN agrees; ours is '
+              f'{spread / paper:.1f}x the published spread.')
+        print('  AGREES: the spacing is negligible here too.'
+              if spread < 2.0 * paper else
+              '  DISAGREES ON MAGNITUDE: the spacing is not negligible here.')
     return 0
 
 
