@@ -25,6 +25,7 @@ from dataclasses import dataclass
 
 import config
 
+from slay.physics.contact import DEFAULT_SURFACE, station_material
 from slay.physics.frame import to_model_frame
 from slay.scene.rollers import StationRole
 
@@ -107,12 +108,14 @@ def point_mass_loads(model, ils, s_centre: float = 0.0,
     return out
 
 
-def lay_tension(model, scene, tension: float) -> list:
+def lay_tension(model, scene, tension: float, shift: float = 0.0,
+                contact_surface: str = DEFAULT_SURFACE,
+                OD: float = None) -> list:
     """Tension at the LOAD station, along that station's own tangent.
 
-    Applied at the header node nearest the station's arc position: the
-    station is the end of the model, so there is nothing to interpolate
-    between and a bracketing pair would be one-sided anyway.
+    Applied at the header node nearest THE MATERIAL UNDER THAT STATION at
+    this shift: the station is the end of the model, so there is nothing to
+    interpolate between and a bracketing pair would be one-sided anyway.
 
     THE DIRECTION IS AWAY FROM THE VESSEL, down the catenary -- the tangent
     of INCREASING s. The model is cut at the stinger tip and the suspended
@@ -122,15 +125,37 @@ def lay_tension(model, scene, tension: float) -> list:
     WORLD vector and this is a model-frame `(fx, fy)`, so it crosses
     `physics.frame`. Measured as built: 10 MT of "lay tension" put 5.27 MT of
     COMPRESSION through the deck. Converted, it puts 9.25 MT of tension.
+
+    `shift` IS NOT OPTIONAL IN THE SENSE THAT A DEFAULT SUGGESTS -- it is
+    the whole of L105. This function used to take none, and picked its node
+    by `|n.s - st.s_arc|` in MATERIAL coordinates, so the lay tension stayed
+    bolted to the same piece of steel for an entire passage while the
+    terminal contact walked inboard by the travel. From the first position
+    onward the model carried a free cantilever of length `shift` with 100 MT
+    on its unsupported tip, pointing in a fixed direction, and past about
+    2.4 m of travel that configuration has no equilibrium: every shroud and
+    long-component sweep died there with CUTBACK EXHAUSTED at lam=0.0000,
+    and the Newton correction that blew up was always the LAST NODE'S.
+
+    The suspended span leaves the pipe where the pipe leaves the stinger,
+    not where it left the stinger an hour ago. So the material point is
+    `station_material(...)[LOAD] - shift`, the same mapping `contact_targets`
+    brackets its slots with and `study.sweep.critical_shifts` reads -- there
+    is one answer to "what steel is under this station now" and all three
+    ask it the same way. At shift 0 this picks the node it always picked, so
+    no single-position result moves.
     """
     if tension == 0.0:
         return []
     st = scene.load
+    s_ref = station_material(scene, contact_surface, OD).get(st.name,
+                                                             st.s_arc)
+    s_mat = s_ref - shift
     tx, ty = to_model_frame(scene.path.tangent(st.s_arc))
     at = {n.index: n for n in model.nodes}
     ids = {i for e in model.elements if e.owner == 'pipeline'
            for i in (e.n1, e.n2)}
-    node = min(ids, key=lambda i: abs(at[i].s - st.s_arc))
+    node = min(ids, key=lambda i: abs(at[i].s - s_mat))
     return [NodalLoad(node=node, fx=tension * tx, fy=tension * ty,
                       source=f'tension:{st.name}')]
 

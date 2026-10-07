@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 104
+# entries: 105
 
 - id: L001
   area: kernel
@@ -2334,7 +2334,11 @@
     7.451, 7.459, 7.464 e6) while the correction grows 0.04 -> 0.05 -> 0.49
     -> 8.6 m.
   cause: >-
-    NOT ESTABLISHED. What it is not, each measured rather than argued:
+    FOUND, and recorded in full as L105: `lay_tension` took no `shift`, so
+    the lay tension stayed on the same material while the terminal contact
+    walked inboard, leaving a free cantilever of length `shift` with 100 MT
+    on its tip. The eliminations below stand as the record of what was ruled
+    out on the way, each measured rather than argued:
     (1) not an iteration or step-size shortage -- n_increments 20 -> 100 ->
     400, MAX_NEWTON 30 -> 200, cutback floor 1/64 -> 1/4096, pen_mult 1e3 /
     1e5 / 1e6, reg_mult 1e-9 / 1e-7 all die identically at lam=0.0000, and
@@ -2463,4 +2467,57 @@
     anywhere in the ledger changes.
   detect: test_the_two_circles_differ_by_a_VERTICAL_translation, test_a_lift_along_the_LOCAL_NORMAL_overshoots_the_roller_top, test_at_theta_zero_the_two_lifts_agree, test_the_writer_lifts_vertically_not_along_the_normal
   refs: [rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, rebuild/tests/test_contact_datum.py]
+  date: 2026-10-07
+
+- id: L105
+  area: physics
+  class: defect
+  symptom: >-
+    THE L102 CLIFF, and its cause. Every passage in every scene stopped at
+    the same TRAVEL -- plain pipe at R = 70, 9 m spacing, 100 MT converges to
+    2.3 m and diverges from 2.4 m out to the full sweep, identically in
+    scenes built for components of 2.642, 4.877, 8.128 and 21.946 m. Always
+    `CUTBACK EXHAUSTED at lam=0.0000`: the first increment could not be taken
+    at any step size, and no solver setting touched it -- n_increments 20 to
+    400, MAX_NEWTON 30 to 200, cutback floor 1/64 to 1/4096, pen_mult 1e3 to
+    1e6, reg_mult 1e-9 and 1e-7 all died the same way. Traced iteration by
+    iteration, the Newton correction that blew up was ALWAYS the last node's:
+    node 137 at s_material 54.388, the stinger end of the mesh, every time,
+    at the solvable shift as well as the unsolvable one.
+  cause: >-
+    `lay_tension` took no `shift`. It chose its node by
+    `|n.s - st.s_arc|` -- MATERIAL coordinates against a STATION arc -- so
+    the full lay tension stayed bolted to the same piece of steel for an
+    entire passage while the terminal contact slot walked inboard by the
+    travel. Measured: at shift 0 the load node and the SR7 slot are both at
+    s_material 54.388; at shift 6 the slot is at 48.388 and the load is
+    still on 54.388, six metres outboard of the last contact. From the first
+    position onward the model therefore carried a FREE CANTILEVER of length
+    `shift`, unconstrained, with 100 MT on its unsupported tip in a fixed
+    direction. Past about 2.4 m that configuration has no equilibrium, which
+    is why the failure is at lam=0.0000 and why no numerical knob reaches it.
+  rule: >-
+    A station is a place on the STINGER; the pipe slides through it. Anything
+    a station does to the pipe -- bear on it, pull on it -- acts on the
+    material under it NOW, which is `station_material(...)[name] - shift`.
+    That is the mapping `contact_targets` brackets its slots with and
+    `study.sweep.critical_shifts` reads, and there must be ONE answer to
+    "what steel is under this station", asked the same way by all three.
+    `lay_tension` was the one caller that never asked. A function that takes
+    no `shift` in a module whose every other shift-dependent quantity takes
+    one is the shape of this defect, and worth grepping for.
+  rule_detail: >-
+    The threshold moved like a load-carrying limit and not like an
+    arithmetic error, which is what made it look physical: R 70/85/120/200 m
+    gave 2.3/2.7/3.2/4.4 m, tension 50/100/150/200 MT gave 3.8/2.3/1.6/1.3 m,
+    spacing 6/9/12 m gave 3.5/2.3/2.3 m. All three are exactly how the
+    critical length of a tip-loaded cantilever should move, and reading them
+    as evidence of real physics was the wrong inference from the right
+    numbers. After the fix the same ladders converge over the whole sweep.
+    AT SHIFT 0 NOTHING MOVES -- the material under the LOAD station is the
+    node the old code picked -- so no single-position result changes, but
+    EVERY SWEPT RESULT AT SHIFT > 0 DOES, and the whole validation ledger is
+    stale until it is re-run.
+  detect: test_the_tension_node_moves_with_the_sweep, test_at_shift_zero_the_tension_lands_where_it_always_did, test_the_tension_lands_on_the_terminal_contact_not_past_it, test_the_passage_no_longer_dies_at_two_and_a_half_metres
+  refs: [rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/tests/test_passage_completion.py]
   date: 2026-10-07

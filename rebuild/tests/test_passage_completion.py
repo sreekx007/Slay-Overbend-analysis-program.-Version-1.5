@@ -182,3 +182,91 @@ def test_case_context_without_a_completion_writes_empty_not_true():
     import inspect
     sig = inspect.signature(rprof.case_context)
     assert sig.parameters['completion'].default is None
+
+
+# ---------------------------------------------------------------------------
+# L105 -- the lay tension follows the LOAD STATION, not the steel
+# ---------------------------------------------------------------------------
+#
+# `lay_tension` took no `shift` and chose its node by `|n.s - st.s_arc|` in
+# MATERIAL coordinates, so the 100 MT stayed on the same piece of pipe for a
+# whole passage while the terminal contact walked inboard by the travel. From
+# the first position onward the model carried a free cantilever of length
+# `shift` with the full lay tension on its unsupported tip, and past about
+# 2.4 m of travel it had no equilibrium -- which is the cliff L102 recorded
+# and could not explain.
+
+from slay.data.materials import material                        # noqa: E402
+from slay.model.assemble import build_model                     # noqa: E402
+from slay.physics.problem import build_problem                  # noqa: E402
+
+TON = 9806.65
+_D = 0.4064
+
+
+def _plain(R=70.0, spacing=9.0, L_comp=8.128):
+    sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L_comp)
+    model = build_model(sc, None, s_centre=sweep.start_centre(sc, L_comp),
+                        extra_stations=sweep._required_stations(sc))
+    lo, hi = sweep.buffer_span(sc)
+    return sc, model, dict(tension=100.0 * TON, material=material('j2'),
+                           vertical_at=(lo,), elastic_spans=((lo, hi),))
+
+
+def _tension_node(pr):
+    ld = [l for l in pr.loads
+          if 'tension' in getattr(l, 'source', '')]
+    assert len(ld) == 1, 'exactly one lay-tension load'
+    return ld[0].node
+
+
+def _s_of(model):
+    return {n.index: n.s for n in model.nodes}
+
+
+def test_the_tension_node_moves_with_the_sweep():
+    """The load acts where the pipe leaves the stinger NOW."""
+    sc, model, kw = _plain()
+    s_of = _s_of(model)
+    seen = []
+    for sh in (0.0, 2.0, 4.0, 6.0):
+        pr = build_problem(model, sc, shift=sh, **kw)
+        seen.append(s_of[_tension_node(pr)])
+    # it walks inboard, roughly one metre of material per metre of travel
+    assert seen == sorted(seen, reverse=True), seen
+    assert seen[0] - seen[-1] == pytest.approx(6.0, abs=1.0), seen
+
+
+def test_at_shift_zero_the_tension_lands_where_it_always_did():
+    """The fix must not move a single-position result. At shift 0 the
+    material under the LOAD station IS the node the old code picked."""
+    sc, model, kw = _plain()
+    s_of = _s_of(model)
+    pr = build_problem(model, sc, shift=0.0, **kw)
+    assert s_of[_tension_node(pr)] == pytest.approx(max(s_of.values()))
+
+
+def test_the_tension_lands_on_the_terminal_contact_not_past_it():
+    """THE DEFECT, as the geometry it was. The load must never sit outboard
+    of the last contact: pipe past the terminal slot is unconstrained, and
+    100 MT on the tip of an unconstrained cantilever is what diverged."""
+    sc, model, kw = _plain()
+    s_of = _s_of(model)
+    for sh in (0.0, 1.0, 2.4, 4.0, 8.0, 10.128):
+        pr = build_problem(model, sc, shift=sh, **kw)
+        slot = max(c.s_material for c in pr.contacts)
+        node_s = s_of[_tension_node(pr)]
+        over = node_s - slot
+        assert abs(over) < 1.0, (
+            f'at shift {sh} the lay tension sits {over:.3f} m outboard of '
+            f'the terminal contact, on unconstrained pipe')
+
+
+def test_the_passage_no_longer_dies_at_two_and_a_half_metres():
+    """The cliff itself, as a solve. Before L105 every one of these
+    diverged; the first converged travel beyond 2.4 m is the whole claim."""
+    from slay.solve.passage import solve
+    sc, model, kw = _plain()
+    for sh in (2.4, 4.0, 8.0):
+        r, _ = solve(build_problem(model, sc, shift=sh, **kw))
+        assert r.converged, f'shift {sh}: {r.status}'

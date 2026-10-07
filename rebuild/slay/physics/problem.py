@@ -128,7 +128,10 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
     loads = list(self_weight(model, sections)) if gravity else []
     if ils is not None and gravity:
         loads += point_mass_loads(model, ils, s_centre=s_centre)
-    loads += lay_tension(model, scene, tension)
+    # THE LOAD STATION IS A PLACE ON THE STINGER, not a piece of steel:
+    # the same `shift` the contact targets use (L105).
+    loads += lay_tension(model, scene, tension, shift=shift,
+                         contact_surface=contact_surface, OD=OD)
 
     return Problem(
         nodes=tuple((n.index, n.s, n.y) for n in model.nodes),
