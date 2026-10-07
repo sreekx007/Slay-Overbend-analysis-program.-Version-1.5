@@ -417,13 +417,55 @@ the six — the generalisation does not contain its own V = 1.0 D entry. Ours
 is 76.6% at the finest mesh, **−3.0%** against the case value. *Compare case
 against case, never case against the prose summarising a spread of cases.*
 
-### TABLE XXXII and XXXIII — deep-section and taper length — NOT RUN
+### TABLE XXXII and XXXIII — deep-section and taper length
 
-TABLE XXXII finds two regimes: L1 from 2.5 D to 10 D at V = 1 D changes
-strain by under 5%, then at **L1 ≥ 25 D** a dramatic reduction as the shroud
-shifts from single- to double-roller contact. TABLE XXXIII finds taper length
-worth under 4%. The L1 ≥ 25 D regime is the same mechanism as TABLE XXIV's
-length saturation and is the part worth running.
+*R = 70 m, 100 MT, 9 m spacing. S2-4 is TABLE XXXIII; the rest are XXXII.
+Strain is the X2 region peak, the quantity the paper tabulates.*
+
+| case | L1 | L2 | V | rebuild X2 | paper | Δ | peak region | BM kN·m |
+|------|-----|-----|-----|-----------|-------|-----|-----|---------|
+| S2-1 | 2.5 D | 2.0 D | 1.0 D | 0.8911% | 0.78% | **+14.2%** | X2 | 1327.1 |
+| S2-2 | 4.0 D | 5.0 D | 1.0 D | 0.7353% | 0.75% | **−2.0%** | X1 | 1317.5 |
+| S2-3 | 10.0 D | 5.0 D | 1.0 D | 0.7187% | 0.76% | **−5.4%** | X1 | 1317.6 |
+| S2-4 | 10.0 D | 1.0 D | 1.0 D | 0.9089% | 0.79% | **+15.1%** | X2 | 1345.1 |
+| S2-6 | 10.0 D | 5.0 D | 2.0 D | 0.9580% | 1.23% | **−22.1%** | X1 | 1352.6 |
+| S2-7 | 25.0 D | 2.0 D | 2.0 D | 1.0960% | 0.66% | **+66.1%** | X2 | 1342.4 |
+| S2-8 | 50.0 D | 2.0 D | 2.0 D | 0.8553% | 0.59% | **+45.0%** | X1 | 1336.1 |
+
+All seven sweep their full travel. Bending moment sits in a 2.7% band
+(1317.5 – 1352.6 kN·m) across a 20-fold change in L1, which is its own
+result: the moment is set by the stinger, not by the shroud.
+
+**The two trends.**
+
+*Control, V = 1 D, L1 2.5 → 10 D.* The paper finds this flat — 0.78 / 0.75 /
+0.76, a spread of 3.8%. The rebuild gives 0.891 / 0.735 / 0.719, a spread of
+19.4%. Not flat, and the disagreement is concentrated in S2-1, the shortest
+shroud, which is also the only one of the three whose peak sits in X2 rather
+than X1.
+
+*Dual-roller, V = 2 D, L1 10 → 25 → 50 D.* The paper finds a 52% drop as the
+shroud grows long enough to span two roller bays. The rebuild gives 0.958 /
+1.096 / 0.855 — a drop of 10.7% from 10 D to 50 D. **The direction is now
+reproduced**; the magnitude is not. Before the sweep defects below were
+fixed, the same comparison read **+160%**, i.e. the opposite sign, so this is
+the first version of this table in which the mechanism appears at all.
+
+**Read this table against what it cost to get.** Every number here is
+post-L101 and post-L105/L106, and the history is the reason to treat the two
+remaining outliers (S2-7 +66.1%, S2-1 +14.2%) as open questions rather than
+settled disagreements:
+
+| | |
+|---|---|
+| L101 | five of the seven passages had been truncating between 6.3% and 38.4% of their travel, and were tabulated against the paper anyway |
+| L105 | the lay tension stayed bolted to one piece of steel for a whole passage, leaving a free cantilever of travel-length with 100 MT on its tip |
+| L106 | nothing cut back the TRAVEL between positions, so a formed plastic hinge stopped four of six cases |
+| guard | with the travel cutback in, S2-8 converged to a 96.7% strain and reported COMPLETE; a converged position whose strain runs off the material table is now refused |
+
+S2-8 is the clearest illustration: it has read 0.8511% (truncated at 10% of
+travel), 22.4324% (complete, and nonsense), and 0.8553% (complete, guarded)
+within a day. Only the last is a result.
 
 ---
 
@@ -555,7 +597,7 @@ travel on the current contact surface and its values are lower bounds.
 | **XXIII / XXIV** thick pipe length | 6 | **done** — moment −7.7 … +12.8% across all lengths; saturation reproduced in character, strain still −32% at 20 D |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
-| **XXXII / XXXIII** shroud L1 and L2 | 7 | not run — **S2-7 and S2-8 are a second dual-roller transition**, in a case L100 never touched |
+| **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
 | **XXXIX** shroud + thick pipe length | 2 | **done** — amplification +37.6% against the paper's +36% |
 | **XLI** shroud + thick pipe location | 3 | not run — three runs, archetype already supports it |
 | **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
