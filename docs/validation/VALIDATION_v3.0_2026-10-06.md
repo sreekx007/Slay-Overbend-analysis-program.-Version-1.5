@@ -1,5 +1,39 @@
 # SLAY Overbend — Validation ledger v3.0
 
+> ## 7 Oct 2026 — four sweep defects fixed, and the whole ledger re-run
+>
+> Between them, L101, L105, L106 and the strain guard changed what a passage
+> *is*, so every number below was re-run. The four, in the order they were
+> found:
+>
+> | | |
+> |---|---|
+> | **L101** | five of seven TABLE XXXII passages had been truncating between 6.3% and 38.4% of their travel, and were compared to the paper anyway. Nothing in the artifact said so. |
+> | **L105** | `lay_tension` took no `shift`, so the lay tension stayed bolted to one piece of steel for a whole passage while the terminal contact walked inboard — a free cantilever of travel-length with 100 MT on its unsupported tip. |
+> | **L106** | nothing cut back the TRAVEL between positions. `solve` cuts back `lam`, which scales contact targets alone, so a formed plastic hinge stopped four of six shroud cases. |
+> | **guard** | with the travel cutback in, S2-8 converged to a 96.7% strain and reported COMPLETE. A converged position whose strain runs past the end of the material table is now refused. |
+>
+> **What moved, and what did not.** The blast radius is narrower than the
+> defect list suggests, and the reason is worth stating: where a passage
+> converged all the way, the frozen lay tension acted at the **stinger tip**,
+> which `report.passage.zone` already cuts out of the reporting band. The
+> reported peaks never saw it. It is the cases that **truncated** that moved.
+>
+> | table | verdict |
+> |---|---|
+> | **XI** diameter and tension | unchanged to four decimals; all six now confirmed at 100% of travel |
+> | **XXIII / XXIV** component length | unchanged to four decimals (0.8470 against 0.8471, and so on); all six at 100% |
+> | **X** stinger configuration | **moved**, +1.8% on config A — the only 120 MT table, and the highest tension in Paper 1 |
+> | **XXXII / XXXIII** shroud L1 and L2 | **moved hard** — five of seven had been truncating; the dual-roller trend changed sign |
+>
+> Two things were found by the re-run itself, not by the fixes. `slide.passage`
+> sweeps plain pipe over `4 × OD` with **no lead clearance**, while
+> `completion`'s default is `L_comp + 1 + 1`; four study tools used the
+> default, and a 20 in passage that had swept every metre reported **102%**
+> and voided all six TABLE XI rows. `completion` now takes an explicit total
+> and `slide.passage` returns the one it used. A **false VOID is as damaging
+> as a false result**, and this ledger would have carried six of them.
+
 > ## L100 — a roller could not bear on an in-line component. Now fixed.
 >
 > **6 Oct 2026.** `contact.header_nodes` chose the nodes a roller may bear
@@ -91,11 +125,19 @@ at a given mesh is shown `—`.
 
 *16 in pipeline, 120 MT. Paper's governing phase: Phase 1.*
 
+*`tools/study_table_x.py`. All three sweep 100% of their travel.*
+
 | Config | R | Paper 1 strain | ours | Δ | ours BM | Paper BM |
 |---|---|---|---|---|---|---|
-| A | 70 m | 0.46% | 0.5373% | **+16.8%** | 1254 kN·m | not published |
-| B | 85 m | 0.38% | 0.4032% | **+6.1%** | 1182 kN·m | not published |
-| C | 105 m | 0.32% | 0.2954% | **−7.7%** | 1070 kN·m | not published |
+| A | 70 m | 0.46% | 0.5468% | **+18.9%** | 1258 kN·m | not published |
+| B | 85 m | 0.38% | 0.4070% | **+7.1%** | 1185 kN·m | not published |
+| C | 105 m | 0.32% | 0.2965% | **−7.3%** | 1072 kN·m | not published |
+
+*Re-run 7 Oct. This is the only table in Paper 1 at **120 MT**, and the only
+one whose values moved: config A from 0.5373% to 0.5468%, about +1.8%. B and
+C moved under 1%. Whether that is L105 or the step size this runner uses is
+not established — the earlier numbers were produced ad hoc and the step was
+not recorded — so it is reported as a change, not attributed.*
 
 Monotonic high-to-low across the radii — the R-trend divergence, crossing
 between 85 and 105 m, with best agreement at R = 85 where the two curves
@@ -103,7 +145,7 @@ cross.
 
 ### TABLE XI — diameter and tension at R = 70
 
-*`tools/study_table_xi.py`. **All six converged**, zero-tension rows
+*`tools/study_table_xi.py`. Re-run 7 Oct: **unchanged to four decimals**, and all six now confirmed at 100% of their travel (they first came back VOID on a false completion check — see the banner). **All six converged**, zero-tension rows
 included — the stated risk that a one-sided roller cannot pull did not
 materialise.*
 
@@ -223,6 +265,19 @@ midspan / roller below midspan"), with the pipeline's own maximum beside it.*
 on the roller TOPS rather than through the axles (L099). The strain and
 moment are unchanged — the lift is a rigid translation — and so is every
 `off_arc` figure below, which was always measured relative to contact.*
+
+**Re-run 7 Oct after L105 and L106, and nothing material changed** — 0.8470
+against 0.8471, 1.4156 against 1.4161, 1.9757 against 1.9763, 0.9265 against
+0.9267, 1.2724 against 1.2728, 1.6418 against 1.6413; the 40 D moment moved
+from +12.8% to +13.0%. All six are now confirmed at 100% of their travel
+(11/11, 18/18, 29/29, 18/18, 30/30, 50/50 positions).
+
+*That is a result, not a non-event.* It is what bounds the blast radius of
+those two defects to passages that **truncated**: where one converged all
+the way, the frozen lay tension acted at the stinger tip, which
+`report.passage.zone` already cuts out of the reporting band. The saturation
+reading is unchanged too — ours +29.0% strain and +76.3% moment from 20 D to
+40 D, against the paper's +2.8% and +45.8%.
 
 **Drawn at the governing step**, both cases, from the profile artifacts:
 `docs/diagrams/tp_L20D_R85_maxBM.png` and `tp_L40D_R85_maxBM.png` — the step
@@ -591,10 +646,10 @@ travel on the current contact surface and its values are lower bounds.
 
 | Published table | Cases | Status |
 |---|---|---|
-| **X** plain pipe by stinger config | 3 | **done** — +16.8 / +6.1 / −7.7% |
-| **XI** diameter and tension | 6 | **done** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
+| **X** plain pipe by stinger config | 3 | **re-run 7 Oct** — +18.9 / +7.1 / −7.3%; moved ~1.8% on config A |
+| **XI** diameter and tension | 6 | **re-run 7 Oct, unchanged** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
 | **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −2.4 to +6.7%** (component body) |
-| **XXIII / XXIV** thick pipe length | 6 | **done** — moment −7.7 … +12.8% across all lengths; saturation reproduced in character, strain still −32% at 20 D |
+| **XXIII / XXIV** thick pipe length | 6 | **re-run 7 Oct, unchanged** — moment −7.7 … +13.0%; saturation still not reproduced, strain −31.6% at 20 D |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
 | **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
