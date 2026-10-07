@@ -84,7 +84,12 @@ def _ctx():
                 R=R, spacing=9.0, OD=OD, t_wall=T_WALL, tension_mt=120.0,
                 L_comp=S_HI - S_LO, s_centre=19.0, zone_s_max=ZONE,
                 n_positions=2, stiffness_ratio=2.0, n_junctions=2,
-                envelope_step=1, region_scheme='X1-X5/offset')
+                envelope_step=1, region_scheme='X1-X5/offset',
+                # A synthetic profile stands for a GOOD one, so it declares
+                # a complete passage. The truncated case has tests of its
+                # own in test_passage_completion.py (L101).
+                passage_complete=True, sweep_total=S_HI - S_LO + 2.0,
+                sweep_ran=S_HI - S_LO + 2.0)
 
 
 def _arc(s):

@@ -48,6 +48,7 @@ for _p in (REPO / 'rebuild', REPO, REPO / 'tools'):
 
 import slide                                               # noqa: E402
 from slay.report import passage as rp                      # noqa: E402
+from slay.study import sweep                               # noqa: E402
 
 TON = 9806.65
 
@@ -95,8 +96,17 @@ def run_case(case, R, spacing, step_OD):
         for (_i, s, m) in getattr(pos.result, 'moments', ()):
             if s + pos.shift < s_max:
                 bm = max(bm, abs(m))
+    # `n_ok == n` is NOT "the passage finished". It says no position
+    # diverged, which a schedule that ended short of the sweep length also
+    # satisfies, and it says nothing about how much travel those positions
+    # covered. `sweep.completion` measures the travel, which is the question
+    # (L101). Plain pipe has L_comp = 0, so its sweep is the two clearances
+    # and the distinction is small here -- it is kept uniform anyway, because
+    # a tool that reports completion only for some cases is a tool a reader
+    # has to check before trusting.
     return dict(case=case, peak=peak, at_s=at_s, bm=bm,
                 n_ok=n_ok, n=len(positions),
+                done=sweep.completion(positions, L_comp),
                 status=('ok' if n_ok == len(positions)
                         else f'{n_ok}/{len(positions)}'))
 
@@ -120,8 +130,10 @@ def main() -> int:
         r = run_case(c, R, spacing, step_OD)
         rows.append(r)
         eps = 100 * r['peak']
-        d = f'{100 * (eps / c["fea"] - 1):+6.1f}%' if r['n_ok'] else '    --'
-        if c['ana'] is not None and r['n_ok']:
+        # A partial traverse gets no difference against the paper (L101).
+        d = (f'{100 * (eps / c["fea"] - 1):+6.1f}%' if r['done'].complete
+             else '  VOID')
+        if c['ana'] is not None and r['done'].complete:
             ana = 100 * analytical(c['OD'], R)
             ours_gap = f'{100 * (eps / ana - 1):+8.1f}%'
             pap_gap = f'{c["gap"]:+9d}%'
@@ -131,11 +143,16 @@ def main() -> int:
         at = '    --' if r['at_s'] is None else f'{r["at_s"]:6.2f}'
         print(f'{c["label"]:7s} {c["T"]:4d}  {eps:8.4f}% {c["fea"]:6.2f}% {d}  '
               f'{anas} {ours_gap} {pap_gap}  {r["bm"] / 1000:8.1f}  '
-              f'{at}  {r["status"]}', flush=True)
+              f'{at}  {r["status"]} {100 * r["done"].fraction:5.0f}%',
+              flush=True)
 
-    done = [r for r in rows if r['n_ok']]
-    print(f'\n  {len(done)}/{len(CASES)} cases produced a number.')
-    zero = [r for r in rows if r['case']['T'] == 0 and r['n_ok']]
+    done = [r for r in rows if r['done'].complete]
+    print(f'\n  {len(done)}/{len(CASES)} cases swept the full passage.')
+    for r in rows:
+        if not r['done'].complete:
+            print(f'    {r["case"]["label"]} {r["case"]["T"]} MT: '
+                  f'{r["done"]}')
+    zero = [r for r in rows if r['case']['T'] == 0 and r['done'].complete]
     if len(zero) == 3:
         print('  The analytical check is available on all three diameters: '
               'the FEA-to-closed-form gap is what Paper 1 claims widens with '

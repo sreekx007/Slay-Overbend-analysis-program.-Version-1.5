@@ -421,13 +421,20 @@ def write(stem, scene, positions, model_of, ils, s_centre, OD, context,
 
 def case_context(case_id, family, scene, problem, OD, t_wall, tension_mt,
                  L_comp, s_centre, zone_s_max, n_positions,
-                 envelope_step, region_scheme='') -> dict:
+                 envelope_step, region_scheme='', completion=None) -> dict:
     """The per-case columns, built once so the three tables cannot disagree.
 
     `stiffness_ratio` and `n_junctions` come off the SOLVED problem rather
     than from the case definition: a shroud is defined as a component and
     solves as bare pipe, and the number that matters is the one the model
     actually has.
+
+    `completion` is `study.sweep.completion(positions, L_comp)` and is
+    REQUIRED, not optional-by-preference: without it the file cannot say
+    whether its envelope came from a passage that happened. It is typed as a
+    keyword with a default only so the three callers can be migrated one at a
+    time; passing None writes the three status columns empty, and a reader
+    must treat empty as unknown rather than as complete.
     """
     return dict(
         profile_schema_version=ps.PROFILE_SCHEMA_VERSION,
@@ -440,4 +447,8 @@ def case_context(case_id, family, scene, problem, OD, t_wall, tension_mt,
         n_junctions=int(len(jr.junctions(problem))),
         envelope_step=int(envelope_step),
         region_scheme=str(region_scheme),
+        passage_complete=('' if completion is None
+                          else bool(completion.complete)),
+        sweep_total=('' if completion is None else float(completion.total)),
+        sweep_ran=('' if completion is None else float(completion.ran)),
     )

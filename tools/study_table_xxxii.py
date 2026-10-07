@@ -45,6 +45,9 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO / 'tools'))
+
+from profile_status import status            # noqa: E402
 D = 0.4064
 
 # TABLE XXXII, plus S2-4 from TABLE XXXIII. `dual` is the paper's second
@@ -73,7 +76,15 @@ def emit(c, R, tension, spacing, out):
 
 
 def read(stem):
-    """Per-region peak and the body moment, from the artifact."""
+    """Per-region peak and the body moment, from the artifact.
+
+    THE SECTIONS TABLE CANNOT TELL YOU WHETHER THE PASSAGE FINISHED, and the
+    filter below is why: a diverged position is the one row carrying
+    `in_band` false and `converged` false, so reading the peaks drops exactly
+    the evidence that the peaks are partial. The case context on the
+    geometry table carries it instead, and `status` is where that is read
+    (L101).
+    """
     f = Path(str(stem) + '.sections.csv')
     if not f.exists():
         return None
@@ -89,7 +100,7 @@ def read(stem):
         if g:
             pk[g] = max(pk[g], abs(float(r['strain'])))
             el[g].add(r['element'])
-    return dict(peak=pk, el=el, bm=bm)
+    return dict(peak=pk, el=el, bm=bm, status=status(stem))
 
 
 def main() -> int:
@@ -108,8 +119,8 @@ def main() -> int:
           f'R = {R:.0f} m, {tension:.0f} MT, {spacing:.0f} m spacing\n')
     print(f'{"case":6s} {"L1":>6s} {"L2":>5s} {"V":>5s}  {"ours X2":>9s} '
           f'{"paper":>7s} {"d%":>8s}  {"n(X2)":>5s} {"peak":>5s} '
-          f'{"BM kN.m":>8s}')
-    got = {}
+          f'{"BM kN.m":>8s} {"swept":>6s}')
+    got, incomplete = {}, []
     for c in CASES:
         if only and c['case'] != only:
             continue
@@ -122,15 +133,34 @@ def main() -> int:
         x2 = 100 * d['peak'].get('X2', 0.0)
         n = len(d['el'].get('X2', ()))
         top = max(d['peak'], key=d['peak'].get) if d['peak'] else '-'
-        got[c['case']] = x2
-        delta = f'{100 * (x2 / c["x2"] - 1):+7.1f}%' if n else '      --'
+        st = d['status']
+        # A PARTIAL TRAVERSE GETS NO PERCENTAGE. The number is not a worse
+        # estimate of the paper's quantity, it is a different quantity --
+        # the worst strain over the part of the passage that solved -- and
+        # printing a difference against the paper for it is what let five of
+        # these cases be read as results (L101).
+        if st.complete is True:
+            got[c['case']] = x2
+            delta = f'{100 * (x2 / c["x2"] - 1):+7.1f}%' if n else '      --'
+        else:
+            delta = '   VOID'
         print(f'{c["case"]:6s} {c["L1"]:5.1f}D {c["L2"]:4.1f}D {c["V"]:4.1f}D  '
               f'{x2:8.4f}% {c["x2"]:6.2f}% {delta}  {n:5d} {top:>5s} '
-              f'{d["bm"] / 1000:8.1f}', flush=True)
+              f'{d["bm"] / 1000:8.1f} {st.flag():>6s}', flush=True)
+        if st.complete is not True:
+            incomplete.append(st)
 
     # THE TWO TRENDS ARE THE RESULT, so they are computed and not left to a
     # reader lining up rows by eye.
     print()
+    if incomplete:
+        print(f'  {len(incomplete)} of {len(CASES)} PASSAGES DID NOT FINISH. '
+              f'Their rows above are a maximum over part of the traverse and '
+              f'carry no difference against the paper:')
+        for st in incomplete:
+            print(f'    {st}')
+        print('  The trends below are computed from the COMPLETE cases only, '
+              'and a trend missing cases is not the trend.\n')
     flat = [got.get(k) for k in ('S2-1', 'S2-2', 'S2-3')]
     if all(flat):
         spread = (max(flat) - min(flat)) / max(flat)

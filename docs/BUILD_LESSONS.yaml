@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 100
+# entries: 101
 
 - id: L001
   area: kernel
@@ -2272,7 +2272,7 @@
   date: 2026-10-06
 
 - id: L101
-  area: study
+  area: measure
   class: defect
   symptom: >-
     Five of the seven TABLE XXXII / XXXIII shroud cases never finished the
@@ -2314,6 +2314,6 @@
     drives the disagreement with the paper, and attributing the gap to it
     was wrong. The shroud had travelled 1.626 m of a required 10.128 m when
     that peak was recorded.
-  detect: pending
-  refs: [rebuild/slay/study/sweep.py, tools/study_table_xxxii.py, docs/diagrams/xxxii_S2-6_peak.png]
+  detect: test_a_passage_that_stops_at_a_diverged_position_is_not_complete, test_every_position_converging_is_not_enough, test_the_fraction_is_of_travel_not_of_positions, test_the_reader_reports_a_truncated_passage_and_refuses_comparison, test_a_file_from_before_the_columns_existed_reads_UNKNOWN_not_complete, test_the_schema_declares_the_three_status_columns
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, tools/profile_status.py, tools/study_table_xxxii.py, rebuild/tests/test_passage_completion.py]
   date: 2026-10-06

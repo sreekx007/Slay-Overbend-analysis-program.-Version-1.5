@@ -109,6 +109,69 @@ def sweep_length(L_comp: float,
     return L_comp + clear_before + clear_after
 
 
+@dataclass(frozen=True)
+class Completion:
+    """Did the passage actually finish, and if not how far did it get.
+
+    WHY THIS IS A TYPE AND NOT A BOOLEAN. `run` stops at the first
+    non-converged position, which is right -- mode A chains state and every
+    later position would start from a diverged one. But a truncated passage
+    returns a list of Positions that looks exactly like a complete one, and
+    an envelope taken over it is a maximum over PART of the traverse. It is
+    not a smaller number of the same kind; it is a different quantity, and
+    comparing it to a published table is comparing two different things.
+    L101 is what that costs: five of the seven TABLE XXXII / XXXIII shroud
+    cases were tabulated against Paper 1 having swept between 6.3% and 38.4%
+    of the travel they needed, and nothing in the artifact said so.
+
+    `fraction` is of the TRAVEL, which is the honest denominator -- a case
+    that solved nine positions of ten has not done 90% of anything if the
+    schedule's steps are uneven.
+    """
+    complete: bool
+    total: float               # m of travel the passage was sized for
+    ran: float                 # m actually reached, converged
+    n_positions: int           # positions attempted
+    n_converged: int
+    failed_at: float = None    # shift of the first position that did not
+    status: str = ''           # that position's solver status
+
+    @property
+    def fraction(self) -> float:
+        return 1.0 if self.total <= 0.0 else max(0.0, self.ran) / self.total
+
+    def __str__(self) -> str:
+        if self.complete:
+            return f'passage COMPLETE: {self.ran:.3f} m of {self.total:.3f} m'
+        return (f'passage INCOMPLETE: {self.ran:.3f} m of {self.total:.3f} m '
+                f'({100 * self.fraction:.1f}%), stopped at shift '
+                f'{self.failed_at:.4f} -- {self.status}')
+
+
+def completion(positions, L_comp: float,
+               clear_before: float = CLEAR_BEFORE,
+               clear_after: float = CLEAR_AFTER) -> Completion:
+    """Was this passage swept end to end? Pass it `run`'s own return value.
+
+    Complete means the LAST position converged AND its shift reached the
+    sweep length. Both halves are needed: a passage can stop early without
+    a diverged position if the schedule was built short, and it can hold a
+    converged final position that is not the final travel.
+    """
+    total = sweep_length(L_comp, clear_before, clear_after)
+    ok = [p for p in positions if p.converged]
+    bad = [p for p in positions if not p.converged]
+    ran = max((p.shift for p in ok), default=0.0)
+    return Completion(
+        complete=bool(ok) and not bad and abs(ran - total) <= 1e-6,
+        total=total, ran=ran,
+        n_positions=len(positions), n_converged=len(ok),
+        failed_at=(bad[0].shift if bad else None),
+        status=(bad[0].result.status if bad else
+                ('' if abs(ran - total) <= 1e-6
+                 else 'schedule ended short of the sweep length')))
+
+
 def start_centre(scene, L_comp: float,
                  clear_before: float = CLEAR_BEFORE,
                  station: str = STATION) -> float:

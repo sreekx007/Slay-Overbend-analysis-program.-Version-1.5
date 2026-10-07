@@ -145,12 +145,24 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     cid = case_id or f'{arch_id.lower()}_R{R:g}_sp{spacing:g}_T{tension_mt:g}'
     geom = rg.offset_geometry(ils, s_centre, OD)
     rpk = rg.region_peaks(positions, p0, geom, env.zone_s_max)
+    # DID THE PASSAGE HAPPEN. `sweep.run` stops at its first non-converged
+    # position, so `positions` can be a partial traverse that looks exactly
+    # like a complete one. Measured here, written into the artifact, and
+    # said out loud -- all three, because L101 got through all three gaps:
+    # the artifact did not carry it, the study tool filtered the one row
+    # that showed it, and nothing printed.
+    done = sweep.completion(positions, L)
     ctx = rprof.case_context(
         case_id=cid, family=arch_id, scene=sc, problem=p0, OD=OD,
         t_wall=t_wall, tension_mt=tension_mt, L_comp=L, s_centre=s_centre,
         zone_s_max=env.zone_s_max, n_positions=len(positions),
         envelope_step=env.index,
-        region_scheme=('X1-X5/offset' if geom else ''))
+        region_scheme=('X1-X5/offset' if geom else ''), completion=done)
+    if not done.complete:
+        print(f'*** {cid}: {done}', file=sys.stderr)
+        print(f'*** the envelope below is a maximum over '
+              f'{100 * done.fraction:.1f}% of the traverse and is NOT '
+              f'comparable with a complete passage', file=sys.stderr)
 
     out = Path(out or (REPO / 'docs' / 'profiles'))
     kw = {} if samples is None else dict(n=samples)
@@ -158,7 +170,7 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
                           OD, ctx, env.zone_s_max, **kw)
     return dict(summary=summary, case_id=cid, envelope=env, records=recs,
                 stem=str(out / cid), geom=geom, regions=rpk,
-                columns=rg.case_columns(geom, rpk))
+                columns=rg.case_columns(geom, rpk), completion=done)
 
 
 # A component's own dimensions, under the names `component_spec` gives them,

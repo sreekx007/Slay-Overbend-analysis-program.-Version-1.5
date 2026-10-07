@@ -61,7 +61,13 @@ import re
 
 from slay.report.schema import IDX, M, NM, NONE, Field
 
-PROFILE_SCHEMA_VERSION = '1.4.0'
+PROFILE_SCHEMA_VERSION = '1.5.0'
+# 1.5.0  `passage_complete`, `sweep_total` and `sweep_ran` in the case
+#        context: whether the component actually traversed the station, and
+#        how far it got if not. A truncated passage produced an artifact
+#        indistinguishable from a complete one -- same columns, same
+#        magnitudes, a plausible envelope -- and five TABLE XXXII cases were
+#        compared to Paper 1 on 6 to 38 per cent of their travel (L101).
 # 1.3.0  `owner` on the sections table: which BODY the element belongs to,
 #        as distinct from `section_owner`, which is whose SECTION it
 #        carries. An EA frame's elements carry the pipe's section but are
@@ -152,6 +158,25 @@ CONTEXT = [
     Field('envelope_step', 'int', IDX, 'count', 'derived',
           'position index of the passage envelope -- the worst position, and '
           'the one a single-figure plot should default to', per='case'),
+    # THE THREE THAT SAY WHETHER THE ANSWER IS AN ANSWER. Everything above
+    # describes a passage; these say whether the passage happened. A sweep
+    # stops at its first non-converged position, so a file can hold a
+    # perfectly well-formed envelope taken over a fraction of the traverse.
+    # Written into the context, not inferred from the rows, because the
+    # diverged position is the ONLY row carrying converged=false and the
+    # natural reading (filter to the band, take the max) drops it.
+    Field('passage_complete', 'bool', NONE, 'flag', 'status',
+          'the component traversed the station: every position converged AND '
+          'the last one reached the full sweep length. FALSE MEANS THE '
+          'ENVELOPE IS NOT COMPARABLE to a complete passage -- it is a '
+          'maximum over part of the travel, not a smaller number of the '
+          'same kind', per='case'),
+    Field('sweep_total', 'float', M, 'length', 'derived',
+          'travel the passage was sized for: L_comp + clear_before + '
+          'clear_after, from `study.sweep.sweep_length`', per='case'),
+    Field('sweep_ran', 'float', M, 'length', 'derived',
+          'travel actually reached by a converged position. Equals '
+          '`sweep_total` exactly when `passage_complete`', per='case'),
 ]
 
 POSITION = [

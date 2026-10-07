@@ -46,6 +46,7 @@ for _p in (REPO / 'rebuild', REPO, REPO / 'tools'):
 import plot_stinger as gen                                 # noqa: E402
 import slide                                               # noqa: E402
 from slay.report import passage as rp                      # noqa: E402
+from slay.study import sweep                               # noqa: E402
 
 D = 0.4064
 T_PIPE = 0.021
@@ -118,9 +119,15 @@ def run_case(c, spacing, step_OD):
             key = 'comp' if i in comp_elems else 'pipe'
             if abs(m) > bm[key]:
                 bm[key], bm_at[key] = abs(m), s + pos.shift
+    # DID THE COMPONENT ACTUALLY TRAVERSE THE STATION. `n_ok`/`n` counts
+    # positions, which is not the same question: the schedule's steps are
+    # uneven, so nine of ten positions can be a fifth of the travel. The
+    # travel is the honest measure and `sweep.completion` is the one place
+    # it is computed (L101).
     return dict(c=c, peak=peak, at_s=at_s, bm=bm['comp'], bm_pipe=bm['pipe'],
                 bm_at=bm_at['comp'], L=L_comp, n_ok=n_ok, n=len(positions),
-                n_comp=len(comp_elems))
+                n_comp=len(comp_elems),
+                done=sweep.completion(positions, L_comp))
 
 
 def main() -> int:
@@ -137,7 +144,7 @@ def main() -> int:
     print(f'{"case":5s} {"R":>4s} {"L":>6s} {"t":>5s}  '
           f'{"ours eps":>9s} {"paper":>7s} {"d%":>7s}   '
           f'{"BM body":>8s} {"paper":>7s} {"d%":>7s} {"BM pipe":>8s}  '
-          f'{"at s":>6s}  conv')
+          f'{"at s":>6s}  conv {"swept":>6s}')
     out = []
     for c in CASES:
         if only and c['case'] != only:
@@ -145,19 +152,34 @@ def main() -> int:
         r = run_case(c, spacing, step_OD)
         out.append(r)
         eps = 100 * r['peak']
-        de = f'{100 * (eps / c["eps"] - 1):+6.1f}%' if r['n_ok'] else '    --'
         bmk = r['bm'] / 1000.0
-        dm = f'{100 * (bmk / c["bm"] - 1):+6.1f}%' if r['n_ok'] else '    --'
+        done = r['done']
+        # NO DIFFERENCE AGAINST THE PAPER FOR A PARTIAL TRAVERSE. The peak
+        # over part of a passage is a different quantity from the peak over
+        # the whole of one, and a percentage between the two is meaningless
+        # rather than approximate (L101).
+        if done.complete:
+            de = f'{100 * (eps / c["eps"] - 1):+6.1f}%'
+            dm = f'{100 * (bmk / c["bm"] - 1):+6.1f}%'
+        else:
+            de = dm = '  VOID'
         at = '    --' if r['at_s'] is None else f'{r["at_s"]:6.2f}'
         print(f'{c["case"]:5s} {c["R"]:4.0f} {c["L_OD"]:5.0f}D {c["t_mm"]:4d}mm  '
               f'{eps:8.4f}% {c["eps"]:6.3f}% {de}   '
               f'{bmk:8.1f} {c["bm"]:7d} {dm} {r["bm_pipe"] / 1000:8.1f}  '
-              f'{at}  {r["n_ok"]}/{r["n"]}', flush=True)
+              f'{at}  {r["n_ok"]}/{r["n"]} '
+              f'{(100 * done.fraction):5.0f}%', flush=True)
 
     # THE SATURATION IS THE RESULT, so it is computed rather than left to a
     # reader comparing two rows by eye.
+    bad = [r for r in out if not r['done'].complete]
+    if bad:
+        print(f'\n  {len(bad)} PASSAGE(S) DID NOT FINISH; those rows carry no '
+              f'difference against the paper and are excluded below:')
+        for r in bad:
+            print(f'    {r["c"]["case"]}: {r["done"]}')
     at85 = {r['c']['L_OD']: r for r in out
-            if r['c']['R'] == 85.0 and r['n_ok']}
+            if r['c']['R'] == 85.0 and r['done'].complete}
     if {20.0, 40.0} <= set(at85):
         a, b = at85[20.0], at85[40.0]
         de = 100 * (b['peak'] / a['peak'] - 1)
