@@ -69,8 +69,28 @@ def _ea_ils(arch_id, P_c1, kT, L_top, system=None, extra=None):
         c['L_top'] = L_top
     # EA-SB's own dimensions, under the names `component_spec` gives them --
     # the same names the reference's tables use (P_l1, P_l2, P_v, kB_ratio).
+    #
+    # A DOTTED KEY ADDRESSES A COMPONENT BY ITS `id`, which is what an
+    # archetype carrying more than one body needs. ILS-SHTP holds a GD-SH and
+    # a GD-TP, and TABLE XXXIX varies the thick pipe's length while TABLE XLI
+    # moves its centre along the shroud -- neither is reachable by editing
+    # `components[0]`, and silently editing the wrong body would produce a
+    # plausible number for a geometry nobody asked for. `L_comp` alone still
+    # means components[0], so every existing caller is untouched.
+    by_id = {d.get('id'): d for d in spec['components']}
     for k, v in (extra or {}).items():
-        if v is not None:
+        if v is None:
+            continue
+        if '.' in k:
+            cid, field = k.split('.', 1)
+            if cid not in by_id:
+                raise ValueError(
+                    f'{arch_id} has no component with id {cid!r} -- it holds '
+                    f'{sorted(x for x in by_id if x)}. A dimension aimed at a '
+                    f'body that is not there would otherwise be dropped in '
+                    f'silence.')
+            by_id[cid][field] = v
+        else:
             c[k] = v
     return ils_builder.build_ils(spec)
 
@@ -185,7 +205,9 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
 # V / L1 / L2 were missing until 6 Oct, which is why Paper 1's Series 4 V
 # sweep could not be driven from here at all -- the one sweep the generator
 # was closest to being able to run.
-COMPONENT_DIMS = ('P_l1', 'P_l2', 'P_v', 'kB_ratio', 'V', 'L1', 'L2')
+COMPONENT_DIMS = ('P_l1', 'P_l2', 'P_v', 'kB_ratio', 'V', 'L1', 'L2',
+                  'SH.V', 'SH.L1', 'SH.L2',
+                  'TP.L_comp', 'TP.t_comp', 'TP.centre_x')
 
 EA_DIMS = COMPONENT_DIMS      # the older name, kept so callers do not break
 
@@ -200,7 +222,9 @@ def _extra(argv=None):
     argv = sys.argv if argv is None else argv
     out = {}
     for k in COMPONENT_DIMS:
-        flag = f'--{k.replace("_", "-")}'
+        # `TP.centre_x` becomes `--tp-centre-x`: the dot is a separator like
+        # the underscore, so a body-qualified dimension reads as one flag.
+        flag = '--' + k.replace('_', '-').replace('.', '-').lower()
         if flag in argv:
             out[k] = float(argv[argv.index(flag) + 1])
     return out or None
