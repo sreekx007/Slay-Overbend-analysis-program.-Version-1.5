@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 101
+# entries: 102
 
 - id: L001
   area: kernel
@@ -2317,3 +2317,66 @@
   detect: test_a_passage_that_stops_at_a_diverged_position_is_not_complete, test_every_position_converging_is_not_enough, test_the_fraction_is_of_travel_not_of_positions, test_the_reader_reports_a_truncated_passage_and_refuses_comparison, test_a_file_from_before_the_columns_existed_reads_UNKNOWN_not_complete, test_the_schema_declares_the_three_status_columns
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, tools/profile_status.py, tools/study_table_xxxii.py, rebuild/tests/test_passage_completion.py]
   date: 2026-10-06
+
+- id: L102
+  area: solve
+  class: finding
+  symptom: >-
+    Every passage in this scene family stops at the same point, and the point
+    is a TRAVEL, not a case property. Plain pipe, R = 70, 9 m spacing, 100 MT,
+    solved fresh at a ladder of shifts: converges to 2.3 m and diverges from
+    2.4 m out to the full 10.128 m sweep, in four scenes built for components
+    of 2.642, 4.877, 8.128 and 21.946 m alike. The failure is always
+    `CUTBACK EXHAUSTED at lam=0.0000` -- the FIRST increment cannot be taken
+    at any step size. Residual stalls at ~7.4e6 N on the nodes bracketing
+    SR2 and is independent of lam: halving the increment seven times
+    reproduces the same plateau to three figures (7.131, 7.302, 7.388, 7.430,
+    7.451, 7.459, 7.464 e6) while the correction grows 0.04 -> 0.05 -> 0.49
+    -> 8.6 m.
+  cause: >-
+    NOT ESTABLISHED. What it is not, each measured rather than argued:
+    (1) not an iteration or step-size shortage -- n_increments 20 -> 100 ->
+    400, MAX_NEWTON 30 -> 200, cutback floor 1/64 -> 1/4096, pen_mult 1e3 /
+    1e5 / 1e6, reg_mult 1e-9 / 1e-7 all die identically at lam=0.0000, and
+    MAX_NEWTON is not even a failure path in `solve.passage` (an exhausted
+    Newton loop commits its increment); (2) not the component -- plain pipe
+    in the same scene fails at the same shift, and the shroud's own contact
+    surface is irrelevant; (3) not the anchor failing to follow the sweep --
+    re-pinning the FIXED restraint on the node whose material is under VR5
+    at that shift changes nothing; (4) not one bad station -- dropping each
+    of the eleven contact targets in turn still diverges; (5) not a mesh
+    count -- the cliff is 2.68, 2.19, 2.47 and 2.78 m at element lengths
+    0.41, 0.79, 1.24 and 1.59 m, so cliff/element runs 6.75 down to 2.00
+    while the cliff in metres barely moves. The problem data itself is
+    nearly identical across the cliff: at shift 0 against shift 6 every
+    field of the `Problem` compares equal except the contact targets, and
+    those differ ONLY in bracketing nodes and interpolation weights -- every
+    `dn` is unchanged.
+  rule_detail: >-
+    Two measurements point at the free pipe the sweep leaves past the
+    terminal slot, and one appears to contradict them; all three are
+    recorded because the contradiction is not resolved. FOR: shifting by
+    whole elements holds every slot's phase almost fixed (SR7 w_lo 1.0000,
+    0.9936, 0.9871, 0.9807) while the free length grows 0, 0.79, 1.59, 2.38
+    m -- and the cliff falls exactly there, at 2.38. FOR: the threshold
+    moves the way a load-carrying limit should and not the way an
+    arithmetic bug would -- R 70/85/120/200 m gives 2.3/2.7/3.2/4.4 m,
+    tension 50/100/150/200 MT gives 3.8/2.3/1.6/1.3 m, spacing 6/9/12 m
+    gives 3.5/2.3/2.3 m. AGAINST: giving a shift-0 model the same free
+    length by hand, through `margin_stinger + extra`, converges at 1, 2,
+    2.4, 2.5, 3 and 4 m of overhang. That test also re-meshes the scene,
+    and `_required_stations` then puts a node exactly on the terminal slot,
+    so it is not a clean control and does not settle it.
+  rule: >-
+    A sweep must assert what it leaves behind. `sweep.py` says "Material
+    leaves the model at the stinger end and needs nothing there" and
+    `check_reach` guards only the vessel end; the stinger end has no
+    equivalent check, and the mesh is built once at shift 0 so the material
+    past the terminal slot grows by exactly the travel. Whatever the
+    mechanism turns out to be, the asymmetry is real and undefended. Until
+    it is fixed, NO shroud or long-component case in this scene family
+    produces a comparable envelope, and `completion` (L101) is what stops
+    one being read as though it did.
+  detect: '-'
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/solve/passage.py, rebuild/slay/physics/contact.py]
+  date: 2026-10-07
