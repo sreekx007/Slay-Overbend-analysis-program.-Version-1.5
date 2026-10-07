@@ -686,14 +686,18 @@ is *labelled* with is reported beside its value rather than instead of it.
 between two connectors, **X_e** outboard from X_c to the far field. F1 has
 one connector and therefore no interior, and the paper tabulates none.*
 
+*Re-run 7 Oct after L105 and L106. **All six sweep 100% of their travel**,
+and the values are unchanged to the third decimal — the same verdict as
+Paper 1's completing tables, and for the same reason.*
+
 | Case | Paper X_c | ours | Δ | Paper X_i | ours | Δ | Paper X_e | ours | Δ |
 |---|---|---|---|---|---|---|---|---|---|
-| EA-ST F2 Case 1 | 0.936% | 0.904% | **−3.5%** | 0.043% | 0.075% | +75.0% | 0.732% | 0.533% | −27.2% |
-| EA-ST F2 Case 2 | 1.410% | 1.601% | +13.6% | 0.075% | 0.124% | +65.2% | 1.021% | 0.683% | −33.1% |
-| EA-SB F1 Case 1 | 2.30% | 0.941% | −59.1% | — | — | — | 1.41% | 1.118% | −20.7% |
-| EA-SB F2 Case 1 | 2.24% | 1.291% | −42.3% | 0.086% | 0.137% | +59.1% | 1.45% | 1.270% | −12.4% |
-| EA-SB F2 Case 2 | 2.40% | 2.170% | **−9.6%** | 0.086% | 0.122% | +42.1% | 1.52% | 0.854% | −43.8% |
-| EA-SB F2 Case 3 | 2.53% | 1.509% | −40.4% | 0.085% | 0.127% | +49.4% | 1.60% | 1.394% | −12.9% |
+| EA-ST F2 Case 1 | 0.936% | 0.904% | **−3.5%** | 0.043% | 0.075% | +74.9% | 0.732% | 0.533% | −27.3% |
+| EA-ST F2 Case 2 | 1.410% | 1.601% | +13.5% | 0.075% | 0.124% | +65.1% | 1.021% | 0.683% | −33.1% |
+| EA-SB F1 Case 1 | 2.30% | 0.941% | −59.1% | — | — | — | 1.41% | 1.117% | −20.8% |
+| EA-SB F2 Case 1 | 2.24% | 1.291% | −42.4% | 0.086% | 0.137% | +59.0% | 1.45% | 1.270% | −12.4% |
+| EA-SB F2 Case 2 | 2.40% | 2.169% | **−9.6%** | 0.086% | 0.122% | +42.1% | 1.52% | 0.854% | −43.8% |
+| EA-SB F2 Case 3 | 2.53% | 1.508% | −40.4% | 0.085% | 0.127% | +49.3% | 1.60% | 1.394% | −12.9% |
 
 **Reproduced: the ordering X_c > X_e ≫ X_i, in all six cases.** That is
 Paper 2's actual finding and the reason the scheme exists — a frame bolted on
@@ -719,11 +723,58 @@ and needs an active set as well as a co-rotating frame; with the frame alone
 it would behave as an always-shut `S`, a different joint silently answering a
 different question.
 
-**PS layouts are prediction, not validation** — Paper 2 publishes F1 and F2
-only. On the shipped archetypes, EA-ST reads X_c 0.601 / 0.357% for F2 / PS:
-a pin and a roller relieve the connector and remove the shielding, X_c
-falling 41% while X_i rises to **equal** X_c. EA-SB truncates at 20% of its
-travel on the current contact surface and its values are lower bounds.
+### PS layouts — prediction, not validation
+
+**Paper 2 publishes F1 and F2 only**, so nothing below has a published
+counterpart. `PS` is `(None, 'P', None, 'S', None)` — a pin at slot 2 and a
+*skewed* roller at slot 4 — and these are the **same case dimensions** as the
+F2 rows above, so the honest comparison is against our own F2 numbers.
+
+*Run 7 Oct; all six sweep 100% of their travel. The earlier note that EA-SB
+"truncates at 20% of its travel and its values are lower bounds" no longer
+holds — that was L105 and L106, and both are fixed.*
+
+| Case | X_c, F2 | X_c, PS | | X_i, F2 | X_i, PS |
+|---|---|---|---|---|---|
+| EA-ST Case 1 | 0.904% | 0.367% | **−59%** | 0.075% | **0.365%** |
+| EA-ST Case 2 | 1.601% | 0.371% | **−77%** | 0.124% | **0.371%** |
+| EA-SB F1 Case 1 | 0.941% | 1.098% | +17% | — | — |
+| EA-SB F2 Case 1 | 1.291% | 0.951% | −26% | 0.137% | **0.647%** |
+| EA-SB F2 Case 2 | 2.169% | 1.113% | −49% | 0.122% | **0.751%** |
+| EA-SB F2 Case 3 | 1.508% | 0.959% | −36% | 0.127% | **0.623%** |
+
+**One mechanism, in both archetypes.** A pin and a skewed roller cannot carry
+the moment an F connector carries, so they *relieve the fastening* — X_c
+falls, by 26–77% in five of the six cases. What they cannot do is shield the
+pipe between them, so the interior stops being quiet: X_i rises by a factor
+of 5 in both EA-SB F2 cases and, in EA-ST, rises to **exactly equal X_c**
+(0.367 against 0.365%, and 0.371 against 0.371%).
+
+That second half is the part worth noticing. Under F2 the design question is
+"how bad is it at the fastening"; under PS the peak is no longer at the
+fastening at all, and the X_c/X_i/X_e partition — which exists because the
+paper found X_c ≫ X_i — stops carrying the information it was built to
+carry. EA-SB F1 is the one case where X_c *rises*, and it has a single
+connector, so there is no interior for the load to move into.
+
+**The earlier figures recorded here, X_c 0.601 / 0.357% for F2 / PS, are
+withdrawn.** They came from truncated passages on a frozen lay tension. The
+qualitative reading they supported — the connector is relieved and the
+shielding is lost — survives, and is now stronger: a 41% fall became 59–77%,
+and "X_i rises to equal X_c" is now exact rather than approximate.
+
+**F1D and F2D are refused, not approximated.** A `D` connector is a deadband
+and needs an active set as well as a co-rotating frame; with the frame alone
+it would behave as an always-shut `S`, a different joint silently answering a
+different question.
+
+*The `S` in a PS layout is itself refused by the mesher under G9 and is
+emitted only through `emit_unenforced_conn_types={'S'}` — the narrow opt-in
+where the mesher emits the joint and the caller takes on enforcing it.
+Checked before these runs rather than assumed: one skewed row is resolved and
+one applied, every Newton iteration, in a co-rotating frame. Had it resolved
+none, the opt-in would have deleted the constraint and these numbers would be
+a G9 violation routed around rather than respected.*
 
 ---
 
@@ -740,10 +791,10 @@ travel on the current contact surface and its values are lower bounds.
 | **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
 | **XXXIX** shroud + thick pipe length | 2 | **re-run 7 Oct** — strain −13.7% and −4.3%; BM −6.5% and −12.2% |
 | **XLI** shroud + thick pipe location | 3 | **run 7 Oct** — strain −8.4 to −9.8%, **BM −4.0 to +1.3%**; the paper's worst-case position is reproduced |
-| **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
+| **Paper 2** EA F1 / F2 | 6 | **re-run 7 Oct, unchanged** — ordering reproduced in all six; all at 100% of travel |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
-**50 of 50 published cases have a rebuild number, and every one of them was produced by the current program.** Paper 1 is complete; Paper 2's six EA cases are still on pre-L105 numbers.
+**50 of 50 published cases have a rebuild number, and every one of them was produced by the current program.** Paper 1 and Paper 2 are both complete. Six PS cases are run as prediction, having no published counterpart; F1D and F2D remain refused under G9.
 
 ## 7. What is not settled
 
