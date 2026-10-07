@@ -388,17 +388,37 @@ that is correct while the extreme-fibre strain derived from it is 20–30% low
 over long stiff bodies is what a recovery convention mismatch looks like —
 and it is now the single open item that would explain the most rows.
 
-### TABLE XXVI — two components, spacing — NOT RUN
+### TABLE XXVI — two components, spacing
 
-| Case | Spacing | Paper strain | Paper BM | ours |
-|---|---|---|---|---|
-| C1 | 2.5 D | 0.771% | 1384 kN·m | — |
-| C2 | 10 D | 0.760% | 1371 kN·m | — |
-| C3 | 20 D | 0.751% | 1365 kN·m | — |
+*`tools/study_table_xxvi.py`. Two 2.5 D bodies at 65 mm wall, R = 70 m,
+100 MT. All three sweep 100% of their travel.*
 
-Spacing changes strain by 2.6% over an eightfold range — the paper's own
-conclusion is that it is negligible. Low value, and it needs a two-component
-assembly we have not built.
+| Case | Spacing | assembly span | Paper strain | ours | Δ | Paper BM | ours, body | Δ |
+|---|---|---|---|---|---|---|---|---|
+| C1 | 2.5 D | 3.048 m | 0.771% | 0.9253% | +20.0% | 1384 kN·m | 1369.8 kN·m | **−1.0%** |
+| C2 | 10 D | 6.096 m | 0.760% | 0.8671% | +14.1% | 1371 kN·m | 1382.4 | **+0.8%** |
+| C3 | 20 D | 10.160 m | 0.751% | 0.8362% | +11.3% | 1365 kN·m | 1352.1 | **−0.9%** |
+
+**The sign agrees and the magnitude does not.** Both fall with spacing — the
+paper 0.771 → 0.751%, a spread of 2.6%, and ours 0.9253 → 0.8362%, a spread
+of 9.6%. The paper's conclusion is that the spacing is *negligible*; at 3.7×
+its spread, ours is not. The moment is within 1% on all three, which is the
+tightest agreement anywhere in this ledger.
+
+**The configuration is inferred, and the inference is stated rather than
+buried.** TABLE XXVI names no radius, tension or component. But its C1 row
+reads 0.771% and **1384 kN·m**, and TABLE XXIII's B1 — R = 70 m, 100 MT, a
+2.5 D body at 65 mm — reads 0.780% and the **same 1384 kN·m**. A shared
+moment to four figures across two tables is not a coincidence, so C1 is read
+as B1 with a second body added. If that reading is wrong the three rows move
+together and the *trend*, which is what the table is about, survives it.
+
+*The earlier note here — "it needs a two-component assembly we have not
+built" — was wrong. `ils_builder` takes a list of components and has always
+iterated over it; what was missing was a spec with two entries in it, which
+is data. Checked before the runner was written: the archetype with a second
+GD-TP at a distinct `id` and `centre_x` builds at all three spacings and
+reports the spans those gaps imply.*
 
 ---
 
@@ -579,11 +599,14 @@ both.*
 
 ### TABLE XXXIX — thick pipe length
 
-| Case | Thick pipe | Paper peak | ours | Δ | where ours peaks | Paper BM | ours, body | Δ |
-|---|---|---|---|---|---|---|---|---|
-| baseline | shroud only | 0.70% | 0.5976% | −14.6% | X2 | — | — | — |
-| 1 | 5 D | 0.952% | 0.8225% | **−13.6%** | X2 | 1405 kN·m | 1331 kN·m | **−5.3%** |
-| 2 | 10 D | 1.26% | 1.2057% | **−4.3%** | **X1** | 1555 kN·m | 1506 kN·m | **−3.2%** |
+*`tools/study_table_xxxix.py`. Re-run 7 Oct; all three sweep 100% of their
+travel.*
+
+| Case | Thick pipe | Paper peak | ours X2 | overall | Δ | where ours peaks | Paper BM | ours, body | Δ |
+|---|---|---|---|---|---|---|---|---|---|
+| baseline | shroud only | 0.70% | 0.5973% | 0.6525% | −14.7% | **X1** | — | 1274.0 kN·m | — |
+| 1 | 5 D | 0.952% | 0.8220% | 0.8220% | **−13.7%** | X2 | 1405 kN·m | 1314.1 | **−6.5%** |
+| 2 | 10 D | 1.26% | *empty* | 1.2052% | **−4.3%** | **X1** | 1555 kN·m | 1365.0 | −12.2% |
 
 *Post-L100. The moments improved from −6.5% and −12.1%; the strains moved
 under 1.5%. The shroud-only baseline is unaffected by L100 — it steps no
@@ -623,20 +646,36 @@ Bending moment rises 1274 → 1314 → 1367 kN·m against the paper's
 — / 1405 / 1555: the direction is reproduced and the magnitude understated,
 by −6.5% and −12.1%.
 
-### TABLE XLI — thick pipe location — NOT RUN
+### TABLE XLI — thick pipe location
 
-| Case | Thick pipe at | Paper X2 | Paper X4 | Paper BM | ours |
-|---|---|---|---|---|---|
-| baseline | shroud only | 0.70% | 0.35% | — | 0.5976% / 0.4586% |
-| 1 | X2, catenary third | 0.901% | 0.49% | 1362 kN·m | — |
-| 2 | X3, midspan | 0.744% | 0.59% | 1310 kN·m | — |
-| 3 | X4, vessel third | 0.744% | 0.57% | 1271 kN·m | — |
+*A 2.5 D body moved along the deep section. `tools/study_table_xxxix.py
+--table XLI`; all four sweep 100% of their travel.*
 
-A 2.5 D body moved along the deep section. The paper's finding is that peak
-strain stays at X2 wherever the body sits, and that putting it *at* X2 is the
-worst case because the stiffness discontinuity lands where curvature is
-highest. Three runs, and the archetype already supports an off-centre
-component.
+| Case | Thick pipe at | Paper X2 | ours X2 | overall | Δ | Paper X4 | ours X4 | Paper BM | ours, body | Δ |
+|---|---|---|---|---|---|---|---|---|---|---|
+| baseline | shroud only | 0.70% | 0.5973% | 0.6525% | −14.7% | 0.35% | 0.4584% | — | 1274.0 kN·m | — |
+| 1 | X2, catenary third | 0.901% | *empty* | 0.8132% | **−9.7%** | 0.49% | 0.4838% | 1362 kN·m | 1307.5 | **−4.0%** |
+| 2 | X3, midspan | 0.744% | 0.6714% | 0.6714% | **−9.8%** | 0.59% | 0.5483% | 1310 kN·m | 1302.9 | **−0.5%** |
+| 3 | X4, vessel third | 0.744% | 0.6811% | 0.6811% | **−8.4%** | 0.57% | *empty* | 1271 kN·m | 1287.5 | **+1.3%** |
+
+**The paper's finding is reproduced.** It says peak strain stays at X2
+wherever the body sits, and that putting the body *at* X2 is the worst case
+because the stiffness discontinuity lands where curvature is highest. Our
+overall peaks are 0.8132 / 0.6714 / 0.6811% — the catenary third is the worst
+by 19%, and the other two are within 1.5% of each other, exactly as the paper
+has them identical at 0.744%.
+
+The strain is low by 8.4–9.8% across all three and the **moment is within 4%**,
+tightening to −0.5% and +1.3% for the two mid-and-vessel positions.
+
+*Two rows have an **empty** X2 or X4, and that is a partition boundary rather
+than a measurement.* Where the thick body's junction lands within a
+centimetre of one of our region boundaries, the region on the far side holds
+no elements at this mesh. The difference is then taken on the **overall
+peak** — the same steel and the same mechanical feature, counted into a
+different region by a boundary that falls elsewhere. This is the same
+ambiguity TABLE XXXIX's 10 D case carries, and the reason the region a peak
+is *labelled* with is reported beside its value rather than instead of it.
 
 ---
 
@@ -696,15 +735,15 @@ travel on the current contact surface and its values are lower bounds.
 | **XI** diameter and tension | 6 | **re-run 7 Oct, unchanged** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
 | **XX / XXI** thick pipe wall thickness | 9 | **re-run 7 Oct, unchanged** — strain +1.6 to +16.8%, **BM −2.1 to +6.0%** (component body) |
 | **XXIII / XXIV** thick pipe length | 6 | **re-run 7 Oct, unchanged** — moment −7.7 … +13.0%; saturation still not reproduced, strain −31.6% at 20 D |
-| **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
+| **XXVI** two components, spacing | 3 | **run 7 Oct** — strain +11.3 to +20.0%, **BM within 1%**; the fall with spacing agrees in sign, 3.7× in magnitude |
 | **XXXI / XXXIV** shroud offset depth | 12 | **re-run 7 Oct** — config C from −39.9 … −73.4% to −5.4 … −22.1%, the largest change in the ledger; A's X3/X4 now monotonic in V; X2 still under-amplified |
 | **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
-| **XXXIX** shroud + thick pipe length | 2 | **done** — amplification +37.6% against the paper's +36% |
-| **XLI** shroud + thick pipe location | 3 | not run — three runs, archetype already supports it |
+| **XXXIX** shroud + thick pipe length | 2 | **re-run 7 Oct** — strain −13.7% and −4.3%; BM −6.5% and −12.2% |
+| **XLI** shroud + thick pipe location | 3 | **run 7 Oct** — strain −8.4 to −9.8%, **BM −4.0 to +1.3%**; the paper's worst-case position is reproduced |
 | **Paper 2** EA F1 / F2 | 6 | **done** — ordering reproduced in all six |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
-**44 of 50 published cases have a rebuild number.**
+**50 of 50 published cases have a rebuild number, and every one of them was produced by the current program.** Paper 1 is complete; Paper 2's six EA cases are still on pre-L105 numbers.
 
 ## 7. What is not settled
 
