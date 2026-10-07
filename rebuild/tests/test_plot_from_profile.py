@@ -280,3 +280,77 @@ def test_mismatched_schema_versions_are_refused(tmp_path):
     p.write_text(json.dumps(d))
     with pytest.raises(SystemExit, match='disagree'):
         mod.load_profile(stem)
+
+
+# ---------------------------------------------------------------------------
+# the position that did not converge
+# ---------------------------------------------------------------------------
+#
+# It is the one worth looking at when a sweep stops, and it is the one the
+# figure used to refuse. `solve.passage` returns from a cutback exhaustion
+# before computing strains or moments, so the diverged position writes
+# geometry rows and NO section rows -- and `plot_profile` exited with "step N
+# is not in this profile", which reads as "there is nothing there" when what
+# is there is the shape. See L101 / L102.
+
+def _diverged_profile(tmp_path):
+    """A profile whose LAST position has geometry and no sections.
+
+    Built by re-emitting the synthetic case with a third geometry position
+    and no sections for it -- the exact shape `report.profile` writes when
+    `solve.passage` exhausts its cutbacks, because it returns before
+    computing strains or moments.
+    """
+    stem = tmp_path / 'diverged'
+    geo = (_geometry(0, 0.0) + _geometry(1, 2.0) + _geometry(2, 4.0))
+    for r in geo:
+        if r['step'] == 2:
+            r['converged'] = False
+    sec = _sections(0, 0.0) + _sections(1, 2.0)
+    rprof.write_table('geometry', geo, Path(f'{stem}.geometry.csv'))
+    rprof.write_table('sections', sec, Path(f'{stem}.sections.csv'))
+    rprof.write_table('stations', _stations(), Path(f'{stem}.stations.csv'))
+    return stem
+
+
+def test_the_diverged_position_is_drawn_not_refused(tmp_path):
+    mod = _load_tool()
+    stem = _diverged_profile(tmp_path)
+    out = tmp_path / 'diverged.png'
+    r = mod.plot_profile(mod.load_profile(stem), str(out), step=2)
+    assert out.exists()
+    assert r['converged'] is False
+    assert r['peak'] is None, 'no strains were computed, so none may be shown'
+
+
+def test_the_strain_panels_say_WHY_they_are_empty(tmp_path):
+    """Blank panels are ambiguous -- they read as zero strain."""
+    mod = _load_tool()
+    stem = _diverged_profile(tmp_path)
+    r = mod.plot_profile(mod.load_profile(stem), str(tmp_path / 'd.png'),
+                         step=2)
+    texts = [t.get_text() for t in r['panels']['strain'].texts]
+    assert any('DID NOT CONVERGE' in t for t in texts)
+    assert 'NOT AVAILABLE' in r['panels']['strain'].get_title(loc='left')
+
+
+def test_a_converged_step_with_no_sections_is_still_refused(tmp_path):
+    """Tolerance is for the DIVERGED position only. A converged position
+    missing its sections is an inconsistent file, not a picture to draw."""
+    mod = _load_tool()
+    stem = tmp_path / 'inconsistent'
+    geo = _geometry(0, 0.0) + _geometry(1, 2.0)
+    rprof.write_table('geometry', geo, Path(f'{stem}.geometry.csv'))
+    rprof.write_table('sections', _sections(0, 0.0),
+                      Path(f'{stem}.sections.csv'))
+    rprof.write_table('stations', _stations(), Path(f'{stem}.stations.csv'))
+    with pytest.raises(SystemExit, match='inconsistent'):
+        mod.plot_profile(mod.load_profile(stem), str(tmp_path / 'x.png'),
+                         step=1)
+
+
+def test_a_step_missing_from_BOTH_tables_is_still_refused(tmp_path):
+    mod = _load_tool()
+    prof = mod.load_profile(_emit(tmp_path))
+    with pytest.raises(SystemExit, match='not in this profile'):
+        mod.plot_profile(prof, str(tmp_path / 'x.png'), step=99)

@@ -498,8 +498,18 @@ def plot_profile(prof, out, step=None):
     sc = [r for r in sc if r.get('owner', 'pipeline') == 'pipeline'] or sc
     conn_x = sorted(0.5 * (float(r['x_0']) + float(r['x_1']))
                     for r in mem if r['kind'] == 'connector')
-    if not g or not sc:
+    if not g:
         raise SystemExit(f'step {step} is not in this profile')
+    # A POSITION CAN HAVE A SHAPE AND NO STRAINS, and that position is the
+    # most interesting one in a failed passage. `solve.passage` returns from
+    # a cutback exhaustion before it computes strains or moments, so the
+    # diverged position writes geometry rows and no section rows. Refusing
+    # to draw it hides exactly the picture that shows why a sweep stopped.
+    # The strain panels say so rather than being left blank and ambiguous.
+    diverged = not truth(g[0].get('converged', 'true'))
+    if not sc and not diverged:
+        raise SystemExit(f'step {step} has geometry but no sections, and did '
+                         f'not diverge -- the profile is inconsistent')
 
     OD, tw = float(c['OD']), float(c['t_wall'])
     shift = float(g[0]['shift'])
@@ -709,6 +719,37 @@ def plot_profile(prof, out, step=None):
     dx.grid(alpha=0.2)
 
     # ---- panels 4 and 5: the strain staircase -----------------------------
+    if not sc:
+        for panel in (bx, cx):
+            panel.set_ylabel('extreme-fibre strain (%)')
+            panel.grid(alpha=0.2)
+            panel.annotate(
+                'this position DID NOT CONVERGE, so no strains were '
+                'computed for it.\nThe shape above is the state the solver '
+                'rolled back to when it gave up:\nthe last converged '
+                'position\'s displacements, read against the rollers where '
+                'they are at THIS shift.',
+                (0.5, 0.5), xycoords='axes fraction', ha='center',
+                va='center', fontsize=10, color='#c1121f')
+        bx.set_title('strain -- NOT AVAILABLE AT THIS POSITION',
+                     fontsize=9.5, loc='left')
+        cx.set_title('', fontsize=9.5, loc='left')
+        cx.set_xlabel('x (m)  --  +x toward the vessel, so the stinger is '
+                      'on the LEFT (starboard view, no flip)')
+        v = geo_s.get('profile_schema_version', '?')
+        fig.suptitle(
+            f'Drawn from the PROFILE ARTIFACT of case {c["case_id"]} and its '
+            f'schema alone -- no solver, no Scene, nothing imported from '
+            f'slay.\nprofile schema {v}   {len(geo_all)} geometry rows, '
+            f'{len(sec_all)} section rows, {len(sta)} stations',
+            fontsize=11)
+        fig.tight_layout(rect=(0, 0, 1, 0.975))
+        fig.savefig(out, dpi=140)
+        return dict(step=step, shift=shift, peak=None, junctions=len(jx),
+                    converged=False, fig=fig,
+                    panels=dict(stinger=ax, closeup=ex, off_arc=dx,
+                                strain=bx, zoom=cx))
+
     out_band = [r for r in sc if not truth(r['in_band'])]
     for panel, zoom in ((bx, False), (cx, True)):
         for run in strain_runs(sc):
@@ -760,6 +801,7 @@ def plot_profile(prof, out, step=None):
     fig.tight_layout(rect=(0, 0, 1, 0.975))
     fig.savefig(out, dpi=140)
     return dict(step=step, shift=shift, peak=peak, junctions=len(jx),
+                converged=True,
                 fig=fig, panels=dict(stinger=ax, closeup=ex, off_arc=dx,
                                      strain=bx, zoom=cx))
 
@@ -775,8 +817,9 @@ def main() -> int:
         prof = load_profile(stem)
         r = plot_profile(prof, out, step=step)
         print(f'wrote {out}')
-        print(f'  step {r["step"]}  shift {r["shift"]:.3f} m  '
-              f'peak in band {100 * r["peak"]:.4f}%  '
+        peak = ('DID NOT CONVERGE -- no strains' if r['peak'] is None
+                else f'peak in band {100 * r["peak"]:.4f}%')
+        print(f'  step {r["step"]}  shift {r["shift"]:.3f} m  {peak}  '
               f'junctions {r["junctions"]}')
         return 0
 
