@@ -84,6 +84,25 @@ TAIL_CLEAR = 1.0          # m, buffer length BEYOND the sweep -- see below
 # fails in bounded time instead of bisecting toward zero.
 SUBSTEP_FLOOR = 1.0 / 64.0
 
+# A CONVERGED POSITION IS NOT AUTOMATICALLY A RESULT.
+#
+# A strain past the end of the material's own stress-strain table is a
+# number the material model has no data for: beyond the last tabulated
+# point the curve is extrapolated, and whatever comes back is arithmetic
+# rather than steel. `material('j2')` ends at 5.26% plastic strain, so this
+# multiple of it leaves generous room for a real overbend peak (~1%) while
+# refusing a state the table cannot describe.
+#
+# WHY A SWEEP NEEDS THIS AND A SINGLE SOLVE DOES NOT. Mode A chains state,
+# so one position that converges to nonsense is carried into every position
+# after it, and each of those converges too. Measured on S2-8: the peak goes
+# 0.877% -> 96.7% at shift 3.251 and then sits at 96.7% for the remaining 31
+# positions, every one of them reporting `ok` and the passage reporting
+# COMPLETE. Nothing in `completion` can see that -- the travel is real and
+# every position converged -- which is precisely why the check has to be on
+# the ANSWER and not on the schedule.
+STRAIN_LIMIT_FACTOR = 2.0
+
 
 @dataclass(frozen=True)
 class Position:
@@ -515,6 +534,14 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     # MODE B DOES NOT BISECT. Each of its positions starts from virgin state,
     # so there is no advance between them to shorten -- a failure there is
     # the position's own and halving the gap to it changes nothing.
+    # The limit is read off the MATERIAL the caller passed, so a case run on
+    # a different steel is judged against its own table and not a constant
+    # someone once measured on this one.
+    _mat = problem_kw.get('material')
+    _tab = getattr(_mat, 'plastic_strain', None)
+    strain_limit = (STRAIN_LIMIT_FACTOR * float(max(_tab))
+                    if _tab else 0.0)
+
     out, state = [], None
     pending = list(schedule(total, step, include=crit))
     done_shift, i = None, 0
@@ -541,6 +568,24 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
                 retry, retry_state = solve(problem, state_in=primed)
                 if retry.converged:
                     result, state_out, seeded = retry, retry_state, True
+
+        # PLAUSIBILITY, BEFORE ANYTHING ELSE IS DONE WITH THE RESULT. A
+        # position whose peak strain runs off the end of the material table
+        # is demoted to a failure, which puts it through exactly the same
+        # path as a diverged one: the advance is halved and retried, and if
+        # it still comes back implausible at the floor the passage stops and
+        # `completion` marks it incomplete. That is the behaviour this had
+        # before the travel cutback -- S2-8 used to STOP at shift 3.251 --
+        # and the cutback must not buy completeness by accepting a state the
+        # old code was right to refuse.
+        if result.converged and strain_limit > 0.0:
+            _s, _eps = result.peak_strain()
+            if _eps > strain_limit:
+                result.status = (
+                    f'STRAIN {100 * _eps:.2f}% AT s={_s:.3f} IS BEYOND THE '
+                    f'MATERIAL DATA (limit {100 * strain_limit:.2f}%): '
+                    f'converged, but not to anything the material model '
+                    f'describes')
 
         # Not converged, carrying state, and there is still room to halve
         # the advance: put an intermediate position in front of this one and

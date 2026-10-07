@@ -35,9 +35,23 @@ import profile_status                                           # noqa: E402
 
 
 class _Result:
-    def __init__(self, converged, status=''):
-        self.converged = converged
+    """Enough of a `Result` for the scheduling tests: a status, and a peak
+    strain the plausibility guard can read. `converged` is a PROPERTY, as it
+    is on the real one, so a stand-in cannot drift from the thing it stands
+    for -- the guard demotes a position by rewriting `status`, and a mock
+    with a settable `converged` would not notice."""
+
+    def __init__(self, converged, status='', eps=0.004):
         self.status = status or ('ok' if converged else 'CUTBACK EXHAUSTED')
+        self.eps = eps
+        self.strains = ((0, 1.0, eps),)
+
+    @property
+    def converged(self):
+        return self.status == 'ok'
+
+    def peak_strain(self, s_min=None):
+        return (1.0, self.eps)
 
 
 class _Pos:
@@ -412,3 +426,54 @@ def test_mode_B_does_not_bisect():
         SW.solve = real
     assert len(flaky.calls) == len(set(flaky.calls)), (
         'mode B re-tried a shift, so it bisected')
+
+
+# ---------------------------------------------------------------------------
+# a converged position is not automatically a result
+# ---------------------------------------------------------------------------
+#
+# The travel cutback made every passage complete, and one of them completed
+# to nonsense: S2-8's peak went 0.877% -> 96.7% at shift 3.251 and sat there
+# for the remaining 31 positions, every one reporting `ok` and the passage
+# reporting COMPLETE. Before the cutback that case STOPPED at 3.251, so the
+# cutback had bought completeness by accepting a state the old code refused.
+# `completion` cannot see this -- the travel is real and every position
+# converged -- so the check has to be on the ANSWER, not the schedule.
+
+class _Blowup:
+    """Converges everywhere, but past `at` returns an absurd strain."""
+
+    def __init__(self, at):
+        self.at = at
+
+    def __call__(self, problem, state_in=None, **kw):
+        shift = problem.contacts[0].s_station - problem.contacts[0].s_material
+        eps = 0.9 if shift > self.at + 1e-9 else 0.004
+        return _Result(True, eps=eps), _State(shift)
+
+
+def test_a_strain_past_the_material_table_is_refused(monkeypatch):
+    sc = _tiny_scene()
+    monkeypatch.setattr(sweep, 'solve', _Blowup(at=0.5))
+    pos = sweep.run(sc, None, L_comp=0.0, step=0.5, mode='A',
+                    tension=0.0, material=material('j2'))
+    done = sweep.completion(pos, 0.0)
+    assert not done.complete, 'a 90% strain must not pass as a result'
+    assert 'BEYOND THE MATERIAL DATA' in done.status, done.status
+
+
+def test_the_limit_comes_from_the_material_that_was_passed():
+    """A case run on a different steel is judged against its own table."""
+    m = material('j2')
+    assert max(m.plastic_strain) == pytest.approx(0.052585, abs=1e-5)
+    assert sweep.STRAIN_LIMIT_FACTOR * max(m.plastic_strain) > 0.1
+
+
+def test_a_plausible_strain_is_untouched(monkeypatch):
+    """The guard must not demote an ordinary overbend peak -- about 1%."""
+    sc = _tiny_scene()
+    monkeypatch.setattr(sweep, 'solve', _Blowup(at=1e9))   # never blows up
+    pos = sweep.run(sc, None, L_comp=0.0, step=0.5, mode='A',
+                    tension=0.0, material=material('j2'))
+    assert sweep.completion(pos, 0.0).complete
+    assert all(p.converged for p in pos)
