@@ -46,9 +46,42 @@ def test_an_EA_flag_is_picked_up():
 
 
 def test_every_component_dimension_has_a_flag_that_round_trips():
+    """Underscore AND dot are flag separators, so `TP.centre_x` is
+    `--tp-centre-x`. The dot rule arrived with the dotted names; this
+    assertion is what makes it a rule rather than a convention one caller
+    happens to follow.
+    """
     for k in emit_profile.COMPONENT_DIMS:
-        flag = f'--{k.replace("_", "-")}'
+        flag = '--' + k.replace('_', '-').replace('.', '-')
         assert emit_profile._extra(['prog', flag, '7.5']) == {k: 7.5}
+
+
+def test_a_flag_matches_whatever_case_it_is_written_in():
+    """L108. Lowercasing the flag and not `argv` broke every upper-case
+    flag at once -- `--V`, `--L1`, `--L2`, `--P-v` -- and broke them
+    SILENTLY: `_extra` returned None, which `emit` reads as "no dimensions
+    were asked for" and answers with the archetype's defaults. A plausible
+    strain for a geometry nobody requested, and nothing on the artifact to
+    say which geometry it was.
+    """
+    for k in emit_profile.COMPONENT_DIMS:
+        stem = k.replace('_', '-').replace('.', '-')
+        for flag in ('--' + stem, '--' + stem.lower(), '--' + stem.upper()):
+            assert emit_profile._extra(['prog', flag, '7.5']) == {k: 7.5}, flag
+
+
+def test_the_flags_the_shroud_RUNNERS_ACTUALLY_PASS_are_picked_up():
+    """The three runners for TABLE XXXI, XXXII and XXXIX spell the shroud
+    `--V --L1 --L2` and the thick pipe `--tp-l-comp --tp-centre-x`, in one
+    command line. Asserting the spellings generically is not enough: L108
+    survived because no test used the exact mixture a caller sends.
+    """
+    got = emit_profile._extra(
+        ['prog', '--archetype', 'ILS-SHTP', '--R', '85.0',
+         '--V', '0.406400', '--L1', '4.064000', '--L2', '1.016000',
+         '--tp-l-comp', '2.032000', '--tp-centre-x', '-1.354667'])
+    assert got == {'V': 0.4064, 'L1': 4.064, 'L2': 1.016,
+                   'TP.L_comp': 2.032, 'TP.centre_x': -1.354667}
 
 
 # ---------------------------------------------------------------------------

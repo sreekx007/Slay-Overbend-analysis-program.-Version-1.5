@@ -1,6 +1,6 @@
 # SLAY Overbend — Validation ledger v3.0
 
-> ## 7 Oct 2026 — four sweep defects fixed, and the whole ledger re-run
+> ## 7 Oct 2026 — four sweep defects fixed, a wrong lay tension found, and the whole ledger re-run
 >
 > Between them, L101, L105, L106 and the strain guard changed what a passage
 > *is*, so every number below was re-run. The four, in the order they were
@@ -13,6 +13,14 @@
 > | **L106** | nothing cut back the TRAVEL between positions. `solve` cuts back `lam`, which scales contact targets alone, so a formed plastic hinge stopped four of six shroud cases. |
 > | **guard** | with the travel cutback in, S2-8 converged to a 96.7% strain and reported COMPLETE. A converged position whose strain runs past the end of the material table is now refused. |
 >
+> **And then a fifth, from outside the program.** Paper 2 was supplied later
+> the same day. Its case tables audit clean, but its parameter block states
+> `Pipeline Tension 100 mT` and both Paper 2 runners defaulted to **120** —
+> `L107`. Every §5 figure, twelve in all, has been re-run at 100 MT. Unlike
+> the four above, nothing in the repository could have caught this one: the
+> paper it contradicted was not in the repository. Both papers are now cited
+> in full under *How to read this*.
+>
 > **What moved, and what did not.** The blast radius is narrower than the
 > defect list suggests, and the reason is worth stating: where a passage
 > converged all the way, the frozen lay tension acted at the **stinger tip**,
@@ -24,7 +32,7 @@
 > | **XI** diameter and tension | unchanged to four decimals; all six now confirmed at 100% of travel |
 > | **XXIII / XXIV** component length | unchanged to four decimals (0.8470 against 0.8471, and so on); all six at 100% |
 > | **XX / XXI** component wall | unchanged — strains under 1% of themselves, moments under 6 kN·m; all nine at 100% |
-> | **X** stinger configuration | **moved**, +1.8% on config A — the only 120 MT table, and the highest tension in Paper 1 |
+> | **X** stinger configuration | **moved**, +1.8% on config A — one of Paper 1's two 120 MT studies, and its highest tension |
 > | **XXXI / XXXIV** shroud offset V | **moved hard** in configuration C: −39.9 … −73.4% became −5.4 … −22.1%. Configuration A's X3/X4 at the deep offsets had been *falling* with V, which is the wrong direction; they are now monotonic |
 > | **XXXII / XXXIII** shroud L1 and L2 | **moved hard** — five of seven had been truncating; the dual-roller trend changed sign |
 >
@@ -89,6 +97,39 @@ still in their own files.*
 
 ## How to read this
 
+### The two sources
+
+Both papers are by the same authors and the second continues the first. Cited
+here in full because for most of this ledger's life they were not: §5 was
+validated against transcribed case tables with no citation recorded, and
+L107 is what that cost.
+
+* **Paper 1** — Sreekanth Manakkattil Sivaraman and Jagannatha Venkataramana
+  Reddy, *Toward AI-Assisted Conceptual Design of Subsea Inline Structures:
+  Classification and Strain Behaviour of Inline Components during S-Lay
+  Installation*. IJRASET, ISSN 2321-9653, **Vol. 14 Issue VII, July 2026**,
+  p. 1127. doi [10.22214/ijraset.2026.84268](https://doi.org/10.22214/ijraset.2026.84268).
+  Source of §§1–4: TABLE X, XI, XX, XXI, XXIII, XXIV, XXVI, XXXI, XXXII,
+  XXXIII, XXXIV, XXXIX, XLI.
+* **Paper 2** — same authors, *Advancing AI Assisted Conceptual Design of
+  Subsea Inline Structures: Mechanical Behaviour of Pipeline-Mounted
+  Structural Assemblies during S-Lay Installation*. IJRASET, **Vol. 14 Issue
+  VIII, Aug 2026**, p. 394. doi [10.22214/ijraset.2026.84577](https://doi.org/10.22214/ijraset.2026.84577).
+  Source of §5: the EA-ST and EA-SB case tables, and the X_c/X_i/X_e region
+  scheme of its Fig. 38.
+
+**Two conventions are the papers' own**, quoted rather than inferred, both
+from Paper 2:
+
+* *"Nominal Strains at element integration points are reported here."* This
+  settles what the reference quantity is; see §7 item 2 for why it does not
+  close the gap.
+* *"Bulkheads and thick inline components required to physically anchor
+  structures to the pipeline are intentionally NOT modelled… Reported strains
+  are for relative comparison (pattern recognition), not absolute code
+  compliance."* The paper itself does not claim its EA magnitudes are
+  absolute, which is the frame to read §5's deltas in.
+
 **Configuration is part of every number.** Unless a table says otherwise:
 406.4 × 21 mm pipe, **9 m roller spacing** (the paper's, stated once in its
 model description), 2 × OD element length (the paper's mesh), J2 plasticity,
@@ -135,8 +176,9 @@ at a given mesh is shown `—`.
 | B | 85 m | 0.38% | 0.4070% | **+7.1%** | 1185 kN·m | not published |
 | C | 105 m | 0.32% | 0.2965% | **−7.3%** | 1072 kN·m | not published |
 
-*Re-run 7 Oct. This is the only table in Paper 1 at **120 MT**, and the only
-one whose values moved: config A from 0.5373% to 0.5468%, about +1.8%. B and
+*Re-run 7 Oct. This is Paper 1's **120 MT** table — one of two, with the
+S1 shroud series behind TABLE XXXI configuration B — and the only one whose
+values moved: config A from 0.5373% to 0.5468%, about +1.8%. B and
 C moved under 1%. Whether that is L105 or the step size this runner uses is
 not established — the earlier numbers were produced ad hoc and the step was
 not recorded — so it is reported as a change, not attributed.*
@@ -681,42 +723,103 @@ is *labelled* with is reported beside its value rather than instead of it.
 
 ## 5. External attached structures — Paper 2
 
-*R = 85 m, 120 MT. Strain reported by fastening, after Paper 2's Fig. 38:
+*R = 85 m, **100 MT**. Strain reported by fastening, after Paper 2's Fig. 38:
 **X_c** within 2 × pipe OD either side of a connector, **X_i** the interior
 between two connectors, **X_e** outboard from X_c to the far field. F1 has
 one connector and therefore no interior, and the paper tabulates none.*
 
-*Re-run 7 Oct after L105 and L106. **All six sweep 100% of their travel**,
-and the values are unchanged to the third decimal — the same verdict as
-Paper 1's completing tables, and for the same reason.*
+*Re-run twice on 7 Oct: first after L105 and L106, then again at the correct
+lay tension. **All six sweep 100% of their travel.** Everything below is from
+the second run.*
+
+> **L107 — these cases had been running at 120 MT, and Paper 2 says 100.**
+> The paper states `Pipeline Tension 100 mT` in all three of its parameter
+> blocks (Sec. VII.A for EA-ST, Sec. VIII.A for EA-SB, and the branch study;
+> PDF pp. 24, 31, 39). Both runners defaulted to `120.0`, carried over from
+> the Paper 1 runners they were written from — and Paper 1's TABLE X *is*
+> 120 MT, so the number was not wrong in the file it came from. It was
+> unfalsifiable here because the paper itself was not in the repository: only
+> its case tables had been transcribed, and a per-case table is precisely
+> what omits the parameter block every case shares.
+>
+> **What the correction moved.** EA-ST **tightened**, from (−3.5, +13.5) to
+> (−5.3, +8.8). All four EA-SB cases moved 2–5 points further low. The
+> scatter that §7 item 1 is about is **unchanged in character** — −14.4%
+> beside −45.4%, −42.8% and −61.3% — so the tension was never its cause.
+>
+> | | X_c at 120 MT | X_c at 100 MT |
+> |---|---|---|
+> | EA-ST Case 1 | −3.5% | **−5.3%** |
+> | EA-ST Case 2 | +13.5% | **+8.8%** |
+> | EA-SB F1 Case 1 | −59.1% | **−61.3%** |
+> | EA-SB F2 Case 1 | −42.4% | **−45.4%** |
+> | EA-SB F2 Case 2 | −9.6% | **−14.4%** |
+> | EA-SB F2 Case 3 | −40.4% | **−42.8%** |
+>
+> The 120 MT column is kept because it is the only evidence that tension does
+> not explain the scatter, and because every §5 figure published in this
+> ledger before 7 Oct 2026 came from it.
+
+**The case tables were audited against the paper and are correct.** Every
+dimension and every published value in §5 was checked against the PDF once it
+was supplied: EA-ST F2 (P_c1 10 D / 20 D, kT 2.22 / 2.85, published
+0.936 / 0.043 / 0.732 and 1.410 / 0.075 / 1.021), EA-SB F1 Case 1 (P_l1 5 D,
+P_l2 2.5 D, P_v 2 D, kB 3.20, published 2.30 / 1.41) and EA-SB F2 Cases 1–3
+(2.24 / 0.086 / 1.45, 2.40 / 0.086 / 1.52, 2.53 / 0.085 / 1.60) all match.
+**So transcription is eliminated as the cause of the EA-SB scatter**, which
+was §7 item 2 and was the candidate it named first.
 
 | Case | Paper X_c | ours | Δ | Paper X_i | ours | Δ | Paper X_e | ours | Δ |
 |---|---|---|---|---|---|---|---|---|---|
-| EA-ST F2 Case 1 | 0.936% | 0.904% | **−3.5%** | 0.043% | 0.075% | +74.9% | 0.732% | 0.533% | −27.3% |
-| EA-ST F2 Case 2 | 1.410% | 1.601% | +13.5% | 0.075% | 0.124% | +65.1% | 1.021% | 0.683% | −33.1% |
-| EA-SB F1 Case 1 | 2.30% | 0.941% | −59.1% | — | — | — | 1.41% | 1.117% | −20.8% |
-| EA-SB F2 Case 1 | 2.24% | 1.291% | −42.4% | 0.086% | 0.137% | +59.0% | 1.45% | 1.270% | −12.4% |
-| EA-SB F2 Case 2 | 2.40% | 2.169% | **−9.6%** | 0.086% | 0.122% | +42.1% | 1.52% | 0.854% | −43.8% |
-| EA-SB F2 Case 3 | 2.53% | 1.508% | −40.4% | 0.085% | 0.127% | +49.3% | 1.60% | 1.394% | −12.9% |
+| EA-ST F2 Case 1 | 0.936% | 0.887% | **−5.3%** | 0.043% | 0.074% | +73.2% | 0.732% | 0.519% | −29.2% |
+| EA-ST F2 Case 2 | 1.410% | 1.534% | **+8.8%** | 0.075% | 0.118% | +57.6% | 1.021% | 0.669% | −34.5% |
+| EA-SB F1 Case 1 | 2.30% | 0.889% | −61.3% | — | — | — | 1.41% | 1.053% | −25.3% |
+| EA-SB F2 Case 1 | 2.24% | 1.222% | −45.4% | 0.086% | 0.133% | +55.1% | 1.45% | 1.208% | −16.7% |
+| EA-SB F2 Case 2 | 2.40% | 2.053% | **−14.4%** | 0.086% | 0.117% | +35.7% | 1.52% | 0.828% | −45.5% |
+| EA-SB F2 Case 3 | 2.53% | 1.447% | −42.8% | 0.085% | 0.121% | +42.9% | 1.60% | 1.321% | −17.5% |
 
-**Reproduced: the ordering X_c > X_e ≫ X_i, in all six cases.** That is
-Paper 2's actual finding and the reason the scheme exists — a frame bolted on
-at points concentrates strain at its fastenings, leaves the pipe between them
-almost unstrained, and the pipe outboard reads the plain overbend.
+**Reproduced: the ordering X_c > X_e ≫ X_i, in five of the six cases.** That
+is Paper 2's actual finding and the reason the scheme exists — a frame bolted
+on at points concentrates strain at its fastenings, leaves the pipe between
+them almost unstrained, and the pipe outboard reads the plain overbend.
+X_c ≫ X_i holds in all five cases that have an interior, by factors of 9.2
+to 17.5.
 
-**Not reproduced: the magnitudes.** EA-ST agrees on X_c to −3.5% and +13.6%.
-**EA-SB reads low**, −9.6% to −59.1%, and an envelope cannot be below a
-single position of the same case — so the envelope offset is *eliminated* as
-the explanation rather than left open. X_c is the quantity most sensitive to
-connector placement, which is the thread to pull. X_i is high by 42–75%
-everywhere; it is an order of magnitude below X_c so it moves no design
-conclusion, but the sign is consistent across all five cases that have one,
-which says one cause and not five.
+**The exception is EA-SB F1 Case 1, which inverts**: X_e 1.053% above X_c
+0.889%, where the paper has 1.41% below 2.30%. It is the one single-connector
+case in the set, so it is also the one case with no interior to be quiet and
+nothing to share the fastening load with — and it is the worst X_c
+disagreement in the ledger at −61.3%. **The inversion is not new and was
+recorded here as holding "in all six cases" through two earlier revisions;
+that was wrong at 120 MT too** (0.941 against 1.117%), and is corrected here.
+Whatever is suppressing EA-SB's X_c is strongest exactly where the structure
+has one attachment point, which is a sharper statement of §7 item 1 than
+"connector placement" and the reason the placement sweep should start with
+F1.
+
+**Not reproduced: the magnitudes.** EA-ST agrees on X_c to −5.3% and +8.8%,
+both inside 10%. **EA-SB reads low**, −14.4% to −61.3%, and an envelope
+cannot be below a single position of the same case — so the envelope offset
+is *eliminated* as the explanation rather than left open. X_c is the quantity
+most sensitive to connector placement, which is the thread to pull. X_i is
+high by 36–73% everywhere; it is an order of magnitude below X_c so it moves
+no design conclusion, but the sign is consistent across all five cases that
+have one, which says one cause and not five.
+
+**Three candidate causes for EA-SB are now eliminated**, which is the whole
+value of the two re-runs: it is not truncation (L105/L106 — all six sweep
+their full travel), not the lay tension (L107 — correcting it left the
+scatter intact), and not transcription (audited against the PDF above). What
+remains is connector placement, and the paper's own caveat that its EA
+strains are "for relative comparison (pattern recognition), not absolute code
+compliance" — it does not claim the magnitudes are absolute.
 
 **X_e is parked by instruction.** Its boundary follows Paper 2's *figures*,
 not its prose: the text says "pipeline outside the structures" while Figs 27
 and 38 draw X_e running up to where X_c begins. Implementing the prose moved
-X_e from −10% to −45%.
+X_e from −10% to −45%. *That comparison was measured at 120 MT and has not
+been re-run; it is a comparison between two boundary definitions on the same
+model, so L107 moves both sides of it.*
 
 **F1D and F2D are refused, not approximated.** A `D` connector is a deadband
 and needs an active set as well as a co-rotating frame; with the frame alone
@@ -730,25 +833,31 @@ counterpart. `PS` is `(None, 'P', None, 'S', None)` — a pin at slot 2 and a
 *skewed* roller at slot 4 — and these are the **same case dimensions** as the
 F2 rows above, so the honest comparison is against our own F2 numbers.
 
-*Run 7 Oct; all six sweep 100% of their travel. The earlier note that EA-SB
-"truncates at 20% of its travel and its values are lower bounds" no longer
-holds — that was L105 and L106, and both are fixed.*
+*Run 7 Oct at **100 MT**, the same correction as the published cases above
+(L107); all six sweep 100% of their travel. Both columns are from the same
+tension, so the comparison is internal and the correction largely cancels out
+of it — the X_c fall moved from 26–77% to 26.4–76.7% and no conclusion below
+changed. The one thing that did move is worth having: under F2 at 120 MT,
+EA-ST's X_i reached X_c exactly; at 100 MT it **passes** it in Case 2. The
+earlier note that EA-SB "truncates at 20% of its travel and its values are
+lower bounds" no longer holds — that was L105 and L106, and both are fixed.*
 
 | Case | X_c, F2 | X_c, PS | | X_i, F2 | X_i, PS |
 |---|---|---|---|---|---|
-| EA-ST Case 1 | 0.904% | 0.367% | **−59%** | 0.075% | **0.365%** |
-| EA-ST Case 2 | 1.601% | 0.371% | **−77%** | 0.124% | **0.371%** |
-| EA-SB F1 Case 1 | 0.941% | 1.098% | +17% | — | — |
-| EA-SB F2 Case 1 | 1.291% | 0.951% | −26% | 0.137% | **0.647%** |
-| EA-SB F2 Case 2 | 2.169% | 1.113% | −49% | 0.122% | **0.751%** |
-| EA-SB F2 Case 3 | 1.508% | 0.959% | −36% | 0.127% | **0.623%** |
+| EA-ST Case 1 | 0.887% | 0.357% | **−59.8%** | 0.074% | **0.355%** |
+| EA-ST Case 2 | 1.534% | 0.358% | **−76.7%** | 0.118% | **0.361%** |
+| EA-SB F1 Case 1 | 0.889% | 1.029% | +15.7% | — | — |
+| EA-SB F2 Case 1 | 1.222% | 0.900% | −26.4% | 0.133% | **0.616%** |
+| EA-SB F2 Case 2 | 2.053% | 1.033% | −49.7% | 0.117% | **0.722%** |
+| EA-SB F2 Case 3 | 1.447% | 0.909% | −37.2% | 0.121% | **0.595%** |
 
 **One mechanism, in both archetypes.** A pin and a skewed roller cannot carry
 the moment an F connector carries, so they *relieve the fastening* — X_c
 falls, by 26–77% in five of the six cases. What they cannot do is shield the
 pipe between them, so the interior stops being quiet: X_i rises by a factor
-of 5 in both EA-SB F2 cases and, in EA-ST, rises to **exactly equal X_c**
-(0.367 against 0.365%, and 0.371 against 0.371%).
+of 4.6–6.2 in all three EA-SB F2 cases and, in EA-ST, **catches X_c
+outright** — 0.357 against 0.355% in Case 1, and 0.358 against 0.361% in
+Case 2, where the interior is now the higher of the two.
 
 That second half is the part worth noticing. Under F2 the design question is
 "how bad is it at the fastening"; under PS the peak is no longer at the
@@ -758,10 +867,12 @@ carry. EA-SB F1 is the one case where X_c *rises*, and it has a single
 connector, so there is no interior for the load to move into.
 
 **The earlier figures recorded here, X_c 0.601 / 0.357% for F2 / PS, are
-withdrawn.** They came from truncated passages on a frozen lay tension. The
-qualitative reading they supported — the connector is relieved and the
-shielding is lost — survives, and is now stronger: a 41% fall became 59–77%,
-and "X_i rises to equal X_c" is now exact rather than approximate.
+withdrawn.** They came from truncated passages on a frozen lay tension, and
+the 120 MT figures that replaced them are superseded in turn by L107. The
+qualitative reading all three supported — the connector is relieved and the
+shielding is lost — has survived every one of those corrections, and is now
+stronger than when it was first recorded: a 41% fall became 59–77%, and "X_i
+rises to equal X_c" became, in EA-ST Case 2, X_i *above* X_c.
 
 **F1D and F2D are refused, not approximated.** A `D` connector is a deadband
 and needs an active set as well as a co-rotating frame; with the frame alone
@@ -795,38 +906,70 @@ condition L101 was written about.*
 | **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
 | **XXXIX** shroud + thick pipe length | 2 | **re-run 7 Oct** — strain −13.7% and −4.3%; BM −6.5% and −12.2% |
 | **XLI** shroud + thick pipe location | 3 | **run 7 Oct** — strain −8.4 to −9.8%, **BM −4.0 to +1.3%**; the paper's worst-case position is reproduced |
-| **Paper 2** EA F1 / F2 | 6 | **re-run 7 Oct, unchanged** — ordering reproduced in all six; all at 100% of travel |
-| **Paper 2** EA PS (prediction) | 6 | **run 7 Oct** — no published counterpart. X_c falls 26–77% against our own F2, X_i rises to equal it |
+| **Paper 2** EA F1 / F2 | 6 | **re-run twice 7 Oct**, the second time at the paper's 100 MT (L107) — ordering reproduced in **five of six**, all at 100% of travel; EA-SB F1 Case 1 inverts X_c and X_e. EA-ST X_c now −5.3% and +8.8%; **EA-SB −14.4 to −61.3%**, scatter unexplained |
+| **Paper 2** EA PS (prediction) | 6 | **re-run 7 Oct at 100 MT** — no published counterpart. X_c falls 26–77% against our own F2 at the same tension; X_i rises 4.6–6.2× and in EA-ST overtakes X_c |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
-**50 of 50 published cases have a rebuild number, and every one of them was produced by the current program.** Paper 1 and Paper 2 are both complete. Six PS cases are run as prediction, having no published counterpart; F1D and F2D remain refused under G9.
+**50 of 50 published cases have a rebuild number, and every one of them was
+produced by the current program at the tension its own paper states.** Paper 1
+and Paper 2 are both complete, and both papers are now cited in full under
+*How to read this* — for most of this ledger's life Paper 2 was not, which is
+what L107 cost. Six PS cases are run as prediction, having no published
+counterpart; F1D and F2D remain refused under G9.
+
+*Tensions are per-table and were audited against both PDFs on 7 Oct, not
+assumed: Paper 1's TABLE X is 120 MT and its S1 shroud series is 120 MT,
+while its component, spacing and S2 series are 100 MT; all of Paper 2 is
+100 MT. The Paper 1 runners each carried the right one. The two Paper 2
+runners did not — L107.*
+
+*Also checked, because L107 invites the question: the shroud runners' `--V`,
+`--L1` and `--L2` flags **stopped reaching the model** for two and a half
+hours on 7 Oct — `L108`, a case-sensitivity slip — and `emit` answers a
+dropped dimension with the archetype's default, silently. **No number here
+is affected.** TABLE XXXI and XXXII, the two that ask for non-default
+dimensions, were both run before the slip; the only campaign inside the
+window was TABLE XXXIX and XLI, whose shroud is held at exactly the
+ILS-SH default (V 1 D, L1 10 D, L2 2.5 D), and the two code paths the
+slip chooses between were built side by side and agree on every field.
+That is a coincidence, not a safeguard, which is why it has three tests
+now.*
 
 ## 7. What is not settled
 
-*Rewritten 7 Oct, after the re-run campaign. Four entries from the previous
-list are **closed** and are recorded at the foot of this section rather than
-deleted, because what closed them is the useful part.*
+*Rewritten 7 Oct, after the re-run campaign, and again the same day after
+Paper 2 was supplied. **Six** entries from the previous lists are closed and
+are recorded at the foot of this section rather than deleted, because what
+closed them is the useful part — and in one case because it closed the
+opposite way to how it was written.*
 
 ### Still open, in the order worth attacking
 
-1. **EA-SB reads 9.6–59.1% low on X_c**, and the scatter is the problem
-   rather than the magnitude: Case 2 agrees to −9.6% while Case 1 and Case 3
-   of the same family and the same study are out by −42.4% and −40.4%. A
-   systematic modelling difference would not pick three cases out of four.
-   Two candidates, neither eliminated: a transcription error in the case
-   dimensions (see 2), or connector placement, which is the quantity X_c is
-   most sensitive to.
+1. **EA-SB reads 14.4–61.3% low on X_c**, and the scatter is the problem
+   rather than the magnitude: F2 Case 2 agrees to −14.4% while F2 Case 1 and
+   F2 Case 3 of the same family and the same study are out by −45.4% and
+   −42.8%. A systematic modelling difference would not pick three cases out
+   of four. **Three candidates are now eliminated** — truncation (L105,
+   L106), lay tension (L107, which moved every case by 2–5 points and left
+   the spread intact) and transcription (the case tables were audited against
+   Paper 2 directly; see §5). **Connector placement is what is left**, and it
+   is the quantity X_c is by construction most sensitive to: X_c is defined
+   as the band within 2 × OD either side of a connector, so where the
+   connector sits decides which elements are even in the region. **Start the
+   placement sweep at F1 Case 1**, not at F2: it is the only
+   single-connector case, the only one that inverts X_c and X_e (1.053%
+   against 0.889%, where the paper has 1.41% below 2.30%), and the worst
+   disagreement in the ledger at −61.3%. Whatever suppresses EA-SB's X_c is
+   strongest where the structure has exactly one attachment point, which is
+   a sharper handle than "connector placement" on its own. Then move P_c1 by
+   ±1 element on F2 Case 1 and see whether −45% can be walked to −14%.
 
-2. **Paper 2 has no citation in this repo.** Its case tables and region
-   definitions were transcribed from supplied figures, so every number in §5
-   is checked against a transcription rather than a source. This matters most
-   for exactly the EA-SB rows in 1, where a transcription error would read
-   precisely like a physics disagreement. **This is cheap to close and
-   nothing else should be concluded about EA-SB until it is.**
-
-3. **We report extreme-fibre strain per element; the papers report "nominal
-   strains at element integration points."** Still never checked against the
-   kernel. The reading has *changed direction* and that is worth stating:
+2. **We report extreme-fibre strain per element; the papers report "nominal
+   strains at element integration points."** Paper 2 states the convention in
+   so many words — *"Nominal Strains at element integration points are
+   reported here"* — so what the reference quantity *is* is now settled; what
+   is not is our strain against the kernel's integration points. The reading
+   has *changed direction* and that is worth stating:
    `slay_sliding_v0_5` shows the reference's own comparison basis is
    `_strain_profile_b31`, an Abaqus-B31 convention that collapses each
    element to one value and then averages across neighbours — a convention
@@ -838,50 +981,50 @@ deleted, because what closed them is the useful part.*
    closing it would widen the gap, not shrink it. The earlier claim that
    this was "the single most promising open item" is **withdrawn**.
 
-4. **Strain falls away with component length while the moment does not** —
+3. **Strain falls away with component length while the moment does not** —
    TABLE XXIII/XXIV, −5.6% at 10 D to −31.6% at 20 D with moments inside
    7.7%. Survived the whole re-run campaign untouched (the values moved in
    the fourth decimal), so it is not a sweep artefact. One-sided LOW, so it
    is not an envelope offset either. The clearest remaining pointer at a real
    modelling difference.
 
-5. **The dual-roller saturation is reproduced in direction but not in
+4. **The dual-roller saturation is reproduced in direction but not in
    degree.** TABLE XXXII now gives −10.7% from 10 D to 50 D against the
    paper's −52%; TABLE XXIII/XXIV gives strain +29.0% and moment +76.3% from
    20 D to 40 D against +2.8% and +45.8%. The sign is right in both, which
    it was not before L105 and L106; the plateau is still much softer than
    published.
 
-6. **TABLE XXVI finds a spacing dependence the paper calls negligible** —
+5. **TABLE XXVI finds a spacing dependence the paper calls negligible** —
    9.6% spread against 2.6%, a factor of 3.7. Its configuration is inferred
    from a shared 1384 kN·m with TABLE XXIII's B1, so the inference is a
    candidate cause. The moments agree within 1%, which argues the geometry
    is right and the strain reporting is not.
 
-7. **The 40 D moment overshoots** at +13.0% where every other length reads
+6. **The 40 D moment overshoots** at +13.0% where every other length reads
    low. That body spans nearly two full roller bays; whether the overshoot is
    our contact engaging too readily or the reference's letting go is
    unsettled.
 
-8. **Whether our envelope and the paper's "Phase 2" are the same mechanical
+7. **Whether our envelope and the paper's "Phase 2" are the same mechanical
    state** sits under every shroud and combined row. Phase 2 carries residual
    plastic curvature from Phase 1 over the mid-stinger rollers; our envelope
    is a maximum over the travel we solve. Now that every passage sweeps its
    full travel this is testable in a way it was not before.
 
-9. **X2 holds one or two elements at 2 × OD** in most shroud cases, including
+8. **X2 holds one or two elements at 2 × OD** in most shroud cases, including
    the closest agreements in §3. A ratio computed over two elements is
    reporting a mesh as much as a strain field.
 
-10. **Region boundaries disagree with the paper's by centimetres**, and in
-    four rows across TABLE XXXIX, XLI and XXXII that is enough to empty a
-    region or move a peak across a boundary. Handled by reporting the overall
-    peak and the region label together, which is a presentation fix and not a
-    resolution.
+9. **Region boundaries disagree with the paper's by centimetres**, and in
+   four rows across TABLE XXXIX, XLI and XXXII that is enough to empty a
+   region or move a peak across a boundary. Handled by reporting the overall
+   peak and the region label together, which is a presentation fix and not a
+   resolution.
 
-11. **F1D and F2D are refused**, not approximated. A `D` is a deadband
-    needing an active set as well as a co-rotating frame. Six published
-    Paper 2 cases are therefore compared and two families are not.
+10. **F1D and F2D are refused**, not approximated. A `D` is a deadband
+   needing an active set as well as a co-rotating frame. Six published
+   Paper 2 cases are therefore compared and two families are not.
 
 ### Closed by the 7 Oct campaign
 
@@ -889,19 +1032,32 @@ deleted, because what closed them is the useful part.*
 |---|---|
 | "`ILS-EASB` truncates at 20% of its passage — the only capability regression from the contact-surface change, undiagnosed" | **L105 and L106.** It was not a contact-surface regression at all: the lay tension was frozen to one piece of steel, and nothing cut back the travel between positions. All six EA cases now sweep 100% |
 | "the lift-off hypothesis in §3 is unverified and would explain three disagreements at once" | **Superseded.** The three disagreements it was invented to explain were truncated passages. TABLE XXXI config C went from −39.9…−73.4% to −5.4…−22.1% with no change to contact |
-| "the double-roller saturation is reproduced in character but not in degree — the inversion is gone" | **Partly, and restated as 5.** The inversion in TABLE XXXII was real and was L105/L106; the residual softness is not |
-| "extreme-fibre strain is the single most promising open item" | **Withdrawn, as 3.** The reference's own convention under-reports where ours over-reports, so it cannot explain a one-sided low |
+| "the double-roller saturation is reproduced in character but not in degree — the inversion is gone" | **Partly, and restated as 4.** The inversion in TABLE XXXII was real and was L105/L106; the residual softness is not |
+| "extreme-fibre strain is the single most promising open item" | **Withdrawn, as 2.** The reference's own convention under-reports where ours over-reports, so it cannot explain a one-sided low |
+| "**Paper 2 has no citation in this repo** — its case tables were transcribed from supplied figures, so every number in §5 is checked against a transcription rather than a source. This is cheap to close and nothing else should be concluded about EA-SB until it is" | **Closed, and it closed the wrong way round.** The paper was supplied and the tables audited against it: every EA-ST and EA-SB dimension and published value matches. So transcription is *eliminated* as the cause of the EA-SB scatter rather than confirmed as it. What the paper did carry was a parameter block nobody here had seen — `Pipeline Tension 100 mT`, against the 120 both runners defaulted to. **The item was right that the missing citation mattered and wrong about what it was hiding** |
+| *(not on the previous list, because nothing here could see it)* "every Paper 2 number was run at 120 MT" | **L107, found by reading the paper.** Twelve figures — six published cases and six PS predictions — re-run at 100 MT. EA-ST tightened to (−5.3, +8.8); EA-SB moved 2–5 points further low with the scatter intact. Both runners now default to 100.0 with the three parameter-block locations beside them |
 
 ### A note on how much of this list was the program
 
-Of the nine entries in the previous version, four were artefacts of four
-sweep defects — L101's silent truncation, L105's frozen lay tension, L106's
-missing travel cutback, and the strain guard that followed. None of the four
-was visible as a wrong number; three of them produced *no* number and the
-fourth produced a 96.7% strain that reported as COMPLETE. The lesson the
-register already carries (L101) is the one to keep: **a result that does not
-exist is more dangerous than a result that is wrong**, because nothing about
-it looks wrong.
+Of the nine entries in the version before this one, four were artefacts of
+four sweep defects — L101's silent truncation, L105's frozen lay tension,
+L106's missing travel cutback, and the strain guard that followed. None of
+the four was visible as a wrong number; three of them produced *no* number
+and the fourth produced a 96.7% strain that reported as COMPLETE. The lesson
+the register already carries (L101) is the one to keep: **a result that does
+not exist is more dangerous than a result that is wrong**, because nothing
+about it looks wrong.
+
+**L107 is the first entry on this list that no amount of looking at the
+program would have found.** The other six closures came from measuring the
+code against itself — a mesh sweep, a bisection, a monkeypatch, a
+re-posed equilibrium. This one came from reading a sentence in a PDF. The
+input was a plain number in a runner, the code around it was correct, every
+test passed, and the result it produced was plausible enough to have been
+published in this ledger three times. **Nothing inside a repository can
+check a figure that only exists outside it**, which is why both papers are
+now cited in full at the top of this file and why L107's rule is about
+sourcing a parameter rather than about validating one.
 
 ---
 
@@ -909,6 +1065,7 @@ it looks wrong.
 
 | Version | Date | What |
 |---|---|---|
+| **3.2** | 7 Oct 2026 | **Paper 2 supplied and audited.** Both papers now cited in full. Case-table transcription verified correct throughout §5, which *eliminates* it as the cause of the EA-SB scatter. **L107: every Paper 2 case had been running at 120 MT against the paper's stated 100** — all twelve figures re-run, runners corrected. EA-ST tightened to (−5.3, +8.8); EA-SB scatter survives all three eliminations. §7 down to ten open items |
 | **3.1** | 7 Oct 2026 | **Every case re-run on the current program** after L101, L105, L106 and the strain guard. All 50 published cases now carry a number from this build, Paper 1 and Paper 2 complete. TABLE XXVI, XXXIX and XLI run for the first time; six PS cases added as prediction. §7 rewritten: four entries closed |
 | **3.0** | 6 Oct 2026 | Restructured on the papers' own table numbering. Rebuild against the papers only. **Bending moment added for every case.** Shroud + thick pipe run for the first time |
 | 2.0 | 6 Oct 2026 | Re-measured on the physical contact surface after L095–L098 |

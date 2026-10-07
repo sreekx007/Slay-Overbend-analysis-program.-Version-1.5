@@ -220,13 +220,22 @@ def _extra(argv=None):
     dict of Nones is truthy (L094).
     """
     argv = sys.argv if argv is None else argv
+    # MATCHED WITHOUT REGARD TO CASE, and that is the whole of L108. The
+    # dotted names needed `.lower()` so that `TP.centre_x` reads as
+    # `--tp-centre-x`, but lowercasing the FLAG while leaving `argv` alone
+    # meant `--V`, `--L1`, `--L2` and `--P-v` stopped matching anything.
+    # `_extra` then returned None, `emit` took that for "no dimensions
+    # asked for" and fell back to the archetype's defaults -- a plausible
+    # number for a geometry nobody requested, with nothing on the artifact
+    # to say so. Three shroud runners pass exactly those flags.
+    low = [a.lower() for a in argv]
     out = {}
     for k in COMPONENT_DIMS:
         # `TP.centre_x` becomes `--tp-centre-x`: the dot is a separator like
         # the underscore, so a body-qualified dimension reads as one flag.
         flag = '--' + k.replace('_', '-').replace('.', '-').lower()
-        if flag in argv:
-            out[k] = float(argv[argv.index(flag) + 1])
+        if flag in low:
+            out[k] = float(argv[low.index(flag) + 1])
     return out or None
 
 

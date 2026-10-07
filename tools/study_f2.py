@@ -194,7 +194,13 @@ def main() -> int:
 
     R = arg('--R', float, 85.0)
     spacing = arg('--spacing', float, 9.0)
-    tension = arg('--tension', float, 120.0)
+    # 100 mT, NOT 120. Paper 2 states `Pipeline Tension 100 mT` in all three
+    # of its parameter blocks -- EA-ST (Sec. VII.A, TABLE IX), EA-SB
+    # (Sec. VIII.A) and the branch study -- and every Paper 2 number in the
+    # ledger before 7 Oct 2026 was run at 120, a fifth too much. Found by
+    # reading the paper once it was supplied, never by a check, because
+    # nothing in the repo knew what the right value was.
+    tension = arg('--tension', float, 100.0)
     L_top_D = arg('--L-top', float, 22.0)
     step_OD = arg('--step', float, 2.0)
     system = arg('--system', str, 'F2')

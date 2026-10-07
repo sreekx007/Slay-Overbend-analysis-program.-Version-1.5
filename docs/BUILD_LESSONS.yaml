@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 106
+# entries: 108
 
 - id: L001
   area: kernel
@@ -2621,4 +2621,112 @@
     sweep that needed sub-steps reports the same total as one that did not.
   detect: test_a_failed_advance_is_halved_and_retried, test_the_halved_positions_are_KEPT_not_scaffolding, test_bisection_stops_at_the_floor_instead_of_halving_forever, test_mode_B_does_not_bisect
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/solve/passage.py, rebuild/tests/test_passage_completion.py]
+  date: 2026-10-07
+
+- id: L107
+  area: process
+  class: defect
+  symptom: >-
+    EVERY Paper 2 number recorded in the ledger before 7 Oct 2026 was
+    computed at 120 MT lay tension. Paper 2 states `Pipeline Tension 100 mT`
+    in all three of its parameter blocks -- EA-ST (Sec. VII.A), EA-SB
+    (Sec. VIII.A) and the branch study. Six published cases and six PS
+    predictions, all run at a fifth too much tension. Found by reading the
+    paper on the day it was supplied, not by any check in the repository.
+  cause: >-
+    `tools/study_f2.py` and `tools/study_easb_cases.py` both carried
+    `tension = arg('--tension', float, 120.0)`. 120 MT is the Paper 1
+    figure and was copied across when the Paper 2 runners were written from
+    the Paper 1 ones. Nothing in the repository knew what Paper 2's tension
+    was, because the paper itself was not in the repository -- only the case
+    tables had been transcribed, and a case table does not carry the
+    parameter block. So the wrong default was unfalsifiable here: no test
+    could have caught it, and the agreement figures it produced were
+    plausible (-3.5% on EA-ST Case 1) rather than obviously broken.
+  cause_detail: >-
+    THE SIZE OF THE ERROR IS NOT THE POINT. Re-running at 100 MT moves
+    EA-ST Case 1 from -3.5% to -5.3% and Case 2 from +13.5% to +8.8%, so the
+    EA-ST band TIGHTENS from (-3.5, +13.5) to (-5.3, +8.8); all four EA-SB
+    cases move 2-5 points further negative (F2 Case 2 -9.6 -> -14.4%, F2
+    Case 1 -42.4 -> -45.4%, F2 Case 3 -40.4 -> -42.8%, F1 Case 1
+    -59.1 -> -61.3%). The EA-SB scatter -- -14.4% beside -45.4%, -42.8% and
+    -61.3% -- is UNCHANGED in character, so the tension was never the cause
+    of it. Every one of those twelve numbers was nonetheless being compared
+    against a paper it did not correspond to.
+  rule: >-
+    A VALIDATION PARAMETER THAT CAME FROM A PAPER MUST NAME THE PAPER AND
+    THE PLACE IN IT. A bare numeric default in a runner is an unsourced
+    claim, and when the source document is absent from the repository it is
+    an unfalsifiable one. The two Paper 2 runners now default to 100.0 with
+    the three parameter-block locations in a comment beside them. More
+    generally: transcribing the case tables out of a paper is not
+    transcribing the paper -- the parameter block that every case shares is
+    exactly the part a per-case table omits, and is therefore the part most
+    likely to be carried over wrong from whichever runner was copied.
+  rule_detail: >-
+    THE TRANSCRIPTION AUDIT CAME BACK CLEAN, which is why this entry is
+    about the parameter block and not the tables. Against the supplied PDF:
+    EA-ST F2 (P_c1 10D/20D, kT 2.22/2.85, published 0.936/0.043/0.732 and
+    1.41/0.075/1.021), EA-SB F1 Case 1 (P_l1 5D, P_l2 2.5D, P_v 2D, kB 3.2,
+    published 2.30/1.41) and EA-SB F2 Cases 1-3 (2.24/0.086/1.45,
+    2.40/0.086/1.52, 2.53/0.085/1.60) all match the ledger exactly. The
+    paper also confirms two conventions the ledger had listed as open:
+    "Nominal Strains at element integration points are reported here", and
+    that bulkheads and thick inline components are intentionally not
+    modelled, so "Reported strains are for relative comparison (pattern
+    recognition), not absolute code compliance."
+  detect: '-'
+  refs: [tools/study_f2.py, tools/study_easb_cases.py, docs/validation/VALIDATION_v3.0_2026-10-06.md]
+  date: 2026-10-07
+
+- id: L108
+  area: process
+  class: defect
+  symptom: >-
+    `emit_profile._extra` stopped matching EVERY upper-case flag at once --
+    `--V`, `--L1`, `--L2`, `--P-v`, `--P-l1`, `--kB-ratio` -- and returned
+    None instead. `emit` reads None as "no dimensions were asked for" and
+    answers with the archetype's default geometry, so a shroud run asked for
+    V = 2 D, L1 = 25 D would have solved V = 1 D, L1 = 10 D and reported a
+    peak strain for it with nothing on the artifact to say which geometry it
+    was. Three runners pass exactly those flags: `study_table_xxxi.py`,
+    `study_table_xxxii.py` and `study_table_xxxix.py`.
+  cause: >-
+    Introduced at b5e2b79 with the dotted component names. `TP.centre_x` has
+    to read as `--tp-centre-x`, so the flag was built with
+    `k.replace('_','-').replace('.','-').lower()` -- and the `.lower()` was
+    applied to the FLAG while `argv` was left as the caller wrote it. Every
+    dimension whose name carries a capital stopped matching. The dotted
+    names it was added for kept working, because they are lower case after
+    the transform anyway, so the change looked correct in exactly the cases
+    it was written for.
+  cause_detail: >-
+    LIVE FOR TWO AND A HALF HOURS AND IT COST NOTHING, by coincidence rather
+    than by design, which is the only reason this is a near-miss and not a
+    retraction. The one campaign run inside that window was TABLE XXXIX and
+    XLI (85c6c0a), and `study_table_xxxix.py` holds the shroud at
+    SH = (V 1 D, L1 10 D, L2 2.5 D) = (0.4064, 4.064, 1.016) m, which is
+    EXACTLY the ILS-SH fixture default. Verified rather than assumed: the
+    two code paths the bug chooses between -- `build_component_ils` on the
+    defaults, and `_ea_ils` with the three values supplied -- were built
+    side by side and compared, and they agree on extent, pipe OD, wall and
+    every component field. TABLE XXXI and XXXII, which DO ask for
+    non-default V, L1 and L2 (up to V = 2 D, L1 = 50 D), were both run
+    before b5e2b79. No published number in the ledger is affected.
+  rule: >-
+    A FLAG IS PART OF THE MODEL (L094's rule) AND SO IS ITS SPELLING. `_extra`
+    now lower-cases a copy of `argv` and matches against that, so a dimension
+    answers to any case the caller writes -- `--V`, `--v`, `--TP-CENTRE-X`.
+    The generic rule is narrower than it looks: a silent default-fallback is
+    the failure mode to design against, because `_extra` returning None is
+    indistinguishable from a caller that asked for nothing. Three tests now
+    hold it: every dimension round-trips through the dot-and-underscore
+    spelling, every dimension round-trips in three cases, and the exact
+    mixed-case command line the three shroud runners send is asserted
+    verbatim. That last one is the point -- L108 survived its own commit
+    because every existing test built its flags with the same generic
+    expression the code did, so code and test were wrong together, and no
+    test used the spelling a real caller sends.
+  detect: test_a_flag_matches_whatever_case_it_is_written_in, test_the_flags_the_shroud_RUNNERS_ACTUALLY_PASS_are_picked_up, test_every_component_dimension_has_a_flag_that_round_trips
+  refs: [tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
   date: 2026-10-07

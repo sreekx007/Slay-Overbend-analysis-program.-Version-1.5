@@ -136,7 +136,13 @@ def main() -> int:
 
     R = arg('--R', float, 85.0)
     spacing = arg('--spacing', float, 9.0)
-    tension = arg('--tension', float, 120.0)
+    # 100 mT, NOT 120. Paper 2 states `Pipeline Tension 100 mT` in all three
+    # of its parameter blocks -- EA-ST (Sec. VII.A, TABLE IX), EA-SB
+    # (Sec. VIII.A) and the branch study -- and every Paper 2 number in the
+    # ledger before 7 Oct 2026 was run at 120, a fifth too much. Found by
+    # reading the paper once it was supplied, never by a check, because
+    # nothing in the repo knew what the right value was.
+    tension = arg('--tension', float, 100.0)
     step_OD = arg('--step', float, 1.0)
     only = arg('--case', str, None)
     system = arg('--system', str, None)
@@ -164,7 +170,13 @@ def main() -> int:
                 ref = c[key]
                 got = 100 * env[key]
                 if ref is None:
-                    return f'{got:8.3f}% (n/a)'
+                    # L097. An F1 layout has ONE connector, so there is no
+                    # interior between two of them -- the region does not
+                    # exist, which is also why the paper tabulates none. The
+                    # envelope over an empty region comes back 0.0, and
+                    # printing that as `0.000%` reads as a MEASURED zero
+                    # strain. A dash means not measured; it never means zero.
+                    return f'{"--":>8s}  (n/a)'
                 return f'{got:8.3f}%{(got - ref) / ref * 100:+7.1f}%'
 
             pc1 = f'{c["P_c1"]:.0f}D' if c['P_c1'] else '--'
