@@ -397,20 +397,49 @@ it ran. The five are a partition, so every element belongs to exactly one.
 *All cases Phase 2 in the paper. `n` is the number of elements in X2 at this
 mesh.*
 
-| Config | V | Paper X2 | ours X2 | Δ | Paper X3 | ours X3 | Paper X4 | ours X4 | ours BM | n |
-|---|---|---|---|---|---|---|---|---|---|---|
-| R=85, 100 MT | 0.75 D | 0.62% | 0.5241% | −15.5% | 0.42% | 0.4775% | 0.35% | 0.4445% | 1248 kN·m | 1 |
-| L1=10D, L2=2.5D | 1.00 D | 0.70% | 0.5976% | −14.6% | 0.55% | 0.5170% | 0.43% | 0.4586% | 1274 kN·m | 1 |
-| | 1.50 D | 0.95% | 0.7336% | −22.8% | 0.75% | 0.5914% | 0.58% | 0.5068% | 1303 kN·m | 1 |
-| | 2.00 D | 1.20% | 0.8824% | −26.5% | 0.88% | 0.6669% | 0.58% | 0.5562% | 1329 kN·m | 1 |
-| | 2.50 D | 1.51% | 1.0034% | −33.6% | 1.07% | 0.4538% | 0.62% | 0.2451% | 1352 kN·m | 1 |
-| | 3.00 D | 1.80% | 1.1577% | −35.7% | 1.20% | 0.4840% | 0.67% | 0.2501% | 1369 kN·m | 1 |
-| R=70, 120 MT | 1.00 D | 0.808% | 0.8481% | **+5.0%** | — | — | — | 0.6800% | 1333 kN·m | 1 |
-| L1=5D, L2=2.5D | 1.50 D | 0.970% | 0.9672% | **−0.3%** | — | — | — | 0.7375% | 1358 kN·m | 1 |
-| | 2.00 D | 1.15% | 1.1415% | **−0.7%** | — | — | — | 0.5958% | 1373 kN·m | 1 |
-| R=70, 100 MT | 1.00 D | 0.76% | 0.4569% | −39.9% | — | 0.2470% | — | 0.2151% | 1318 kN·m | 2 |
-| L1=10D, L2=5D | 1.50 D | 1.03% | 0.8190% | −20.5% | — | 0.3252% | — | 0.2525% | 1335 kN·m | 2 |
-| | 2.00 D | 1.23% | 0.3276% | −73.4% | — | 0.2190% | — | 0.1949% | 1339 kN·m | 2 |
+*`tools/study_table_xxxi.py`. Re-run 7 Oct; all twelve sweep 100% of their
+travel.*
+
+| Config | V | Paper X2 | ours X2 | Δ | Paper X3 | ours X3 | Paper X4 | ours X4 | ours BM |
+|---|---|---|---|---|---|---|---|---|---|
+| R=85, 100 MT | 0.75 D | 0.62% | 0.5239% | −15.5% | 0.42% | 0.4773% | 0.35% | 0.4443% | 1247.5 kN·m |
+| L1=10D, L2=2.5D | 1.00 D | 0.70% | 0.5973% | −14.7% | 0.55% | 0.5167% | 0.43% | 0.4584% | 1274.0 |
+| | 1.50 D | 0.95% | 0.7332% | −22.8% | 0.75% | 0.5912% | 0.58% | 0.5066% | 1303.3 |
+| | 2.00 D | 1.20% | 0.8820% | −26.5% | 0.88% | 0.6667% | 0.58% | 0.5560% | 1329.0 |
+| | 2.50 D | 1.51% | 1.0338% | −31.5% | 1.07% | 0.7387% | 0.62% | 0.6043% | 1351.6 |
+| | 3.00 D | 1.80% | 1.1852% | −34.2% | 1.20% | 0.8118% | 0.67% | 0.6391% | 1368.9 |
+| R=70, 120 MT | 1.00 D | 0.808% | 0.8685% | **+7.5%** | — | — | — | 0.6675% | 1332.9 |
+| L1=5D, L2=2.5D | 1.50 D | 0.970% | 0.9822% | **+1.3%** | — | — | — | 0.7308% | 1358.0 |
+| | 2.00 D | 1.15% | 1.1410% | **−0.8%** | — | — | — | 0.8378% | 1372.3 |
+| R=70, 100 MT | 1.00 D | 0.76% | 0.7187% | **−5.4%** | — | 0.5567% | — | 0.5386% | 1317.6 |
+| L1=10D, L2=5D | 1.50 D | 1.03% | 0.8389% | −18.6% | — | 0.6084% | — | 0.5874% | 1335.0 |
+| | 2.00 D | 1.23% | 0.9580% | −22.1% | — | 0.6699% | — | 0.6403% | 1352.6 |
+
+**Configuration C is where the sweep defects were hiding**, and the change is
+the largest in the ledger:
+
+| V | before | after |
+|---|---|---|
+| 1.00 D | −39.9% | **−5.4%** |
+| 1.50 D | −20.5% | −18.6% |
+| 2.00 D | −73.4% | **−22.1%** |
+
+Those three rows are the same geometry as TABLE XXXII's S2-3 and S2-6, run by
+a different tool, and the two agree to four decimals — 0.7187% and 0.9580%
+from both. That cross-check is kept deliberately: two tools, one answer.
+
+**Configuration A's X3 and X4 moved at the deep offsets.** At V = 2.50 D and
+3.00 D they had read 0.4538 / 0.4840% and 0.2451 / 0.2501% — *lower* than the
+shallower offsets, which is the wrong direction and was visible in the old
+table as a non-monotonicity nobody chased. They now read 0.7387 / 0.8118% and
+0.6043 / 0.6391%, monotonic in V like every other column. The X2 column barely
+moved (−33.6 → −31.5%, −35.7 → −34.2%), so this was a truncation eating the
+deep-section tail, not a change in the peak.
+
+**What did not change is the finding.** X2 is still monotonic in V and the
+rate is still under-amplified against the paper in configuration A — −15.5%
+at 0.75 D widening to −34.2% at 3.00 D. Configuration B, the shortest shroud
+at the highest tension, agrees within 7.5%.
 
 *X3 and X4 are published only for the R = 85 configuration (TABLE XXXIV).
 The `—` in our X3 column at R = 70 / 120 MT is a region holding **no
@@ -651,7 +680,7 @@ travel on the current contact surface and its values are lower bounds.
 | **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −2.4 to +6.7%** (component body) |
 | **XXIII / XXIV** thick pipe length | 6 | **re-run 7 Oct, unchanged** — moment −7.7 … +13.0%; saturation still not reproduced, strain −31.6% at 20 D |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
-| **XXXI / XXXIV** shroud offset depth | 12 | **done** — X2 monotonic in V; rate under-amplified |
+| **XXXI / XXXIV** shroud offset depth | 12 | **re-run 7 Oct** — config C from −39.9 … −73.4% to −5.4 … −22.1%, the largest change in the ledger; A's X3/X4 now monotonic in V; X2 still under-amplified |
 | **XXXII / XXXIII** shroud L1 and L2 | 7 | **run, all seven complete** — −22.1% to +66.1%; the dual-roller drop is reproduced in direction (−10.7% against the paper's −52%) for the first time |
 | **XXXIX** shroud + thick pipe length | 2 | **done** — amplification +37.6% against the paper's +36% |
 | **XLI** shroud + thick pipe location | 3 | not run — three runs, archetype already supports it |

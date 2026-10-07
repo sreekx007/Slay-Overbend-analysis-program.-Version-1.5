@@ -74,6 +74,7 @@ def read(stem):
     if not f.exists():
         return None
     pk = collections.defaultdict(float)
+    el = collections.defaultdict(set)
     bm = 0.0
     for r in csv.DictReader(open(f)):
         if r['owner'] != 'pipeline' or r['in_band'] not in ('1', 'True',
@@ -83,7 +84,12 @@ def read(stem):
             bm = max(bm, abs(float(r['moment'])))
         if r['region']:
             pk[r['region']] = max(pk[r['region']], abs(float(r['strain'])))
-    return dict(peak=pk, bm=bm, status=status(stem))
+            el[r['region']].add(r['element'])
+    # L097: a region that holds NO ELEMENTS at this mesh must not print
+    # 0.0000, which reads as a measurement of zero strain rather than as the
+    # absence of anything to measure. Config B's L1 = 5 D divides into
+    # thirds of 0.677 m against an element of 0.813 m, so X3 is empty.
+    return dict(peak=pk, el=el, bm=bm, status=status(stem))
 
 
 def main() -> int:
@@ -116,16 +122,19 @@ def main() -> int:
                 print(f'{V:5.2f}D  FAILED: {tail[-1][:60] if tail else "?"}')
                 continue
             st = d['status']
+            def _cell(g):
+                n = len(d['el'].get(g, ()))
+                return ('      --' if n == 0
+                        else f'{100 * d["peak"].get(g, 0.0):8.4f}%')
             x2 = 100 * d['peak'].get('X2', 0.0)
-            x3 = 100 * d['peak'].get('X3', 0.0)
-            x4 = 100 * d['peak'].get('X4', 0.0)
+            c3, c4 = _cell('X3'), _cell('X4')
             # No difference against the paper for a partial traverse (L101).
             delta = (f'{100 * (x2 / p2 - 1):+7.1f}%' if st.complete is True
                      else '   VOID')
             f3 = f'{p3:6.2f}%' if p3 is not None else '     --'
             f4 = f'{p4:6.2f}%' if p4 is not None else '     --'
             print(f'{V:5.2f}D  {x2:8.4f}% {p2:6.3f}% {delta}  '
-                  f'{x3:8.4f}% {f3}  {x4:8.4f}% {f4}  '
+                  f'{c3:>9s} {f3}  {c4:>9s} {f4}  '
                   f'{d["bm"] / 1000:8.1f} {st.flag():>6s}', flush=True)
             if st.complete is not True:
                 bad.append((name, V, st))
