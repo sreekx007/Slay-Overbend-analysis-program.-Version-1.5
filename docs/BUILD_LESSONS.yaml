@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 102
+# entries: 103
 
 - id: L001
   area: kernel
@@ -2379,4 +2379,45 @@
     one being read as though it did.
   detect: '-'
   refs: [rebuild/slay/study/sweep.py, rebuild/slay/solve/passage.py, rebuild/slay/physics/contact.py]
+  date: 2026-10-07
+
+- id: L103
+  area: measure
+  class: finding
+  symptom: >-
+    `report.profile._world` places a sample at `(-(s + shift + ux), y + uy)`,
+    advancing the pipe by adding `shift` to a STRAIGHT reference. Read
+    quickly that looks like a horizontal translation, which would be wrong
+    on the stinger, where the pipe runs at up to 44 degrees and material
+    advances along its own axis. It is not wrong, and the claim that it was
+    -- made in commit 8a2af25's message and in this session's chat -- is
+    withdrawn.
+  cause: >-
+    The straight reference is the DECK, which is horizontal, and the
+    reference is indexed by STATION, not by material. `arc_target_by_projection`
+    is the authority and says so in one line -- `ux, uy = -(x - (-s)), y`
+    with `(x, y) = path.position(s)` and `s` the station arc. So `dn` is the
+    normal displacement from the reference point at `(-s, 0)` to the path
+    point at `s`, and a material point that has advanced by `shift` bears on
+    a station whose reference sits `shift` further along that horizontal
+    line. `_world` adding `shift` is what keeps the report in the same frame
+    the targets were built in. All the curvature lives in the displacement,
+    which is the point of a corotational formulation; nothing is translated
+    along the arc because nothing needs to be.
+  rule_detail: >-
+    MEASURED, not argued. If the placement drifted with travel, `off_arc`
+    at a FIXED station would walk by roughly `shift * n_x` -- about 0.7 of
+    the travel at SR7. Over S2-4's complete 6.877 m passage, twelve
+    positions, `off_arc` at each station reads:
+    SR4 35.5 .. 37.3 mm, SR5 63.8 .. 66.2, SR6 100.0 .. 103.5,
+    SR7 126.4 .. 136.9. Flat to about 10 mm over 6.9 m of travel, against
+    a predicted 4.8 m if the frame were wrong. SR3 swings 16 -> 71 -> 18 mm
+    and is the component passing over it, which is the signal, not drift.
+  rule: >-
+    A frame question is answered by holding something fixed and sweeping the
+    variable, not by reading the expression. The expression here is
+    ambiguous to the eye and unambiguous to the test, and the test costs one
+    run of a case that already exists.
+  detect: '-'
+  refs: [rebuild/slay/report/profile.py, rebuild/slay/physics/contact.py]
   date: 2026-10-07
