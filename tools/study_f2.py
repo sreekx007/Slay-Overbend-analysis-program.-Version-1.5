@@ -75,15 +75,26 @@ PAPER = {
 }
 
 
-def build(P_c1_D, kT, L_top_D):
+def build(P_c1_D, kT, L_top_D, system='F2'):
     """ILS-EAST re-dimensioned, by editing the archetype's own definition.
 
     `ils_builder` stays the single author of what a component IS (G7), so
     the frame's geometry comes with the edit rather than being constructed
     here.
+
+    `system` NAMES A PUBLISHED LAYOUT and nothing is approximated to fit it.
+    PS is `(None, 'P', None, 'S', None)` -- a pin at slot 2 and a SKEWED
+    roller at slot 4 -- and the mesher refuses an 'S' by default, under G9.
+    It is emitted only through `emit_unenforced_conn_types={'S'}`, the narrow
+    opt-in where the mesher emits the joint and the CALLER takes on enforcing
+    it; `solve.passage` discharges that by rebuilding the tie's co-rotating
+    frame every Newton iteration. Checked before this was used rather than
+    assumed: with the opt-in, one skewed row is resolved and one is applied,
+    so the constraint is enforced and not quietly dropped.
     """
     spec = copy.deepcopy({a['id']: a for a in json.loads(
         FIXTURE.read_text())['archetypes']}['ILS-EAST']['definition'])
+    spec['ils']['connection_system'] = system
     c = spec['components'][0]
     c['P_c1'] = P_c1_D * D
     c['kT_ratio'] = kT
@@ -146,12 +157,16 @@ def region_peaks(position, problem, s_max, body=None):
     return out, (conn[0], conn[-1])
 
 
-def run_case(name, R, spacing, tension_mt, L_top_D, step_OD):
+def run_case(name, R, spacing, tension_mt, L_top_D, step_OD,
+             system='F2'):
     p = PAPER[name]
-    ils = build(p['P_c1_D'], p['kT'], L_top_D)
-    sc, L_comp, recs, _junc, probs, positions, _done = slide.passage(
+    ils = build(p['P_c1_D'], p['kT'], L_top_D, system)
+    sc, L_comp, recs, _junc, probs, positions, done = slide.passage(
         arch_id='none', ils=ils, R=R, spacing=spacing,
-        tension_mt=tension_mt, step=step_OD * D, verbose=False)
+        tension_mt=tension_mt, step=step_OD * D, verbose=False,
+        # The S in a PS layout is emitted only under this opt-in --
+        # G9's narrow route, with `solve.passage` enforcing the tie.
+        emit_unenforced_conn_types=frozenset({'S'}))
     s_max, _label = rp.zone(sc)
     # The STRUCTURE's material span, which is what X_e is keyed on.
     s_centre = sweep.start_centre(sc, L_comp)
@@ -167,6 +182,7 @@ def run_case(name, R, spacing, tension_mt, L_top_D, step_OD):
         for k in env:
             env[k] = max(env[k], got[k])
     return dict(name=name, paper=p, env=env, per_pos=per_pos, span=span,
+                done=done,
                 L_comp=L_comp, n=len(positions),
                 n_ok=sum(1 for r in recs if r.converged))
 
@@ -181,18 +197,28 @@ def main() -> int:
     tension = arg('--tension', float, 120.0)
     L_top_D = arg('--L-top', float, 22.0)
     step_OD = arg('--step', float, 2.0)
+    system = arg('--system', str, 'F2')
 
-    print(f'EA-ST, F2 connection.  R = {R:.0f} m, spacing = {spacing:.0f} m, '
-          f'{tension:.0f} MT, L_top = {L_top_D:.0f} D (assumed, held fixed)')
+    print(f'EA-ST, {system} connection.  R = {R:.0f} m, '
+          f'spacing = {spacing:.0f} m, {tension:.0f} MT, '
+          f'L_top = {L_top_D:.0f} D (assumed, held fixed)')
+    if system != 'F2':
+        print(f'  *** Paper 2 publishes F1 and F2 ONLY. {system} has no '
+              f'published values, so the\n      columns below are a '
+              f'PREDICTION and the differences are against F2\'s numbers '
+              f'for\n      the same geometry, which is a comparison between '
+              f'two of OUR runs -- not validation.')
 
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         for name in ('Case 1', 'Case 2'):
-            r = run_case(name, R, spacing, tension, L_top_D, step_OD)
+            r = run_case(name, R, spacing, tension, L_top_D, step_OD,
+                         system)
             p, env = r['paper'], r['env']
             print(f'\n=== {name}: P_c1 = {p["P_c1_D"]:.0f} D, kT = {p["kT"]}, '
                   f'L_comp = {r["L_comp"]:.3f} m, '
-                  f'{r["n_ok"]}/{r["n"]} positions converged ===')
+                  f'{r["n_ok"]}/{r["n"]} positions converged, '
+                  f'{100 * r["done"].fraction:.0f}% of travel ===')
             print(f'  connectors at s = {r["span"][0]:.3f} and '
                   f'{r["span"][1]:.3f} m  '
                   f'(span {(r["span"][1] - r["span"][0]) / D:.2f} D)')

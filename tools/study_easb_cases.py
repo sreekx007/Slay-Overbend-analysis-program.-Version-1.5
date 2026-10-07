@@ -79,11 +79,14 @@ CASES = {
 }
 
 
-def build(c):
+def build(c, system=None):
     """ILS-EASB re-dimensioned, by editing the archetype's own definition."""
     spec = copy.deepcopy({a['id']: a for a in json.loads(
         FIXTURE.read_text())['archetypes']}['ILS-EASB']['definition'])
-    spec['ils']['connection_system'] = c['system']
+    # A `--system` override replaces the case's own layout. Paper 2
+    # publishes F1 and F2 only, so anything else is PREDICTION and the tool
+    # says so rather than printing a difference that looks like validation.
+    spec['ils']['connection_system'] = system or c['system']
     comp = spec['components'][0]
     comp['P_l1'] = c['P_l1'] * D
     comp['P_l2'] = c['P_l2'] * D
@@ -94,12 +97,19 @@ def build(c):
     return ils_builder.build_ils(spec)
 
 
-def run_case(name, R, spacing, tension_mt, step_OD):
+def run_case(name, R, spacing, tension_mt, step_OD, system=None):
     c = CASES[name]
-    ils = build(c)
-    sc, L_comp, recs, _junc, probs, positions, _done = slide.passage(
+    ils = build(c, system)
+    sc, L_comp, recs, _junc, probs, positions, done = slide.passage(
         arch_id='none', ils=ils, R=R, spacing=spacing,
-        tension_mt=tension_mt, step=step_OD * D, verbose=False)
+        tension_mt=tension_mt, step=step_OD * D, verbose=False,
+        # A PS layout puts a SKEWED 'S' at slot 4, which the mesher refuses
+        # by default under G9. This is the narrow opt-in: the mesher emits
+        # the joint and `solve.passage` enforces it, rebuilding its
+        # co-rotating frame every Newton iteration. Verified before use --
+        # one skewed row resolved, one applied -- so the tie is enforced and
+        # not quietly dropped.
+        emit_unenforced_conn_types=frozenset({'S'}))
     s_max, _lbl = rp.zone(sc)
     s_centre = sweep.start_centre(sc, L_comp)
     body = (s_centre - L_comp / 2.0, s_centre + L_comp / 2.0)
@@ -114,7 +124,7 @@ def run_case(name, R, spacing, tension_mt, step_OD):
             env[k] = max(env[k], got[k])
     n_ok = sum(1 for r in recs if r.converged)
     reach = max((r.shift for r in recs if r.converged), default=0.0)
-    return dict(name=name, case=c, env=env, span=span, L_comp=L_comp,
+    return dict(name=name, case=c, done=done, env=env, span=span, L_comp=L_comp,
                 n=len(positions), n_ok=n_ok, reach=reach, per_pos=per_pos,
                 full=(n_ok == len(positions)))
 
@@ -129,17 +139,25 @@ def main() -> int:
     tension = arg('--tension', float, 120.0)
     step_OD = arg('--step', float, 1.0)
     only = arg('--case', str, None)
+    system = arg('--system', str, None)
     names = [only] if only else list(CASES)
 
     print(f'EA-SB.  R = {R:.0f} m, spacing = {spacing:.0f} m, '
-          f'{tension:.0f} MT, sweep step = {step_OD:g} x OD')
+          f'{tension:.0f} MT, sweep step = {step_OD:g} x OD'
+          + (f', system OVERRIDDEN to {system}' if system else ''))
+    if system:
+        print(f'  *** Paper 2 publishes F1 and F2 ONLY. {system} has no '
+              f'published values, so the X_c / X_i / X_e\n      columns are '
+              f'a PREDICTION; the paper columns below belong to the case\'s '
+              f'OWN system\n      and the differences against them are NOT '
+              f'validation.')
     print(f'\n{"case":11s}{"sys":>5s}{"P_l1":>6s}{"P_l2":>6s}{"P_c1":>6s}'
           f'{"P_v":>5s}{"kB":>6s}   {"X_c":>17s}{"X_i":>17s}{"X_e":>17s}'
           f'   passage')
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
         for name in names:
-            r = run_case(name, R, spacing, tension, step_OD)
+            r = run_case(name, R, spacing, tension, step_OD, system)
             c, env = r['case'], r['env']
 
             def cell(key):
