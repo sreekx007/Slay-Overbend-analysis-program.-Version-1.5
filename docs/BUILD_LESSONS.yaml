@@ -2545,7 +2545,7 @@
 
 - id: L106
   area: solve
-  class: finding
+  class: defect
   symptom: >-
     With L105 fixed, EVERY shroud case sweeps its full travel in mode B --
     S2-8's 23.946 m included -- and mode A, the chained path every study
@@ -2589,22 +2589,36 @@
     were repointed at 200 MT -- the same corner one notch further in --
     rather than deleted.
   rule: >-
-    Carrying plastic state between positions is what mode A IS -- it is the
-    real load path, and the v1.45 bug was losing that state, not keeping it.
-    So the fix cannot be to drop it. What is needed is a solve that can
-    advance past a formed hinge: a line search against the residual rather
-    than a cap on the step, or arc-length control, or restarting a position
-    from virgin state and re-applying the carried plastic strain. Until one
-    of those is in, mode A results past a yielded shroud do not exist, and
-    `completion` (L101) is what stops a partial one being read as a result.
-  rule_detail_2: >-
-    FILED AS A FINDING, NOT A DEFECT, and the distinction is the register's
-    own: a defect is an entry that produced RUNNING CODE WITH WRONG NUMBERS,
-    and must name the test that fails if it returns. This produces no
-    numbers at all -- the passage stops and `completion` marks every result
-    past it VOID -- so there is nothing to detect yet and nothing wrong to
-    guard against. It becomes a defect the day someone reads a truncated
-    mode A envelope as an answer, which is exactly what L101 now prevents.
-  detect: '-'
-  refs: [rebuild/slay/solve/passage.py, rebuild/slay/study/sweep.py]
+    EVERY LOAD PATH NEEDS A CUTBACK, and this one had none. `solve` cuts back
+    `lam`, which scales the contact targets alone; what MOVES those targets
+    is the advance between two positions, and nothing below the study layer
+    knows a sweep is happening, so nothing below it can shorten that advance.
+    The sweep owns the schedule, so the sweep owns the cutback: a chained
+    position that fails now gets the midpoint inserted and is retried from
+    the same state, down to a floor of step/64. The guessed remedies -- line
+    search, arc-length control, re-applying plastic strain from a virgin
+    restart -- were all aimed at the Newton loop, and none of them was
+    needed. The question "which quantity is too large, and who is allowed to
+    shrink it" came first and answered it.
+  rule_detail_5: >-
+    THREE MEASUREMENTS BEFORE ANY CODE, each ruling out a different suspect.
+    (1) The committed state is a true equilibrium, so this was not a
+    state-commit bug: re-posing position 4's own problem and re-solving from
+    the state it returned reconverges at residual 1.6e-07 with |dU| 1e-06 m.
+    (2) The kernel forms a CONSISTENT elastoplastic tangent,
+    E_t = E H / (E + H), so it was not a wrong-tangent problem. (3)
+    Bisecting the one failing advance, 1.6256 -> 2.4384 m: one step of
+    0.8128 m fails, two of 0.4064 m reach the same position, as do four,
+    eight and sixteen. Independently, a uniform schedule at 1 x OD instead
+    of 2 x OD carries S2-6 the whole 10.128 m in 29 positions with no code
+    change at all.
+  rule_detail_6: >-
+    AFTER, every case completes in BOTH modes: plain pipe, S2-1, S2-4, S2-3,
+    S2-6 and S2-8 all 100% of their travel, against 100/35/100/24/16/10% in
+    mode A before. A halved position is KEPT, not used as scaffolding -- the
+    pipe passes through it -- so the envelope is taken over more of the
+    passage rather than less, while `completion` still measures travel and a
+    sweep that needed sub-steps reports the same total as one that did not.
+  detect: test_a_failed_advance_is_halved_and_retried, test_the_halved_positions_are_KEPT_not_scaffolding, test_bisection_stops_at_the_floor_instead_of_halving_forever, test_mode_B_does_not_bisect
+  refs: [rebuild/slay/study/sweep.py, rebuild/slay/solve/passage.py, rebuild/tests/test_passage_completion.py]
   date: 2026-10-07
