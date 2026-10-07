@@ -23,7 +23,9 @@
 > |---|---|
 > | **XI** diameter and tension | unchanged to four decimals; all six now confirmed at 100% of travel |
 > | **XXIII / XXIV** component length | unchanged to four decimals (0.8470 against 0.8471, and so on); all six at 100% |
+> | **XX / XXI** component wall | unchanged — strains under 1% of themselves, moments under 6 kN·m; all nine at 100% |
 > | **X** stinger configuration | **moved**, +1.8% on config A — the only 120 MT table, and the highest tension in Paper 1 |
+> | **XXXI / XXXIV** shroud offset V | **moved hard** in configuration C: −39.9 … −73.4% became −5.4 … −22.1%. Configuration A's X3/X4 at the deep offsets had been *falling* with V, which is the wrong direction; they are now monotonic |
 > | **XXXII / XXXIII** shroud L1 and L2 | **moved hard** — five of seven had been truncating; the dual-roller trend changed sign |
 >
 > Two things were found by the re-run itself, not by the fixes. `slide.passage`
@@ -208,16 +210,31 @@ instant a roller is below midspan". The pipeline's own maximum is given
 beside it because the two are close and it is the quantity an unqualified
 "peak moment" would return.
 
+*`tools/study_table_xx.py`. Re-run 7 Oct; all nine sweep 100% of their
+travel.*
+
 | Case | t | R | Paper strain | ours | Δ | Paper BM | ours, body | Δ | ours, pipe |
 |---|---|---|---|---|---|---|---|---|---|
-| A1 | 32 mm | 70 m | 0.562% | 0.6298% | +12.1% | 1311 kN·m | 1298 kN·m | **−1.0%** | 1289 |
-| A1 | | 85 m | 0.473% | 0.4815% | **+1.8%** | 1251 kN·m | 1242 kN·m | **−0.7%** | 1238 |
-| A1 | | 100 m | 0.339% | 0.3779% | +11.5% | 1131 kN·m | 1177 kN·m | +4.1% | 1175 |
-| A2 | 42 mm | 70 m | 0.647% | 0.7002% | +8.2% | 1347 kN·m | 1317 kN·m | −2.2% | 1306 |
-| A2 | | 85 m | 0.508% | 0.5476% | +7.8% | 1288 kN·m | 1270 kN·m | **−1.4%** | 1264 |
-| A2 | | 100 m | 0.358% | 0.4188% | +17.0% | 1144 kN·m | 1209 kN·m | +5.7% | 1205 |
-| A3 | 53 mm | 70 m | 0.727% | 0.7709% | **+6.0%** | 1366 kN·m | 1333 kN·m | −2.4% | 1320 |
-| A3 | | 85 m | 0.556% | 0.6153% | +10.7% | 1311 kN·m | 1293 kN·m | **−1.4%** | 1284 |
+| A1 | 32 mm | 70 m | 0.562% | 0.6358% | +13.1% | 1311 kN·m | 1299.2 kN·m | **−0.9%** | 1284.6 |
+| A1 | | 85 m | 0.473% | 0.4804% | **+1.6%** | 1251 kN·m | 1247.1 | **−0.3%** | 1236.0 |
+| A1 | | 100 m | 0.339% | 0.3771% | +11.2% | 1131 kN·m | 1182.7 | +4.6% | 1174.5 |
+| A2 | 42 mm | 70 m | 0.647% | 0.7015% | +8.4% | 1347 kN·m | 1320.6 | **−2.0%** | 1304.4 |
+| A2 | | 85 m | 0.508% | 0.5452% | +7.3% | 1288 kN·m | 1276.1 | **−0.9%** | 1263.0 |
+| A2 | | 100 m | 0.358% | 0.4183% | +16.8% | 1144 kN·m | 1212.7 | +6.0% | 1204.3 |
+| A3 | 53 mm | 70 m | 0.727% | 0.7701% | **+5.9%** | 1366 kN·m | 1337.5 | **−2.1%** | 1320.0 |
+| A3 | | 85 m | 0.556% | 0.6127% | +10.2% | 1311 kN·m | 1297.0 | **−1.1%** | 1284.0 |
+| A3 | | 100 m | 0.395% | 0.4487% | +13.6% | 1184 kN·m | 1230.8 | +4.0% | 1220.9 |
+
+*Essentially unchanged by the re-run — strains moved under 1% of themselves
+(0.6298 → 0.6358, 0.4815 → 0.4804, and so on) and the body moments by under
+6 kN·m. These are 2.5 D components whose passages already completed, so they
+are in the same class as TABLE XXIII/XXIV: the frozen lay tension acted at
+the stinger tip, outside the reporting band.*
+
+**The moment agreement is the strongest in the ledger** — eight of nine
+within 6%, six of nine within 2.1% — and it is one-sided by radius: negative
+at R = 70 and 85, positive at R = 100. The strain is high against the paper
+in every one of the nine.
 | A3 | | 100 m | 0.425% | 0.4489% | **+5.6%** | 1150 kN·m | 1228 kN·m | +6.7% | 1221 |
 
 **Bending moment agrees far better than strain: −2.4% to +6.7%, against
@@ -677,7 +694,7 @@ travel on the current contact surface and its values are lower bounds.
 |---|---|---|
 | **X** plain pipe by stinger config | 3 | **re-run 7 Oct** — +18.9 / +7.1 / −7.3%; moved ~1.8% on config A |
 | **XI** diameter and tension | 6 | **re-run 7 Oct, unchanged** — strain +7.2 to +25.7%; *gap over `D/2R` roughly 2× the paper's* |
-| **XX / XXI** thick pipe wall thickness | 9 | **done** — strain +1.8 to +17.0%, **BM −2.4 to +6.7%** (component body) |
+| **XX / XXI** thick pipe wall thickness | 9 | **re-run 7 Oct, unchanged** — strain +1.6 to +16.8%, **BM −2.1 to +6.0%** (component body) |
 | **XXIII / XXIV** thick pipe length | 6 | **re-run 7 Oct, unchanged** — moment −7.7 … +13.0%; saturation still not reproduced, strain −31.6% at 20 D |
 | **XXVI** two components, spacing | 3 | not run — paper finds the effect negligible |
 | **XXXI / XXXIV** shroud offset depth | 12 | **re-run 7 Oct** — config C from −39.9 … −73.4% to −5.4 … −22.1%, the largest change in the ledger; A's X3/X4 now monotonic in V; X2 still under-amplified |
