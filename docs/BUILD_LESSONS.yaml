@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 105
+# entries: 106
 
 - id: L001
   area: kernel
@@ -2541,4 +2541,58 @@
     point masses -- to be identical.
   detect: test_the_tension_node_moves_with_the_sweep, test_the_tension_slides_between_nodes_instead_of_jumping, test_at_shift_zero_the_tension_lands_where_it_always_did, test_the_tension_lands_on_the_terminal_contact_not_past_it, test_the_passage_no_longer_dies_at_two_and_a_half_metres
   refs: [rebuild/slay/physics/loads.py, rebuild/slay/physics/problem.py, rebuild/slay/study/sweep.py, rebuild/tests/test_passage_completion.py]
+  date: 2026-10-07
+
+- id: L106
+  area: solve
+  class: finding
+  symptom: >-
+    With L105 fixed, EVERY shroud case sweeps its full travel in mode B --
+    S2-8's 23.946 m included -- and mode A, the chained path every study
+    actually runs, still truncates. Measured, as travel swept: plain pipe
+    100/100%, S2-4 100/100%, S2-1 35/100%, S2-3 24/100%, S2-6 16/100%,
+    S2-8 10/100% (mode A / mode B). S2-1 is a REGRESSION: it completed its
+    4.642 m before L105 and now stops at 1.626 m. Mode B completing every
+    case is what makes this a solver failure and not a modelling one -- an
+    equilibrium exists at every position and mode A cannot reach it.
+  cause: >-
+    The carried PLASTIC STATE, isolated by substitution rather than
+    inferred. Solving S2-6's position 5 from position 4's full state gives
+    CUTBACK EXHAUSTED at lam=0.0000; from the same displacements with
+    `plastic=None` it converges in 20 increments with no cutbacks; from
+    virgin state, in 40. Resetting the active set, dropping to PEN_FIRST and
+    raising n_increments to 200 all change nothing. The residual sits at
+    nodes 78 to 80, s_material 6.8 to 8.4 m -- the shroud's own taper, where
+    the carried plastic strain peaks at 0.728% as V = 2 D forces the pipe
+    over it. Past that hinge the tangent is soft and Newton OVERSHOOTS: the
+    corrections run 0.04, 0.05, 0.49, 8.5 m.
+  rule_detail: >-
+    A STEP CAP WAS TRIED AND REJECTED, and the attempt is recorded because
+    the next person will have the same idea. Limiting a Newton correction
+    that exceeds DIVERGENCE_DU to half of it, engaged only where the old
+    code failed outright, moved S2-6's failure from lam=0.0000 to lam=0.1000
+    after 213 capped steps and no further: it buys one increment, not a
+    passage. It also made the hard corner in `test_seed_state` converge
+    without its seed, breaking the three tests that pin why `seed_state`
+    exists. Reverted. The step length is a symptom; the basin is the
+    problem, and a cap does not change which basin the iteration is in.
+  rule: >-
+    Carrying plastic state between positions is what mode A IS -- it is the
+    real load path, and the v1.45 bug was losing that state, not keeping it.
+    So the fix cannot be to drop it. What is needed is a solve that can
+    advance past a formed hinge: a line search against the residual rather
+    than a cap on the step, or arc-length control, or restarting a position
+    from virgin state and re-applying the carried plastic strain. Until one
+    of those is in, mode A results past a yielded shroud do not exist, and
+    `completion` (L101) is what stops a partial one being read as a result.
+  rule_detail_2: >-
+    FILED AS A FINDING, NOT A DEFECT, and the distinction is the register's
+    own: a defect is an entry that produced RUNNING CODE WITH WRONG NUMBERS,
+    and must name the test that fails if it returns. This produces no
+    numbers at all -- the passage stops and `completion` marks every result
+    past it VOID -- so there is nothing to detect yet and nothing wrong to
+    guard against. It becomes a defect the day someone reads a truncated
+    mode A envelope as an answer, which is exactly what L101 now prevents.
+  detect: '-'
+  refs: [rebuild/slay/solve/passage.py, rebuild/slay/study/sweep.py]
   date: 2026-10-07
