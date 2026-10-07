@@ -67,6 +67,11 @@ NEWTON_TOL = 1e-3          # on max|residual| / max(max|Fint|, 1), DOF 3+
 CUTBACK_FLOOR = 1.0 / 64.0
 CUTBACK_GROWTH = 1.4
 
+# Fraction of DIVERGENCE_DU a capped Newton step is allowed to take. Below 1
+# so a capped step lands strictly inside the band the old code treated as
+# divergence, rather than on its edge.
+STEP_CAP = 0.5
+
 DIVERGENCE_U = 100.0       # m
 DIVERGENCE_DU = 1.0        # m, in one Newton step
 
@@ -89,6 +94,7 @@ class Result:
     increments: int = 0
     iterations: int = 0
     cutbacks: int = 0
+    capped: int = 0            # Newton steps whose LENGTH was limited
     contact_passes: int = 0
     residual: float = 0.0
     strains: tuple = ()        # (element index, s_mid, eps_max)
@@ -276,11 +282,35 @@ def solve(problem, state_in: SolveState = None, *,
                 dU = spsolve(Ks, R)
                 fm = max(float(np.max(np.abs(Fint))), 1.0)
                 rc = float(np.max(np.abs(R[3:]))) / fm
-                U += dU
+
+                # THE STEP IS CAPPED, AND ONLY WHERE IT WOULD OTHERWISE HAVE
+                # FAILED OUTRIGHT. This is the `seed` fallback's rule applied
+                # to the Newton step: a case whose full step is already
+                # inside `DIVERGENCE_DU` takes `alpha = 1` and keeps the
+                # exact load path it had before, bit for bit, so this cannot
+                # move a number that was already right. Only the steps the
+                # old code answered with `failed = True` behave differently.
+                #
+                # WHY A CAP IS THE RIGHT ANSWER HERE. Past a sharply yielded
+                # hinge the tangent is soft and Newton overshoots rather than
+                # diverges: measured on S2-6 at the shroud's own taper, the
+                # corrections run 0.04, 0.05, 0.49, 8.5 m while an
+                # equilibrium for that position demonstrably exists -- mode B
+                # finds it from virgin state. An uncapped step walks out of
+                # the basin on the third iteration; a capped one stays in it.
+                # The cap is a LENGTH, not a direction: `dU` still points
+                # where the linearised system says, and the increment is
+                # still rejected if the capped iteration cannot converge.
+                dUmax = float(np.max(np.abs(dU)))
+                alpha = 1.0
+                if np.isfinite(dUmax) and dUmax > DIVERGENCE_DU:
+                    alpha = STEP_CAP * DIVERGENCE_DU / dUmax
+                    res.capped += 1
+                U += alpha * dU
                 res.iterations += 1
                 if (np.isnan(U).any()
                         or np.max(np.abs(U)) > DIVERGENCE_U
-                        or float(np.max(np.abs(dU))) > DIVERGENCE_DU):
+                        or not np.isfinite(dUmax)):
                     failed = True
                     break
                 if it > 0 and rc < NEWTON_TOL:
