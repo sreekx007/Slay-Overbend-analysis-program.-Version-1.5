@@ -36,7 +36,18 @@ TON = 9806.65
 
 # The corner that failed: smallest pipe, widest spacing, highest tension,
 # tightest radius. Every one of those pushes the same way.
-HARD = dict(R=70.0, spacing=12.0, tension_mt=160.0, OD=0.1683, t_wall=0.0110)
+#
+# THE TENSION MOVED FROM 160 TO 200 MT, and the reason is worth keeping.
+# The Newton step cap made the 160 MT corner converge DIRECTLY, so the three
+# tests below -- all of which assert that this case needs the seed -- were
+# asserting something that had stopped being true. The honest repair is to
+# point them at a corner that still needs it, not to delete them, and that
+# required establishing that any such corner exists: a 54-point grid over
+# OD (168.3 / 273.1 / 406.4 mm), R (50 / 60 / 70 m), spacing (9 / 12 m) and
+# tension (160 / 200 / 260 MT) leaves 14 corners still failing a direct
+# solve. 168.3 mm at R = 70, 12 m spacing and 200 MT is one of them, and is
+# the same corner one notch further in. `seed_state` is not dead code.
+HARD = dict(R=70.0, spacing=12.0, tension_mt=200.0, OD=0.1683, t_wall=0.0110)
 EASY = dict(R=85.0, spacing=9.0, tension_mt=120.0, OD=0.4064, t_wall=0.0210)
 
 _CACHE = {}

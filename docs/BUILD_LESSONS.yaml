@@ -2567,15 +2567,27 @@
     over it. Past that hinge the tangent is soft and Newton OVERSHOOTS: the
     corrections run 0.04, 0.05, 0.49, 8.5 m.
   rule_detail: >-
-    A STEP CAP WAS TRIED AND REJECTED, and the attempt is recorded because
-    the next person will have the same idea. Limiting a Newton correction
-    that exceeds DIVERGENCE_DU to half of it, engaged only where the old
-    code failed outright, moved S2-6's failure from lam=0.0000 to lam=0.1000
-    after 213 capped steps and no further: it buys one increment, not a
-    passage. It also made the hard corner in `test_seed_state` converge
-    without its seed, breaking the three tests that pin why `seed_state`
-    exists. Reverted. The step length is a symptom; the basin is the
-    problem, and a cap does not change which basin the iteration is in.
+    A STEP CAP WAS TRIED, REJECTED ON ONE CASE, AND THEN KEPT, and the whole
+    sequence is recorded because the error in the middle is the instructive
+    part. Limiting a Newton correction that exceeds DIVERGENCE_DU to half of
+    it, engaged only where the old code failed outright, moves S2-6 from
+    lam=0.0000 to lam=0.1000 after 213 capped steps and no further. Measured
+    on S2-6 ALONE that reads as "buys one increment, not a passage", and it
+    was removed on that reading while the sweep commissioned to judge it was
+    still running. The sweep then said: mode A goes from two of six cases
+    complete to four of six -- S2-3 from 24% to 100% and S2-8 from 10% to
+    100%, with S2-1 and S2-6 unmoved. S2-6 is one of the two it does not
+    help. The cap was restored. A change is judged on the set it was
+    measured against, not on the first case to hand.
+  rule_detail_4: >-
+    THE CAP DOES CHANGE WHAT NEEDS A SEED, which had to be established and
+    not assumed. It made `test_seed_state`'s 160 MT corner converge directly,
+    so three tests asserting that case needs the seed became false. A 54-point
+    grid over OD (168.3 / 273.1 / 406.4 mm), R (50 / 60 / 70 m), spacing
+    (9 / 12 m) and tension (160 / 200 / 260 MT) leaves 14 corners still
+    failing a direct solve, so `seed_state` is not dead code and the tests
+    were repointed at 200 MT -- the same corner one notch further in --
+    rather than deleted.
   rule: >-
     Carrying plastic state between positions is what mode A IS -- it is the
     real load path, and the v1.45 bug was losing that state, not keeping it.
