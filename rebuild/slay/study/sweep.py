@@ -78,6 +78,12 @@ CLEAR_AFTER = 1.0         # m, trailing edge clear of SR2 at the finish
 STATION = 'SR2'           # the station the passage is built around
 TAIL_CLEAR = 1.0          # m, buffer length BEYOND the sweep -- see below
 
+# Smallest advance a bisecting sweep will attempt, as a fraction of `step`.
+# Six halvings. Measured on the step that needed it, ONE was enough; the
+# floor is there so a position that is unreachable for some other reason
+# fails in bounded time instead of bisecting toward zero.
+SUBSTEP_FLOOR = 1.0 / 64.0
+
 
 @dataclass(frozen=True)
 class Position:
@@ -483,8 +489,38 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
                            problem_kw.get('contact_surface',
                                           DEFAULT_SURFACE),
                            problem_kw.get('OD')) if include_critical else ()
+    # THE TRAVEL IS CUT BACK TOO, and this is the only place that can do it.
+    #
+    # `solve` cuts back `lam`, which scales the CONTACT TARGETS and nothing
+    # else -- loads are at full value from the first Newton iteration, as
+    # L050 requires. But what moves those targets in the first place is the
+    # ADVANCE between two positions, and no layer below this one knows that
+    # a sweep is happening, so no layer below this one can shorten it.
+    #
+    # L106 is what that cost. Once the shroud forms a plastic hinge, mode A
+    # could not take the next 0.8128 m advance at all: S2-6 stopped at 16%
+    # of its travel, S2-1 at 35%, S2-3 at 24%, S2-8 at 10%, while mode B --
+    # every position from virgin state -- swept all of them end to end. So
+    # an equilibrium existed at every position and the chained path could
+    # not reach it in one step. Measured across the exact failing step,
+    # 1.6256 -> 2.4384 m: one advance of 0.8128 m fails, two of 0.4064 m
+    # reach the same position, and so do four, eight and sixteen.
+    #
+    # A HALVED ADVANCE IS A REAL LAY POSITION, so it is solved and KEPT, not
+    # used as scaffolding and thrown away. The pipe really does pass through
+    # it. Keeping it also means the envelope is taken over more of the
+    # passage rather than less, and `completion` still measures travel, so a
+    # sweep that needed sub-steps reports the same total as one that did not.
+    #
+    # MODE B DOES NOT BISECT. Each of its positions starts from virgin state,
+    # so there is no advance between them to shorten -- a failure there is
+    # the position's own and halving the gap to it changes nothing.
     out, state = [], None
-    for i, shift in enumerate(schedule(total, step, include=crit)):
+    pending = list(schedule(total, step, include=crit))
+    done_shift, i = None, 0
+    min_advance = step * SUBSTEP_FLOOR
+    while pending:
+        shift = pending[0]
         problem = build_problem(model, scene, shift=shift, **problem_kw)
         result, state_out = solve(problem, state_in=state)
 
@@ -506,13 +542,30 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
                 if retry.converged:
                     result, state_out, seeded = retry, retry_state, True
 
+        # Not converged, carrying state, and there is still room to halve
+        # the advance: put an intermediate position in front of this one and
+        # try again from the same state. Nothing is recorded for the attempt
+        # that failed -- it is not a position the pipe reached.
+        if (not result.converged and mode == 'A' and state is not None
+                and done_shift is not None
+                and shift - done_shift > min_advance):
+            mid = 0.5 * (done_shift + shift)
+            if verbose:
+                print(f'  pos {i:2d}  shift {shift:7.3f} m  {result.status}'
+                      f'  -> halving the advance to {mid:7.3f} m')
+            pending.insert(0, mid)
+            continue
+
+        pending.pop(0)
         out.append(Position(index=i, shift=shift,
                             s_lead=s_centre + L_comp / 2.0 + shift,
                             s_trail=s_centre - L_comp / 2.0 + shift,
                             result=result, seeded=seeded))
         if verbose:
             print(f'  pos {i:2d}  shift {shift:7.3f} m  {result.status}')
+        i += 1
         state = state_out if mode == 'A' else None
         if not result.converged:
             break
+        done_shift = shift
     return out

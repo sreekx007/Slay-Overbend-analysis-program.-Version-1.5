@@ -308,3 +308,107 @@ def test_the_passage_no_longer_dies_at_two_and_a_half_metres():
     for sh in (2.4, 4.0, 8.0):
         r, _ = solve(build_problem(model, sc, shift=sh, **kw))
         assert r.converged, f'shift {sh}: {r.status}'
+
+
+# ---------------------------------------------------------------------------
+# L106 -- the sweep cuts back the TRAVEL, not just the load factor
+# ---------------------------------------------------------------------------
+#
+# `solve` cuts back `lam`, which scales the contact targets alone. What moves
+# those targets is the advance between two positions, and nothing below the
+# study layer knows a sweep is happening, so nothing below it can shorten
+# that advance. Once the shroud formed a plastic hinge, mode A could not take
+# the next 0.8128 m in one go and four of six cases truncated while mode B
+# swept all of them.
+
+class _Flaky:
+    """A solve that refuses any advance larger than `limit`, and otherwise
+    behaves. Stands in for the hinge, so the SCHEDULING is under test and not
+    the Newton loop."""
+
+    def __init__(self, limit):
+        self.limit = limit
+        self.last = None
+        self.calls = []
+
+    def __call__(self, problem, state_in=None, **kw):
+        shift = problem.contacts[0].s_station - problem.contacts[0].s_material
+        self.calls.append(round(shift, 6))
+        ok = (state_in is None or self.last is None
+              or shift - self.last <= self.limit + 1e-9)
+        res = _Result(ok)
+        if ok:
+            self.last = shift
+        return res, _State(shift)
+
+
+class _State:
+    def __init__(self, shift):
+        self.U = self.theta = self.plastic = None
+        self.active = ()
+        self.shift = shift
+
+
+def _tiny_scene():
+    return sweep.scene_for(R=70.0, spacing=9.0, L_comp=0.0)
+
+
+def test_a_failed_advance_is_halved_and_retried(monkeypatch):
+    """The whole mechanism, with the solver replaced by a rule."""
+    sc = _tiny_scene()
+    flaky = _Flaky(limit=0.5)
+    monkeypatch.setattr(sweep, 'solve', flaky)
+    pos = sweep.run(sc, None, L_comp=0.0, step=1.0, mode='A',
+                    tension=0.0, material=material('j2'))
+    done = sweep.completion(pos, 0.0)
+    assert done.complete, done
+    # every recorded advance is within what the stand-in would accept
+    shifts = [p.shift for p in pos]
+    assert shifts == sorted(shifts)
+    assert max(b - a for a, b in zip(shifts, shifts[1:])) <= 0.5 + 1e-9
+
+
+def test_the_halved_positions_are_KEPT_not_scaffolding():
+    """A sub-step is a position the pipe really passes through, so it is in
+    the result. If they were discarded the envelope would be taken over less
+    of the passage than was actually solved."""
+    sc = _tiny_scene()
+    plain = sweep.run(sc, None, L_comp=0.0, step=1.0, mode='A',
+                      tension=0.0, material=material('j2'))
+    assert all(p.converged for p in plain)
+    assert len(plain) >= 2
+
+
+def test_bisection_stops_at_the_floor_instead_of_halving_forever():
+    """An advance that is refused for some OTHER reason must fail in bounded
+    time, not bisect toward zero."""
+    sc = _tiny_scene()
+    flaky = _Flaky(limit=-1.0)          # refuses every chained advance
+    import slay.study.sweep as SW
+    real = SW.solve
+    SW.solve = flaky
+    try:
+        pos = SW.run(sc, None, L_comp=0.0, step=1.0, mode='A',
+                     tension=0.0, material=material('j2'))
+    finally:
+        SW.solve = real
+    assert not sweep.completion(pos, 0.0).complete
+    # 1/64 of a 1.0 m step is six halvings, so the retries are bounded
+    assert len(flaky.calls) < 40, len(flaky.calls)
+
+
+def test_mode_B_does_not_bisect():
+    """Every mode B position starts from virgin state, so there is no advance
+    between them to shorten and halving the gap changes nothing."""
+    sc = _tiny_scene()
+    flaky = _Flaky(limit=-1.0)
+    import slay.study.sweep as SW
+    real = SW.solve
+    SW.solve = flaky
+    try:
+        SW.run(sc, None, L_comp=0.0, step=1.0, mode='B',
+               tension=0.0, material=material('j2'))
+    finally:
+        SW.solve = real
+    assert len(flaky.calls) == len(set(flaky.calls)), (
+        'mode B re-tried a shift, so it bisected')
