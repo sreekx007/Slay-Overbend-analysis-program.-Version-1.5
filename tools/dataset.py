@@ -246,7 +246,7 @@ def run_case(case: dict, git_sha: str = '', stamp: str = '') -> dict:
             # and wall are the archetype's own, so `L_OD` and `t_ratio` are
             # read back off it rather than driving it.
             ils = slide.archetype(case['family'])
-        sc, L_comp, recs, junc, probs, positions = slide.passage(
+        sc, L_comp, recs, junc, probs, positions, _done = slide.passage(
             arch_id='none', R=case['R'], spacing=case['spacing'],
             tension_mt=case['tension_mt'], OD=OD, t_wall=t_wall,
             step=2.0 * OD, ils=ils, verbose=False)

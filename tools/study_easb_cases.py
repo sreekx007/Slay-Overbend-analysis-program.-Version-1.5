@@ -97,7 +97,7 @@ def build(c):
 def run_case(name, R, spacing, tension_mt, step_OD):
     c = CASES[name]
     ils = build(c)
-    sc, L_comp, recs, _junc, probs, positions = slide.passage(
+    sc, L_comp, recs, _junc, probs, positions, _done = slide.passage(
         arch_id='none', ils=ils, R=R, spacing=spacing,
         tension_mt=tension_mt, step=step_OD * D, verbose=False)
     s_max, _lbl = rp.zone(sc)

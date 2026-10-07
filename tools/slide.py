@@ -179,7 +179,16 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             emit_unenforced_conn_types=frozenset()):
     """Run one passage.
 
-    Returns `(scene, L_comp, records, junction rows, problems, positions)`.
+    Returns `(scene, L_comp, records, junction rows, problems, positions,
+    completion)`.
+
+    THE COMPLETION IS RETURNED, NOT LEFT TO THE CALLER TO RECOMPUTE, because
+    this function does not use the default clearances and a caller cannot
+    know that without reading it. Plain pipe here sweeps `4 x OD` with NO
+    lead clearance; `sweep.completion`'s default is `L_comp + 1 + 1`. Four
+    study tools called it with that default and a 20 in plain-pipe passage
+    that had swept every metre of its travel came back as "102%" and was
+    voided against the paper. One sizing, computed once, handed back.
     The raw `positions` are handed back as well as the measured `records`
     because element-level strain lives on `position.result` and a record
     carries only the peaks -- the region scheme (`slay.report.regions`)
@@ -262,7 +271,8 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     if verbose:
         _table(records, L_comp, time.time() - t0)
         _junction_table(records, junc)
-    return sc, L_comp, records, junc, probs, positions
+    done = sweep.completion(positions, L_comp, total=total)
+    return sc, L_comp, records, junc, probs, positions, done
 
 
 def _warn_step(step, OD):

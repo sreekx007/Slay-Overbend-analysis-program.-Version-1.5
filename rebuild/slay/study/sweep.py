@@ -170,22 +170,36 @@ class Completion:
     def __str__(self) -> str:
         if self.complete:
             return f'passage COMPLETE: {self.ran:.3f} m of {self.total:.3f} m'
+        # `failed_at` is None when nothing diverged and the schedule simply
+        # ended short, which is one of the two ways to be incomplete and the
+        # one this used to crash on.
+        where = ('' if self.failed_at is None
+                 else f', stopped at shift {self.failed_at:.4f}')
         return (f'passage INCOMPLETE: {self.ran:.3f} m of {self.total:.3f} m '
-                f'({100 * self.fraction:.1f}%), stopped at shift '
-                f'{self.failed_at:.4f} -- {self.status}')
+                f'({100 * self.fraction:.1f}%){where} -- {self.status}')
 
 
 def completion(positions, L_comp: float,
                clear_before: float = CLEAR_BEFORE,
-               clear_after: float = CLEAR_AFTER) -> Completion:
+               clear_after: float = CLEAR_AFTER,
+               total: float = None) -> Completion:
     """Was this passage swept end to end? Pass it `run`'s own return value.
 
     Complete means the LAST position converged AND its shift reached the
     sweep length. Both halves are needed: a passage can stop early without
     a diverged position if the schedule was built short, and it can hold a
     converged final position that is not the final travel.
+
+    `total` OVERRIDES the clearances, and exists because they are not a
+    constant. `tools/slide.py` sweeps plain pipe over `4 x OD` with no lead
+    clearance at all, so the default `L_comp + 1 + 1` is the wrong
+    denominator for it -- and wrong in the direction that matters, reporting
+    a COMPLETE 20 in passage as 102% of a travel it never had and then
+    voiding it. A caller that sized its own sweep says so here rather than
+    being second-guessed.
     """
-    total = sweep_length(L_comp, clear_before, clear_after)
+    total = (sweep_length(L_comp, clear_before, clear_after)
+             if total is None else float(total))
     ok = [p for p in positions if p.converged]
     bad = [p for p in positions if not p.converged]
     ran = max((p.shift for p in ok), default=0.0)

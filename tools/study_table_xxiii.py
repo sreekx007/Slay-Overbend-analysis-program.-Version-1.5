@@ -83,7 +83,7 @@ def run_case(c, spacing, step_OD):
                                   t_ratio=c['t_mm'] / 1000.0 / T_PIPE)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        sc, L_comp, _recs, _junc, probs, positions = slide.passage(
+        sc, L_comp, _recs, _junc, probs, positions, done = slide.passage(
             arch_id='none', ils=ils, R=c['R'], spacing=spacing,
             tension_mt=100.0, step=step_OD * D, verbose=False)
     s_max, _label = rp.zone(sc)
@@ -127,7 +127,7 @@ def run_case(c, spacing, step_OD):
     return dict(c=c, peak=peak, at_s=at_s, bm=bm['comp'], bm_pipe=bm['pipe'],
                 bm_at=bm_at['comp'], L=L_comp, n_ok=n_ok, n=len(positions),
                 n_comp=len(comp_elems),
-                done=sweep.completion(positions, L_comp))
+                done=done)
 
 
 def main() -> int:

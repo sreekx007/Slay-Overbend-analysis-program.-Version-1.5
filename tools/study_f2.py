@@ -149,7 +149,7 @@ def region_peaks(position, problem, s_max, body=None):
 def run_case(name, R, spacing, tension_mt, L_top_D, step_OD):
     p = PAPER[name]
     ils = build(p['P_c1_D'], p['kT'], L_top_D)
-    sc, L_comp, recs, _junc, probs, positions = slide.passage(
+    sc, L_comp, recs, _junc, probs, positions, _done = slide.passage(
         arch_id='none', ils=ils, R=R, spacing=spacing,
         tension_mt=tension_mt, step=step_OD * D, verbose=False)
     s_max, _label = rp.zone(sc)

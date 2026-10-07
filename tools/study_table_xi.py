@@ -79,7 +79,7 @@ def analytical(OD, R):
 def run_case(case, R, spacing, step_OD):
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')
-        sc, L_comp, recs, _junc, _probs, positions = slide.passage(
+        sc, L_comp, recs, _junc, _probs, positions, done = slide.passage(
             arch_id='none', R=R, spacing=spacing,
             tension_mt=float(case['T']), OD=case['OD'], t_wall=case['t'],
             step=step_OD * case['OD'], verbose=False)
@@ -106,7 +106,7 @@ def run_case(case, R, spacing, step_OD):
     # has to check before trusting.
     return dict(case=case, peak=peak, at_s=at_s, bm=bm,
                 n_ok=n_ok, n=len(positions),
-                done=sweep.completion(positions, L_comp),
+                done=done,
                 status=('ok' if n_ok == len(positions)
                         else f'{n_ok}/{len(positions)}'))
 
