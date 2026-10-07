@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 103
+# entries: 104
 
 - id: L001
   area: kernel
@@ -2420,4 +2420,47 @@
     run of a case that already exists.
   detect: '-'
   refs: [rebuild/slay/report/profile.py, rebuild/slay/physics/contact.py]
+  date: 2026-10-07
+
+- id: L104
+  area: measure
+  class: defect
+  symptom: >-
+    Every stinger roller showed the pipe lifted off it, in a sequence that
+    grew down the stinger: at S2-6 shift 0, `off_arc` read SR2 3.9 mm,
+    SR3 16.3, SR4 37.3, SR5 65.0, SR6 103.6, SR7 125.9 -- on a column whose
+    schema says "0 means sitting on the rollers". The solver disagreed. At
+    those same positions every one of SR2..SR7 was ACTIVE with a constraint
+    residual of 0.00 mm. Spotted from the figure by eye, asked as "is this
+    correct?", and it was not.
+  cause: >-
+    L099's magnitude was right and its DIRECTION was wrong. The reported
+    centreline was lifted by `contact_offset * n`, along the LOCAL normal.
+    `arc_target(R_eff, theta)` is the normal offset from a straight
+    reference at arc length `R_eff * theta`, so by the projection identity
+    the solved shape is a circle of radius R_eff TANGENT TO THE DECK, centre
+    (0, R_eff); the roller-top locus is a circle of the same radius
+    CONCENTRIC WITH THE AXLE ARC, centre (0, R). Those differ by (0, R-R_eff)
+    at every angle and by nothing else, so the recovery is a rigid VERTICAL
+    translation. Along the local normal it instead carries the pipe past the
+    top by `contact_offset * (1 - cos theta)` -- 0 at SR1, 142 mm at SR7 on a
+    70 m stinger -- and that overshoot is what `off_arc` reported as
+    lift-off.
+  rule: >-
+    A rigid translation has a direction as well as a size, and the direction
+    is the half that a deck-side check cannot see. Every test L099 shipped
+    sat at theta = 0, where `contact_offset * n` and the vertical ARE the
+    same vector, so all five passed against the defect for a day. A datum
+    test must be written where the candidates disagree. Measured after the
+    fix, `off_arc` at SR2..SR6 reads within 3 mm of zero at every converged
+    position and SR7 within 17 mm, against 4 to 126 mm before.
+  rule_detail: >-
+    The solve was never touched and never wrong, which the numbers confirm
+    from both ends: the constraint residual was already 0.00 mm, and the two
+    circles differ by a rigid translation, which produces no strain. What
+    moved is `x` and `y` on the geometry table, and `off_arc` with them --
+    profile schema 1.6.0. Figures redrawn; no strain, moment or envelope
+    anywhere in the ledger changes.
+  detect: test_the_two_circles_differ_by_a_VERTICAL_translation, test_a_lift_along_the_LOCAL_NORMAL_overshoots_the_roller_top, test_at_theta_zero_the_two_lifts_agree, test_the_writer_lifts_vertically_not_along_the_normal
+  refs: [rebuild/slay/report/profile.py, rebuild/slay/report/profile_schema.py, rebuild/tests/test_contact_datum.py]
   date: 2026-10-07

@@ -120,6 +120,31 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
     # here: curvature already enters through `R_eff`, and what was missing
     # was only the datum the result is reported against.
     #
+    # AND IT IS A VERTICAL TRANSLATION, NOT A LIFT ALONG THE LOCAL NORMAL.
+    # This is the half of L099 that was got wrong, and it put the pipe back
+    # through the rollers everywhere but the deck.
+    #
+    # `arc_target(R_eff, theta)` is the normal offset from a STRAIGHT
+    # reference at arc length `R_eff * theta`, so by the projection identity
+    # `arc_target_by_projection` asserts, the solved shape is a circle of
+    # radius R_eff TANGENT TO THE DECK -- centre (0, R_eff). The roller-top
+    # locus is a different circle: concentric with the axle arc, centre
+    # (0, R), radius R_eff. Those two differ by (0, R - R_eff) at every
+    # angle and by nothing else -- a rigid VERTICAL translation of exactly
+    # `contact_offset`, which is why the curvature, and so the strain, is
+    # right (L099's claim, and it holds).
+    #
+    # Lifting by `contact_offset * n` instead is 0.503 m along the LOCAL
+    # normal. On the deck n = (0, -1) and the two agree, which is why this
+    # looked fixed. On the arc the normal swings round with theta, so the
+    # lift carries the pipe PAST the roller top by
+    # `contact_offset * (1 - cos theta)` -- 0 at SR1, 142 mm at SR7 on a
+    # 70 m stinger. `off_arc` then reported the pipe lifting off every
+    # stinger roller in sequence, 17 mm at SR3 rising to 126 mm at SR7,
+    # while the solver's own constraint residual at those same slots was
+    # 0.00 mm. The figure disagreed with the solve, and the figure was
+    # wrong.
+    #
     # IT STOPS BEING A TRANSLATION IF THE RADII DIFFER, so that is checked
     # rather than assumed.
     radii = {st.radius for st in scene.stations
@@ -145,10 +170,11 @@ def geometry_rows(scene, model, ms, U, ils, s_centre, OD, shift, step,
         s_sta = float(s_mat) + shift
         ax, ay = scene.path.position(s_sta)
         nx, ny = scene.path.normal(s_sta)
-        # The solved centreline, lifted onto the roller tops. `normal` points
-        # from the roller toward the pipe, so this is a + and not a -.
-        px = float(xs[k]) + contact_offset * nx
-        py = float(ys[k]) + contact_offset * ny
+        # The solved centreline, lifted onto the roller tops. The lift is
+        # VERTICAL and +y is down, so it is a minus: see the derivation
+        # above. Not `contact_offset * n`, which only coincides on the deck.
+        px = float(xs[k])
+        py = float(ys[k]) - contact_offset
         x_local = s_centre - float(s_mat)
         sec = ils.assembly.section_at(x_local) if ils is not None else None
         con = ils.assembly.contact_at(x_local) if ils is not None else None

@@ -61,7 +61,14 @@ import re
 
 from slay.report.schema import IDX, M, NM, NONE, Field
 
-PROFILE_SCHEMA_VERSION = '1.5.0'
+PROFILE_SCHEMA_VERSION = '1.6.0'
+# 1.6.0  `x` and `y` carry the contact lift as a VERTICAL translation, not
+#        a lift along the local normal. Same magnitude, and identical on the
+#        deck, but on the arc the normal swings with theta and the old form
+#        fell short by contact_offset * (1 - cos theta) -- 142 mm at SR7 on
+#        a 70 m stinger. `off_arc` therefore read 17 to 126 mm of lift-off
+#        at stinger rollers whose solver constraint residual was 0.00 mm.
+#        Values move; the contract does not.
 # 1.5.0  `passage_complete`, `sweep_total` and `sweep_ran` in the case
 #        context: whether the component actually traversed the station, and
 #        how far it got if not. A truncated passage produced an artifact
@@ -216,7 +223,14 @@ GEOMETRY = _identity('geometry') + CONTEXT + POSITION + [
           'u_s)`. Every value here is SOLVED, never placed on the arc '
           'formula', per='sample'),
     Field('y', 'float', M, 'length', 'value',
-          'WORLD y of the solved centreline, +y DOWN', per='sample'),
+          'WORLD y of the solved centreline, +y DOWN, carrying the contact '
+          'lift as `u_y - contact_offset`. The lift is VERTICAL: the solved '
+          'shape is a circle of radius R_eff tangent to the DECK and the '
+          'roller-top locus is one of the same radius concentric with the '
+          'AXLE arc, and those differ by a constant vertical vector. Lifting '
+          'along the local normal instead agrees only at theta = 0 and falls '
+          'short by contact_offset * (1 - cos theta) up the stinger',
+          per='sample'),
     Field('arc_x', 'float', M, 'length', 'value',
           'WORLD x of the ROLLER-CENTRE locus at this s_station -- the arc '
           'LayPath.R is measured to, which is where the roller AXLES are and '
