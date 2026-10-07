@@ -780,6 +780,10 @@ a G9 violation routed around rather than respected.*
 
 ## 6. Scorecard
 
+*Every row below was produced by the current program on 7 Oct 2026. Before
+that date the ledger mixed results from four different builds, which is the
+condition L101 was written about.*
+
 | Published table | Cases | Status |
 |---|---|---|
 | **X** plain pipe by stinger config | 3 | **re-run 7 Oct** — +18.9 / +7.1 / −7.3%; moved ~1.8% on config A |
@@ -792,50 +796,112 @@ a G9 violation routed around rather than respected.*
 | **XXXIX** shroud + thick pipe length | 2 | **re-run 7 Oct** — strain −13.7% and −4.3%; BM −6.5% and −12.2% |
 | **XLI** shroud + thick pipe location | 3 | **run 7 Oct** — strain −8.4 to −9.8%, **BM −4.0 to +1.3%**; the paper's worst-case position is reproduced |
 | **Paper 2** EA F1 / F2 | 6 | **re-run 7 Oct, unchanged** — ordering reproduced in all six; all at 100% of travel |
+| **Paper 2** EA PS (prediction) | 6 | **run 7 Oct** — no published counterpart. X_c falls 26–77% against our own F2, X_i rises to equal it |
 | **Paper 2** EA F1D / F2D | — | refused under G9, needs the `D` active set |
 
 **50 of 50 published cases have a rebuild number, and every one of them was produced by the current program.** Paper 1 and Paper 2 are both complete. Six PS cases are run as prediction, having no published counterpart; F1D and F2D remain refused under G9.
 
 ## 7. What is not settled
 
-1. **Paper 2 has no citation in this repo.** Its case tables and region
+*Rewritten 7 Oct, after the re-run campaign. Four entries from the previous
+list are **closed** and are recorded at the foot of this section rather than
+deleted, because what closed them is the useful part.*
+
+### Still open, in the order worth attacking
+
+1. **EA-SB reads 9.6–59.1% low on X_c**, and the scatter is the problem
+   rather than the magnitude: Case 2 agrees to −9.6% while Case 1 and Case 3
+   of the same family and the same study are out by −42.4% and −40.4%. A
+   systematic modelling difference would not pick three cases out of four.
+   Two candidates, neither eliminated: a transcription error in the case
+   dimensions (see 2), or connector placement, which is the quantity X_c is
+   most sensitive to.
+
+2. **Paper 2 has no citation in this repo.** Its case tables and region
    definitions were transcribed from supplied figures, so every number in §5
-   is checked against a transcription rather than a source — which matters
-   most for the EA-SB rows 40–60% out, where a transcription error would read
-   exactly like a physics disagreement.
-2. **We report extreme-fibre strain per element; the papers report "nominal
-   strains at element integration points."** Expected to coincide for a B31
-   beam in pure bending, **never checked against the kernel**. This is now
-   the single most promising open item, because three independent lines
-   point at it: §2's bending moments agree to a few percent while its
-   strains disagree by 10–17% on the same nine runs; §1's TABLE XI shows our excess over pure
-   bending running at roughly twice Abaqus's, measured against arithmetic
-   rather than another model; and every strain disagreement in this file is
-   one-sided high. All three are what a local-peak reporting offset would
-   produce, and none of them would move the section force.
-3. **The lift-off hypothesis in §3 is unverified** and would explain three
-   disagreements at once.
-4. **Whether our envelope and the paper's "Phase 2" are the same mechanical
-   state** is unsettled, and sits under every shroud and combined row.
-   Phase 2 carries residual plastic curvature from Phase 1 over the
-   mid-stinger rollers; our envelope is a maximum over the travel we solve.
-5. **`ILS-EASB` truncates at 20% of its passage** on the current contact
-   surface, where it ran the full travel on the superseded one. The only
-   capability regression from that change, undiagnosed.
-6. **X2 holds one element at 2 × OD** in most shroud cases, including the
-   closest agreements in §3.
-7. **The double-roller saturation is reproduced in character but not in
-   degree** (§2): moment now climbs 2.6× faster than strain where the paper
-   has 16×. The inversion is gone; the plateau is still softer than
+   is checked against a transcription rather than a source. This matters most
+   for exactly the EA-SB rows in 1, where a transcription error would read
+   precisely like a physics disagreement. **This is cheap to close and
+   nothing else should be concluded about EA-SB until it is.**
+
+3. **We report extreme-fibre strain per element; the papers report "nominal
+   strains at element integration points."** Still never checked against the
+   kernel. The reading has *changed direction* and that is worth stating:
+   `slay_sliding_v0_5` shows the reference's own comparison basis is
+   `_strain_profile_b31`, an Abaqus-B31 convention that collapses each
+   element to one value and then averages across neighbours — a convention
+   its own docstring says **under-reports a peak at a point support and
+   converges to it from below**. We report `max(|eps_top|, |eps_bot|)`, an
+   upper-bracket quantity. So our strains sit on the more generous
+   convention and are *still* low against the paper in most of the ledger,
+   which means the convention cannot be the explanation for the shortfall —
+   closing it would widen the gap, not shrink it. The earlier claim that
+   this was "the single most promising open item" is **withdrawn**.
+
+4. **Strain falls away with component length while the moment does not** —
+   TABLE XXIII/XXIV, −5.6% at 10 D to −31.6% at 20 D with moments inside
+   7.7%. Survived the whole re-run campaign untouched (the values moved in
+   the fourth decimal), so it is not a sweep artefact. One-sided LOW, so it
+   is not an envelope offset either. The clearest remaining pointer at a real
+   modelling difference.
+
+5. **The dual-roller saturation is reproduced in direction but not in
+   degree.** TABLE XXXII now gives −10.7% from 10 D to 50 D against the
+   paper's −52%; TABLE XXIII/XXIV gives strain +29.0% and moment +76.3% from
+   20 D to 40 D against +2.8% and +45.8%. The sign is right in both, which
+   it was not before L105 and L106; the plateau is still much softer than
    published.
-8. **Strain falls away with component length while the moment does not** —
-   −5.5% at 10 D to −31.6% at 20 D with moments inside 7.7%. One-sided LOW,
-   so it cannot be the envelope offset, and it is the clearest remaining
-   pointer at gap 2.
-9. **The 40 D moment overshoots** at +12.8% where every other length reads
-   low. That body spans nearly two full roller bays, and whether the
-   overshoot is our contact engaging too readily or the reference's letting
-   go is unsettled.
+
+6. **TABLE XXVI finds a spacing dependence the paper calls negligible** —
+   9.6% spread against 2.6%, a factor of 3.7. Its configuration is inferred
+   from a shared 1384 kN·m with TABLE XXIII's B1, so the inference is a
+   candidate cause. The moments agree within 1%, which argues the geometry
+   is right and the strain reporting is not.
+
+7. **The 40 D moment overshoots** at +13.0% where every other length reads
+   low. That body spans nearly two full roller bays; whether the overshoot is
+   our contact engaging too readily or the reference's letting go is
+   unsettled.
+
+8. **Whether our envelope and the paper's "Phase 2" are the same mechanical
+   state** sits under every shroud and combined row. Phase 2 carries residual
+   plastic curvature from Phase 1 over the mid-stinger rollers; our envelope
+   is a maximum over the travel we solve. Now that every passage sweeps its
+   full travel this is testable in a way it was not before.
+
+9. **X2 holds one or two elements at 2 × OD** in most shroud cases, including
+   the closest agreements in §3. A ratio computed over two elements is
+   reporting a mesh as much as a strain field.
+
+10. **Region boundaries disagree with the paper's by centimetres**, and in
+    four rows across TABLE XXXIX, XLI and XXXII that is enough to empty a
+    region or move a peak across a boundary. Handled by reporting the overall
+    peak and the region label together, which is a presentation fix and not a
+    resolution.
+
+11. **F1D and F2D are refused**, not approximated. A `D` is a deadband
+    needing an active set as well as a co-rotating frame. Six published
+    Paper 2 cases are therefore compared and two families are not.
+
+### Closed by the 7 Oct campaign
+
+| was | closed by |
+|---|---|
+| "`ILS-EASB` truncates at 20% of its passage — the only capability regression from the contact-surface change, undiagnosed" | **L105 and L106.** It was not a contact-surface regression at all: the lay tension was frozen to one piece of steel, and nothing cut back the travel between positions. All six EA cases now sweep 100% |
+| "the lift-off hypothesis in §3 is unverified and would explain three disagreements at once" | **Superseded.** The three disagreements it was invented to explain were truncated passages. TABLE XXXI config C went from −39.9…−73.4% to −5.4…−22.1% with no change to contact |
+| "the double-roller saturation is reproduced in character but not in degree — the inversion is gone" | **Partly, and restated as 5.** The inversion in TABLE XXXII was real and was L105/L106; the residual softness is not |
+| "extreme-fibre strain is the single most promising open item" | **Withdrawn, as 3.** The reference's own convention under-reports where ours over-reports, so it cannot explain a one-sided low |
+
+### A note on how much of this list was the program
+
+Of the nine entries in the previous version, four were artefacts of four
+sweep defects — L101's silent truncation, L105's frozen lay tension, L106's
+missing travel cutback, and the strain guard that followed. None of the four
+was visible as a wrong number; three of them produced *no* number and the
+fourth produced a 96.7% strain that reported as COMPLETE. The lesson the
+register already carries (L101) is the one to keep: **a result that does not
+exist is more dangerous than a result that is wrong**, because nothing about
+it looks wrong.
 
 ---
 
@@ -843,6 +909,7 @@ a G9 violation routed around rather than respected.*
 
 | Version | Date | What |
 |---|---|---|
+| **3.1** | 7 Oct 2026 | **Every case re-run on the current program** after L101, L105, L106 and the strain guard. All 50 published cases now carry a number from this build, Paper 1 and Paper 2 complete. TABLE XXVI, XXXIX and XLI run for the first time; six PS cases added as prediction. §7 rewritten: four entries closed |
 | **3.0** | 6 Oct 2026 | Restructured on the papers' own table numbering. Rebuild against the papers only. **Bending moment added for every case.** Shroud + thick pipe run for the first time |
 | 2.0 | 6 Oct 2026 | Re-measured on the physical contact surface after L095–L098 |
 | 1.0 | 6 Oct 2026 | First consolidated ledger, all results on the superseded contact surface |
