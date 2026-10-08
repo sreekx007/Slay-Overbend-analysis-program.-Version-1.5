@@ -1,0 +1,78 @@
+ILS-SIMPLE for EA-SB F2 -- the first genuinely combined reduction
+=================================================================
+
+NOT VALIDATION. The "EA-SB" column is Sec. 5's own row for the full model on
+this build; the paper column is Paper 2's published value.
+
+WHY THIS ONE IS DIFFERENT. EA-ST needed a measured stiffness and no shroud.
+EA-SB needs BOTH: its stiffness is in a frame tied at two connectors, AND it
+lifts the pipe. Measured, not assumed: `contact_at` on an ILS-EASB returns
+y = P_v with owner GD-SB over the base, against the plain 0.2032 m outside.
+
+THE TWO MEASUREMENTS
+--------------------
+Stiffness by `tools/stiffness_rig.py` between the pipeline-side connector
+nodes; lift by the same contact-profile sampling `report.regions` uses.
+
+case          P_c1  P_l1    kB |   L_span  EI/EIp    E_eq     lin     bnd |    V/D    lift   L1/D  L2/D  tot/D
+F2 Case 1     5.0D 10.0D  2.50 |   2.0320   4.183    878G +0.011% -0.000% |  2.000  609.6m  9.996 1.875 13.747
+F2 Case 2    10.0D 10.0D  3.10 |   4.0640   7.870   1653G +0.026% -0.000% |  2.000  609.6m  9.996 1.875 13.747
+F2 Case 3    10.0D 15.0D  3.10 |   4.0640   6.289   1321G +0.032% -0.000% |  2.000  609.6m 14.999 1.870 18.740
+
+Case 3 is LESS stiff than Case 2 (6.289 against 7.870) at the same connector
+span and the same kB, because its base is longer (P_l1 15 D against 10 D) and
+that is a different frame. The rig picks this up without being told.
+
+THE SHROUD IS REPRODUCED AS MEASURED, not forced to the body length. For a
+GD-TP the two coincide by construction; here they are genuinely independent --
+the stiffened span is the connector span (5 D, 10 D, 10 D) while the lifted
+footprint is 13.7 D or 18.7 D. `body_covers_shroud` is FALSE in all three,
+which is the first time that flag has fired on a real case and is exactly
+what it was built to report.
+
+THE RESULTS
+-----------
+R = 85 m, 9 m spacing, 100 MT, step 1 x OD, mesh ruled 2 x OD.
+ALL THREE SWEEP 100% OF THEIR TRAVEL.
+
+case         E/GPa  Lb/D        Xb        Xe      peak   EA-SB   ratio   vs paper
+F2 Case 1      878   5.0   0.0719%   1.3463%   1.3463%  1.222%  110.2%     60.1%
+F2 Case 2     1653  10.0   0.0444%   2.1855%   2.1855%  2.053%  106.5%     91.1%
+F2 Case 3     1321  10.0   0.0547%   1.5681%   1.5681%  1.447%  108.4%     62.0%
+
+Peak against peak: +10.2%, +6.5%, +8.4%. All HIGH, mean +8.4%, band 3.7
+points. The peak is in Xe in all three, outboard of the body.
+
+THREE FAMILIES, THREE SIGNATURES
+--------------------------------
+family                            n    mean            band  one sign
+GD-TP  (shroud, covers=True)      9   -2.17    -3.3 to -1.0      True
+EA-ST  (NO shroud)                2   +1.50    -0.8 to +3.8     False
+EA-SB  (shroud, covers=False)     3   +8.37   +6.5 to +10.2      True
+
+THE SHROUD HYPOTHESIS IS REFUTED, and it was recorded only one commit ago.
+L113 proposed that the GD-TP family's -2% bias came from the shroud --
+"matched depth is not matched contact geometry", a flat standing in for a
+cylinder -- on the evidence that the two EA-ST cases, which have no shroud,
+straddled zero. EA-SB HAS a shroud and biases +8.4%, the OPPOSITE WAY from
+GD-TP's -2.2%. A single mechanism in the shroud cannot produce a bias that is
+negative in one family and positive in another. The hypothesis is dead; it is
+marked so in L113 rather than quietly dropped.
+
+WHAT IS LEFT, stated as candidates and not as findings:
+
+  THE LOAD PATH DIFFERS, and only for EA-SB. In the real structure the roller
+  bears on the FRAME, which reaches the pipe only at the two connectors. In
+  the stand-in the shroud is clamped to the pipe and transfers roller load to
+  it CONTINUOUSLY along its length. That is a materially different support
+  condition over a 13.7 D footprint and it has no counterpart in the GD-TP
+  family, where the body IS the pipe and transfer is continuous in both.
+
+  THE STIFFENED SPAN MAY BE WRONG. The reduction stiffens only between the
+  connectors, which is right for a top structure attached at two points. A
+  base structure bears along its whole base, and whether that puts bending
+  stiffness into the pipe outside the connector span has not been
+  established either way here.
+
+Both are testable and neither has been tested. Nothing in this file should be
+read as explaining the EA-SB offset.

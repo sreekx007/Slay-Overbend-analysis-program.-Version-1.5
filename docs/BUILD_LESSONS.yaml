@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 113
+# entries: 114
 
 - id: L001
   area: kernel
@@ -2998,6 +2998,69 @@
     track the same effective lift. Small, one-signed, present only where a
     shroud is used: the right signature. It is labelled a hypothesis
     wherever it appears and must not be cited as a cause until tested.
+  withdrawn: >-
+    REFUTED 8 Oct 2026, the same day, by EA-SB F2 -- see L114. EA-SB HAS a
+    shroud and biases +8.37%, the OPPOSITE WAY from GD-TP's -2.17%. One
+    mechanism in the shroud cannot produce a bias that is negative in one
+    family and positive in another. The two ESTABLISHED halves of this entry
+    stand: accuracy does not degrade with stiffness ratio, and the -2% bias
+    is a GD-TP family property rather than the method's. Only the proposed
+    CAUSE is withdrawn.
   detect: '-'
   refs: [docs/simple/RESULTS_EAST_F2_2026-10-08.txt, docs/validation/VALIDATION_v3.0_2026-10-06.md]
+  date: 2026-10-08
+
+- id: L114
+  area: measure
+  class: finding
+  symptom: >-
+    Three component families reduced to ILS-SIMPLE now show three DIFFERENT
+    error signatures on peak strain, and they do not line up with anything
+    simple. GD-TP (nine cases, shroud present): mean -2.17%, band -3.3 to
+    -1.0, every one LOW. EA-ST (two, no shroud): -0.8 and +3.8, straddling
+    zero. EA-SB (three, shroud present): mean +8.37%, band +6.5 to +10.2,
+    every one HIGH.
+  cause: >-
+    Not established. What IS established is what it is not: L113's proposed
+    cause -- the shroud's flat standing in for the original's cylinder at
+    matched depth -- is REFUTED. GD-TP and EA-SB both carry a shroud and
+    bias in OPPOSITE directions, and one mechanism cannot do that. The
+    hypothesis was recorded one commit earlier on two EA-ST points and was
+    killed by the first family that tested it, which is the correct
+    lifetime for a hypothesis but a short one.
+  cause_detail: >-
+    EA-SB IS THE FIRST GENUINELY COMBINED REDUCTION and the first case where
+    `body_covers_shroud` is FALSE on real geometry: the stiffened span is the
+    connector span (5 D, 10 D) while the lifted footprint is 13.7 D or
+    18.7 D, and the two are independent rather than coincident as they are
+    for a GD-TP. Both measurements behaved: the rig's linearity check ran
+    +0.011 to +0.032% and its boundary check -0.000% on all three, and the
+    rig correctly read Case 3 as LESS stiff than Case 2 (6.289 against
+    7.870 x EI_pipe) at the same connector span and kB, because its base is
+    longer and that is a different frame. So the offset is not an artefact
+    of the extraction.
+  rule: >-
+    TWO CANDIDATES REMAIN, BOTH UNTESTED, AND NEITHER MAY BE CITED AS A
+    CAUSE. (1) THE LOAD PATH, which differs only for EA-SB: in the real
+    structure the roller bears on the FRAME and reaches the pipe only at the
+    two connectors, while in the stand-in the shroud is clamped to the pipe
+    and transfers roller load CONTINUOUSLY along 13.7 D. That has no
+    counterpart in the GD-TP family, where the body IS the pipe and transfer
+    is continuous in both. (2) THE STIFFENED SPAN: the reduction stiffens
+    only between the connectors, right for a top structure attached at two
+    points, and it is not established whether a base structure bearing along
+    its whole length puts bending stiffness into the pipe outside that span.
+    Until one is tested, a simplified EA-SB peak should be read as running
+    roughly 8% HIGH -- which is the usable statement, and the opposite
+    direction to the GD-TP correction.
+  rule_detail: >-
+    THE GENERAL LESSON IS ABOUT THE SHAPE OF THE EVIDENCE. Nine GD-TP cases
+    all low looked like one cause; two EA-ST cases straddling zero looked
+    like the cause was the shroud; three EA-SB cases all high showed it was
+    not. A tight one-signed band within a family says there is one mechanism
+    IN THAT FAMILY; it says nothing about which. Reducing a second family is
+    what tests a cause, and reducing a third is what killed the answer the
+    second one suggested.
+  detect: '-'
+  refs: [docs/simple/RESULTS_EASB_F2_2026-10-08.txt, docs/simple/RESULTS_EAST_F2_2026-10-08.txt, docs/validation/VALIDATION_v3.0_2026-10-06.md]
   date: 2026-10-08
