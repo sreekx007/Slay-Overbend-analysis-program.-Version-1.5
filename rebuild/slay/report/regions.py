@@ -174,9 +174,12 @@ def simple_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
     giving it Xb/Xe as well would put one strain in two schemes and invite
     them to disagree.
     """
-    base = offset_geometry(ils, s_centre, OD=OD, n=n)
-    if base is None:
+    # The `ils is None` guard used to come free with `base is None`, which
+    # returned early. Since a body-only GD-Simple has no `base`, the guard
+    # has to be its own.
+    if ils is None:
         return None
+    base = offset_geometry(ils, s_centre, OD=OD, n=n)
     lo_x, hi_x = ils.extent
     OD_pipe = ils.assembly.pipe.OD_pipe if OD is None else OD
 
@@ -192,7 +195,7 @@ def simple_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
         if sec is None:
             continue
         own = getattr(sec, 'owner', 'pipe')
-        if own == 'pipe' or own == base.owner:
+        if own == 'pipe' or (base is not None and own == base.owner):
             continue                 # bare pipe, or the shroud itself
         if abs(getattr(sec, 'OD', OD_pipe) - OD_pipe) > 1.0e-9:
             return None              # a STEP. That is a junction case.
@@ -206,11 +209,34 @@ def simple_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
     s_ves = s_centre - xs[max(on)]
     if s_cat - s_ves <= FLAT_TOL:
         return None
+    body_owner = owners.pop()
+
+    # NO SHROUD IS A GD-SIMPLE TOO, and it is what an EA-ST reduces to: a
+    # top structure changes nothing a roller touches, so there is no offset
+    # and `offset_geometry` rightly returns None. The Xb/Xe partition does
+    # not need one -- it is drawn on the BODY -- so the only thing missing
+    # is the shroud footprint the inherited fields carry.
+    #
+    # THOSE FIELDS ARE SET TO THE BODY when there is no shroud, and that is
+    # a deliberate choice rather than a filler: `body_peaks` and the
+    # `peak_on_shroud` column both read them as "the component's
+    # footprint", and for a body-only GD-Simple the body IS the whole
+    # footprint. `lift_max` is then 0 and `V` is the pipe's own half-OD,
+    # which is what "no lift" means in this frame -- not a shroud sitting
+    # at zero depth.
+    if base is None:
+        half = (ils.assembly.pipe.OD_pipe if OD is None else OD) / 2.0
+        return SimpleGeometry(
+            s_cat_end=s_cat, s_deep_cat=s_cat, s_deep_ves=s_ves,
+            s_ves_end=s_ves, V=half, lift_max=0.0, OD=2.0 * half,
+            owner=body_owner, s_body_cat=s_cat, s_body_ves=s_ves,
+            body_owner=body_owner)
+
     return SimpleGeometry(
         s_cat_end=base.s_cat_end, s_deep_cat=base.s_deep_cat,
         s_deep_ves=base.s_deep_ves, s_ves_end=base.s_ves_end,
         V=base.V, lift_max=base.lift_max, OD=base.OD, owner=base.owner,
-        s_body_cat=s_cat, s_body_ves=s_ves, body_owner=owners.pop())
+        s_body_cat=s_cat, s_body_ves=s_ves, body_owner=body_owner)
 
 
 def offset_geometry(ils, s_centre, OD=None, n=N_SAMPLES):

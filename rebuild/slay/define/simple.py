@@ -91,10 +91,14 @@ class Simple:
     ils: object
     E: float
     L_body: float
-    V: float
-    L1: float
-    L2: float
+    V: float = None          # None on a body-only GD-Simple: no shroud,
+    L1: float = None         # because the thing it stands in for changes
+    L2: float = None         # nothing a roller touches (EA-ST).
     centre_x: float = 0.0
+
+    @property
+    def has_shroud(self) -> bool:
+        return self.V is not None
 
     @property
     def extent(self) -> tuple[float, float]:
@@ -149,8 +153,8 @@ def _base_pipeline() -> dict:
     return copy.deepcopy(arch['ILS-SHTP']['definition']['pipeline'])
 
 
-def spec(*, E: float, L_body: float, V: float, L1: float, L2: float,
-         centre_x: float = 0.0, OD: float = None,
+def spec(*, E: float, L_body: float, V: float = None, L1: float = None,
+         L2: float = None, centre_x: float = 0.0, OD: float = None,
          t_wall: float = None) -> dict:
     """The `ils_builder` spec for one GD-Simple. Validated, not trusted.
 
@@ -163,6 +167,25 @@ def spec(*, E: float, L_body: float, V: float, L1: float, L2: float,
     are not, and offering a second centre would invite a GD-Simple whose
     body hangs off the end of its own shroud.
     """
+    # NO SHROUD IS A LEGITIMATE GD-SIMPLE, and it is what an EA-ST reduces
+    # to. A top structure sits ON the pipe and changes nothing a roller
+    # touches -- measured, not assumed: `contact_at` returns the plain pipe
+    # 0.2032 m with owner 'pipe' at every station of an ILS-EAST. There is
+    # no lift to reproduce, and a shroud put there anyway would need
+    # V = OD/2 for zero lift, which is a component doing nothing while still
+    # owning contact.
+    #
+    # ALL THREE OR NONE. A shroud needs V, L1 and L2 together; two of the
+    # three is a half-stated component, and defaulting the third would
+    # invent geometry the caller did not ask for.
+    shroud = (V, L1, L2)
+    if any(v is not None for v in shroud) and any(v is None for v in shroud):
+        raise SimpleRuleError(
+            f'GD-Simple: a shroud needs V, L1 and L2 together, got '
+            f'V={V!r}, L1={L1!r}, L2={L2!r}. Pass all three for a body on a '
+            f'shroud, or none for a body alone.')
+    has_shroud = V is not None
+
     pipe = _base_pipeline()
     if OD is not None:
         pipe['OD_pipe'] = float(OD)
@@ -175,13 +198,16 @@ def spec(*, E: float, L_body: float, V: float, L1: float, L2: float,
         raise SimpleRuleError(
             f'GD-Simple: E must be positive, got {E!r}. E is the whole '
             'reason this component exists; there is no default for it.')
-    if min(L_body, L1, L2, V) <= 0.0:
+    if L_body <= 0.0:
         raise SimpleRuleError(
-            f'GD-Simple: L_body, L1, L2 and V must all be positive -- got '
-            f'L_body={L_body!r}, L1={L1!r}, L2={L2!r}, V={V!r}')
+            f'GD-Simple: L_body must be positive, got {L_body!r}')
+    if has_shroud and min(L1, L2, V) <= 0.0:
+        raise SimpleRuleError(
+            f'GD-Simple: L1, L2 and V must all be positive -- got '
+            f'L1={L1!r}, L2={L2!r}, V={V!r}')
     # The shroud's own floor, restated here so the message names GD-Simple
     # rather than GD-SH. `OffsetShroud.validate` would catch it too.
-    if V < OD_pipe / 2.0:
+    if has_shroud and V < OD_pipe / 2.0:
         raise SimpleRuleError(
             f'GD-Simple: V ({V * 1000:.1f} mm) is measured from the pipe '
             f'CENTRELINE down to the shroud BOTTOM FLAT, so it cannot be '
@@ -203,13 +229,13 @@ def spec(*, E: float, L_body: float, V: float, L1: float, L2: float,
         # includes header steel, so a header that moves with a builder
         # default moves every recorded mass with it.
         'header': {'half_length': 6.0, 'provenance': 'DERIVED'},
-        'components': [
+        'components': ([
             {'code': 'GD-SH', 'id': SHROUD_ID, 'centre_x': float(centre_x),
              'V': float(V), 'L1': float(L1), 'L2': float(L2),
              # DESIGN, not PAPER: no published study defines a GD-Simple.
              # The PIPELINE above stays PAPER -- it is the same 406.4 x 21
              # line pipe every validated case runs on.
-             'provenance': 'DESIGN'},
+             'provenance': 'DESIGN'}] if has_shroud else []) + [
             # THE NEUTRAL BODY. t_comp == t_pipe exactly, which is what
             # makes OD_comp == OD_pipe and the stiffness step vanish. It is
             # NOT a thick pipe with a small wall: there is no step at all,
@@ -219,16 +245,19 @@ def spec(*, E: float, L_body: float, V: float, L1: float, L2: float,
              't_comp': t_pipe, 'L_comp': float(L_body),
              'provenance': 'DESIGN'},
         ],
-        'associations': [
+        # The association ties the SHROUD to the centreline, so a body-only
+        # GD-Simple has none to declare.
+        'associations': ([
             {'type': 'PositionOrientation',
              'from': {'component': SHROUD_ID},
              'to': {'datum': 'pipeline_centreline'},
              'constraint': 'V', 'value': float(V)},
-        ],
+        ] if has_shroud else []),
     }
 
 
-def build(*, E: float = None, L_body: float, V: float, L1: float, L2: float,
+def build(*, E: float = None, L_body: float, V: float = None,
+          L1: float = None, L2: float = None,
           centre_x: float = 0.0, OD: float = None,
           t_wall: float = None) -> Simple:
     """Build one GD-Simple. `E` defaults to the pipeline steel's.
@@ -259,5 +288,6 @@ def build(*, E: float = None, L_body: float, V: float, L1: float, L2: float,
             f'{b.OD_comp * 1000:.3f} mm against pipe OD '
             f'{ils.assembly.pipe.OD_pipe * 1000:.3f} mm. GD-Simple carries '
             'the PIPELINE section; a stepped one is a GD-TP study.')
-    return Simple(ils=ils, E=E, L_body=float(L_body), V=float(V),
-                  L1=float(L1), L2=float(L2), centre_x=float(centre_x))
+    _f = lambda v: None if v is None else float(v)      # noqa: E731
+    return Simple(ils=ils, E=E, L_body=float(L_body), V=_f(V),
+                  L1=_f(L1), L2=_f(L2), centre_x=float(centre_x))

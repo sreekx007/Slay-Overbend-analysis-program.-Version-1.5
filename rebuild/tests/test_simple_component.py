@@ -349,3 +349,67 @@ def test_at_E_equal_to_the_pipeline_and_no_yielding_the_body_vanishes():
     # Measured 8 Oct 2026: 0.2031% both sides. Held to 1% of each other --
     # loose enough for the mesh, far tighter than any defect would survive.
     assert xb == pytest.approx(xe, rel=0.01), f'Xb {xb} vs Xe {xe}'
+
+
+# ---------------------------------------------------------------------------
+# 6. a GD-Simple with NO shroud -- what an EA-ST reduces to
+# ---------------------------------------------------------------------------
+
+def test_a_top_structure_changes_nothing_a_roller_touches():
+    """The measurement the body-only variant exists for. If this ever comes
+    back with a lift, EA-ST needs a shroud after all and the reduction is
+    wrong, not the test."""
+    import plot_stinger as gen
+    ils = gen.build_component_ils('ILS-EAST')
+    half = ils.assembly.pipe.OD_pipe / 2.0
+    for x in (-5.0, -2.0, 0.0, 2.0, 5.0):
+        c = ils.assembly.contact_at(x)
+        assert c is not None and c.y == pytest.approx(half, abs=1e-12)
+        assert getattr(c, 'owner', 'pipe') == 'pipe'
+
+
+def test_a_body_only_GD_Simple_builds_and_has_no_shroud():
+    sm = sp.build(E=1767e9, L_body=10 * D)
+    assert sm.has_shroud is False
+    codes = [c.code for c in sm.ils.assembly.components]
+    assert codes == ['GD-TP'], f'expected the body alone, got {codes}'
+    assert sm.extent == pytest.approx((-5 * D, 5 * D))
+    # and it still carries the pipeline section
+    body = sm.ils.assembly.components[0]
+    assert body.OD_comp == pytest.approx(sm.ils.assembly.pipe.OD_pipe)
+
+
+def test_a_half_stated_shroud_is_refused():
+    """Two of V/L1/L2 is not a component; defaulting the third would invent
+    geometry nobody asked for."""
+    for kw in (dict(V=0.25), dict(V=0.25, L1=1.0), dict(L1=1.0, L2=0.1)):
+        with pytest.raises(sp.SimpleRuleError, match='together'):
+            sp.build(E=1e11, L_body=4.0, **kw)
+
+
+def test_the_body_only_case_still_gets_Xb_and_Xe():
+    """`offset_geometry` returns None without a shroud, and the Xb/Xe
+    partition does not need one -- it is drawn on the BODY."""
+    sm = sp.build(E=1767e9, L_body=10 * D)
+    L = sm.extent[1] - sm.extent[0]
+    scene = sweep.scene_for(R=85.0, spacing=9.0, L_comp=L)
+    s_centre = sweep.start_centre(scene, L)
+    assert rg.offset_geometry(sm.ils, s_centre) is None
+    g = rg.simple_geometry(sm.ils, s_centre)
+    assert isinstance(g, rg.SimpleGeometry)
+    assert g.lift_max == pytest.approx(0.0, abs=1e-12)
+    assert g.L_body == pytest.approx(10 * D, abs=5e-3)
+    assert [n for n, _lo, _hi in rg.bounds(g)] == ['Xe', 'Xb', 'Xe']
+
+
+def test_without_a_shroud_the_footprint_fields_mean_the_BODY():
+    """`body_peaks` and `peak_on_shroud` read the inherited s_* fields as
+    'the component's footprint'. With no shroud the body IS the footprint,
+    so they are set to it deliberately rather than left at zero."""
+    sm = sp.build(E=1767e9, L_body=10 * D)
+    L = sm.extent[1] - sm.extent[0]
+    scene = sweep.scene_for(R=85.0, spacing=9.0, L_comp=L)
+    g = rg.simple_geometry(sm.ils, sweep.start_centre(scene, L))
+    assert g.s_cat_end == pytest.approx(g.s_body_cat)
+    assert g.s_ves_end == pytest.approx(g.s_body_ves)
+    assert g.body_covers_shroud is True

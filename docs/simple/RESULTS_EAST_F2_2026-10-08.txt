@@ -1,0 +1,97 @@
+ILS-SIMPLE for EA-ST F2 -- equivalent stiffness measured, not read
+===================================================================
+
+NOT VALIDATION. The "EA-ST" column is Sec. 5's own row for the full model on
+this build; the paper column is Paper 2's published value. Every comparison
+here is internal except where the paper is named.
+
+WHY THIS ONE NEEDED A RIG. A GD-TP carries its stiffness in the pipe WALL, so
+`simplify.equivalent` reads EI straight off `section_at`. An EA structure
+does not: its stiffness is in a frame tied to the pipe at two connectors, and
+`section_at` returns the plain pipeline everywhere along it. There is nothing
+to read, which is why the reducer refuses an EA-ST by name. The stiffness is
+MEASURED instead -- `tools/stiffness_rig.py`.
+
+AND IT NEEDED NO SHROUD. Measured, not assumed: `contact_at` on an ILS-EAST
+returns the plain pipe 0.2032 m with owner 'pipe' at every station. A top
+structure changes nothing a roller touches, so there is no lift to reproduce.
+`define.simple` and `report.regions` both gained a body-only path.
+
+THE EXTRACTION
+--------------
+Pure bending over the span between the two pipeline-side connector nodes:
+equal and opposite moments, rigid-body restraint only, gravity off, no lay
+tension, linear elastic. The span then carries constant M, so
+EI_eq = M*L/dtheta in closed form -- no search, and none is done.
+
+case        P_c1    kT       L       EI_eq  EI/EIp    E_eq |      lin     bnd     ctrl
+F2 case 1    10D  2.22  4.0640     836.67M   8.415   1767G |  -0.029% -0.000% +0.0000%
+F2 case 2    20D  2.85  8.1280    1209.88M  12.168   2555G |  -0.073% -0.000% +0.0000%
+
+  lin  = EI at 2M against EI at M. Connectors slipping would show here.
+  bnd  = clamped-end boundary against the self-equilibrating one.
+  ctrl = plain pipe through the same rig against analytic E*I.
+
+THE QUADRATURE IS NOT THE DEFAULT, and that is the one real finding in the
+extraction. `solve`'s default polar scheme (the B31-equivalent angular
+integration the reference runs use) reads the plain-pipe control 0.2955% LOW
+-- a fixed bias, independent of length and mesh. Self-calibrating it away, by
+taking the ILS stiffness as a ratio to the rig's own plain-pipe figure,
+OVER-corrects: 8.436 where the truth is 8.415, because the frame members are
+not the pipe section and do not carry the same bias. The fix is the converged
+Cartesian scheme, polar=False with n_fibres=20, which reads the control to
++0.0002%.
+
+Magnitude sanity: the frame's bottom chord sits 0.6096 m off the pipe axis,
+so composite action dominates. Full composite would be about 45 x EI_pipe and
+none would be 1 x. 8.4 and 12.2 sit between, which is what two discrete tie
+points and finite connector stiffness should give, and the longer span
+develops more of it.
+
+THE RESULTS
+-----------
+R = 85 m, 9 m spacing, 100 MT, sweep step 1 x OD, mesh ruled 2 x OD.
+BOTH SWEEP 100% OF THEIR TRAVEL.
+
+case         E/GPa   L/D        Xb        Xe      peak    EA-ST   ratio    vs paper
+F2 case 1     1767  10.0   0.0394%   0.9204%   0.9204%   0.887%   103.8%     98.3%
+F2 case 2     2555  20.0   0.0344%   1.5214%   1.5214%   1.534%    99.2%    107.9%
+
+PEAK AGAINST PEAK: +3.8% and -0.8%. On case 1 the stand-in is CLOSER to the
+paper (-1.7%) than the full EA-ST model is (-5.3%), which is not a claim that
+it is better -- two cases cannot say that -- but it is worth recording.
+
+THE PEAK LANDS IN THE RIGHT PLACE. s_material +8.4097 in both, against a body
+catenary-side end at +8.0000: about one OD outboard of the body. That is the
+stiffness discontinuity, and it is where EA-ST's X_c is defined (within 2 x OD
+of a connector). Same location, same mechanism.
+
+Xb is negligible, 0.034 to 0.039%. At 8.4x and 12.2x stiffness, elastic, the
+body carries almost nothing and sheds it all outboard.
+
+THE RELATION ACROSS ALL TWELVE CASES
+------------------------------------
+  EI/EIp   family   n                      peak deltas     mean
+   1.664    GD-TP   3                  -1.9, -2.0, -2.4   -2.10
+   3.248    GD-TP   4            -3.0, -1.3, -1.9, +9.4   -2.07   (B4 excluded)
+   4.366    GD-TP   3                  -3.3, -1.0, -2.7   -2.33
+   8.415    EA-ST   1                              +3.8
+  12.168    EA-ST   1                              -0.8
+
+1. ACCURACY DOES NOT DEGRADE WITH STIFFNESS RATIO. From 1.66x to 12.17x, a
+   factor of seven, the error stays inside +/-4%. The method does not weaken
+   as the body gets stiffer, which was the obvious thing to fear.
+
+2. THE -2% BIAS IS A GD-TP PROPERTY, NOT A METHOD PROPERTY. It sits at -2.10,
+   -2.07 and -2.33 across three stiffness ratios -- flat -- with all nine on
+   one side. The two EA-ST cases STRADDLE ZERO. So the systematic offset that
+   Sec. 6 limit 5 records does not follow the modulus; it follows the family.
+
+A CANDIDATE FOR THE BIAS, AND IT IS A HYPOTHESIS ON TWO POINTS. What differs
+between the families is the SHROUD: the GD-TP stand-in has one, to reproduce
+lift; the EA-ST stand-in has none, because there is no lift. So -- MATCHED
+DEPTH IS NOT MATCHED CONTACT GEOMETRY. A GD-TP presents the roller a CYLINDER
+of radius 235.2 mm; the shroud presents a FLAT at the same depth. As the pipe
+rotates through a roller, a flat and a cylinder of a different radius do not
+track the same effective lift. That would be small, one-signed, and present
+only where a shroud is used, which is the signature. Untested.

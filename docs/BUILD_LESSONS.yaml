@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 111
+# entries: 113
 
 - id: L001
   area: kernel
@@ -2910,4 +2910,94 @@
     the word "exaggeration" would have been wrong.
   detect: test_depth_is_the_bodys_OWN_contact_surface, test_bending_stiffness_is_reproduced_exactly, test_axial_stiffness_is_WRONG_and_reported, test_a_zero_taper_is_refused_with_the_reason, test_a_body_that_owns_no_contact_is_refused
   refs: [rebuild/slay/define/simplify.py, tools/simplify_ils.py, tools/plot_simple_ils.py, rebuild/tests/test_simplify.py]
+  date: 2026-10-08
+
+- id: L112
+  area: measure
+  class: finding
+  symptom: >-
+    An EA-ST cannot be reduced the way a GD-TP is. `simplify.equivalent`
+    refuses it -- "nothing in this assembly owns a section" -- because its
+    stiffness is in a FRAME tied to the pipe at two connectors and
+    `section_at` returns the plain pipeline everywhere along it. There is no
+    section to read EI off.
+  cause: >-
+    Two structurally different reductions, not one with a wider input. A
+    GD-TP changes the pipe wall; an EA structure changes nothing about the
+    pipe and adds stiffness in parallel, through discrete attachments.
+  rule: >-
+    MEASURE IT WITH A RIG (`tools/stiffness_rig.py`). Pure bending over the
+    span between the two pipeline-side connector nodes: equal and opposite
+    token moments, rigid-body restraint only, gravity off, no lay tension,
+    linear elastic. The span then carries constant M, so EI_eq = M*L/dtheta
+    IN CLOSED FORM. No search loop: one that stopped when the rotation
+    "almost" matched would be choosing its own tolerance where an exact
+    inverse exists. Measured EA-ST F2: 8.415 x EI_pipe at P_c1 = 10 D
+    (E_eq 1767 GPa) and 12.168 x at 20 D (E_eq 2555 GPa).
+  rule_detail: >-
+    THREE CHECKS, ALL PRINTED, NONE ASSUMED. Linearity: EI at 2M against EI
+    at M, -0.029% and -0.073%, so the connectors are not slipping and one
+    equivalent E is meaningful. Boundary: a clamped end against the
+    self-equilibrating pair agrees to -0.000%, so the clamp imposes no local
+    restraint the span can feel. Control: plain pipe through the same rig
+    against analytic E*I. A rig that cannot reproduce a known answer proves
+    nothing about an unknown one.
+  rule_detail_2: >-
+    THE QUADRATURE IS NOT THE DEFAULT, and the obvious correction is wrong.
+    `solve`'s default polar scheme -- the B31-equivalent angular integration
+    the reference runs use -- reads the plain-pipe control 0.2955% LOW, a
+    fixed bias independent of length and mesh. SELF-CALIBRATING IT AWAY
+    OVER-CORRECTS: taking the ILS stiffness as a ratio to the rig's own
+    plain-pipe figure gives 8.436 where the truth is 8.415, because the
+    frame members are not the pipe section and do not carry the same bias. A
+    bias is only cancellable by a ratio when it is COMMON to both terms. Use
+    `polar=False, n_fibres=20`, the converged Cartesian scheme, which reads
+    the control to +0.0002%.
+  rule_detail_3: >-
+    AN EA-ST NEEDS NO SHROUD, measured rather than assumed: `contact_at` on
+    an ILS-EAST returns the plain pipe 0.2032 m with owner 'pipe' at every
+    station. A top structure changes nothing a roller touches, so there is
+    no lift to reproduce, and a shroud put there anyway would need V = OD/2
+    for zero lift -- a component doing nothing while still owning contact.
+    `define.simple` and `report.regions.simple_geometry` both gained a
+    body-only path; V, L1 and L2 are now all-three-or-none, because two of
+    them is a half-stated component and defaulting the third would invent
+    geometry nobody asked for. Without a shroud the inherited `s_*`
+    footprint fields are set to the BODY deliberately, since `body_peaks`
+    and `peak_on_shroud` read them as "the component's footprint" and for a
+    body-only GD-Simple the body is the whole footprint.
+  detect: test_a_top_structure_changes_nothing_a_roller_touches, test_a_body_only_GD_Simple_builds_and_has_no_shroud, test_the_body_only_case_still_gets_Xb_and_Xe, test_a_half_stated_shroud_is_refused
+  refs: [tools/stiffness_rig.py, rebuild/slay/define/simple.py, rebuild/slay/report/regions.py, docs/simple/RESULTS_EAST_F2_2026-10-08.txt]
+  date: 2026-10-08
+
+- id: L113
+  area: measure
+  class: finding
+  symptom: >-
+    The simplified model's ~2% low bias on peak strain, recorded as Sec. 6
+    limit 5 and unexplained there, does NOT appear in the EA-ST family.
+  cause: >-
+    Measured across twelve cases spanning EI/EI_pipe from 1.664 to 12.168.
+    The GD-TP family sits at -2.10, -2.07 and -2.33 per stiffness group --
+    FLAT across a factor of 2.6 in stiffness -- with all nine on the same
+    side. The two EA-ST cases STRADDLE ZERO (-0.8 and +3.8). So the offset
+    does not follow the modulus; it follows the FAMILY.
+  rule: >-
+    TWO THINGS ARE NOW ESTABLISHED AND ONE IS A HYPOTHESIS.
+    Established: accuracy does not degrade with stiffness ratio -- over a
+    factor of seven in EI the peak error stays inside +/-4%, which was the
+    obvious thing to fear and is not happening. Established: the bias is a
+    property of the GD-TP reduction and not of the method, so Sec. 6 limit 5
+    should not be read as a blanket "simplified strains run 2% low".
+    HYPOTHESIS, on two points and untested: what differs between the
+    families is the SHROUD. The GD-TP stand-in has one, to reproduce lift;
+    the EA-ST stand-in has none, because a top structure lifts nothing. So
+    MATCHED DEPTH IS NOT MATCHED CONTACT GEOMETRY -- a GD-TP presents the
+    roller a CYLINDER of radius 235.2 mm while the shroud presents a FLAT at
+    the same depth, and as the pipe rotates through a roller the two do not
+    track the same effective lift. Small, one-signed, present only where a
+    shroud is used: the right signature. It is labelled a hypothesis
+    wherever it appears and must not be cited as a cause until tested.
+  detect: '-'
+  refs: [docs/simple/RESULTS_EAST_F2_2026-10-08.txt, docs/validation/VALIDATION_v3.0_2026-10-06.md]
   date: 2026-10-08

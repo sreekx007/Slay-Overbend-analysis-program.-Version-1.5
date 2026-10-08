@@ -1196,6 +1196,86 @@ strain that decides a design sits in the pipe beside the component, not in
 the component, and that is the one the stand-in gets right to within 3.3%
 while matching the moment to 1%.
 
+### EA-ST F2 — a second family, and a different reduction
+
+*8 Oct 2026. The EA-ST column is §5's own row for the full model on this
+build; the paper column is Paper 2's published value.*
+
+**An EA structure cannot be reduced the way a GD-TP is**, and
+`simplify.equivalent` refuses it by name: its stiffness is in a **frame** tied
+to the pipe at two connectors, and `section_at` returns the plain pipeline
+everywhere along it. There is no section to read EI off. It is **measured**
+instead, by `tools/stiffness_rig.py`: pure bending over the span between the
+two pipeline-side connector nodes, equal and opposite token moments,
+rigid-body restraint only, gravity off, no lay tension, linear elastic. The
+span carries constant M, so `EI_eq = M·L/Δθ` **in closed form** — no search,
+and none is done.
+
+| Case | `P_c1` | kT | L | `EI_eq` | `EI/EI_p` | **E_eq** | lin | bnd | ctrl |
+|---|---|---|---|---|---|---|---|---|---|
+| F2 case 1 | 10 D | 2.22 | 4.064 m | 836.7 MN·m² | 8.415 | **1767 GPa** | −0.029% | −0.000% | +0.0000% |
+| F2 case 2 | 20 D | 2.85 | 8.128 m | 1209.9 MN·m² | 12.168 | **2555 GPa** | −0.073% | −0.000% | +0.0000% |
+
+*`lin` is EI at 2M against EI at M — connectors slipping would show there.
+`bnd` is a clamped end against the self-equilibrating pair. `ctrl` is plain
+pipe through the same rig against analytic `E·I`.*
+
+**The quadrature is not the default, and the obvious correction is wrong.**
+`solve`'s default polar scheme reads the plain-pipe control **0.2955% low**, a
+fixed bias independent of length and mesh. Self-calibrating it away — taking
+the ILS stiffness as a ratio to the rig's own plain-pipe figure —
+**over-corrects**, giving 8.436 where the truth is 8.415, because the frame
+members are not the pipe section and do not carry the same bias. A bias
+cancels in a ratio only when it is *common* to both terms. The extraction
+uses `polar=False, n_fibres=20`, which reads the control to +0.0002%.
+
+**It needs no shroud**, measured rather than assumed: `contact_at` on an
+ILS-EAST returns the plain pipe 0.2032 m, owner `pipe`, at every station. A
+top structure changes nothing a roller touches. `define.simple` and
+`report.regions` both gained a body-only path, and V/L1/L2 are now
+all-three-or-none.
+
+| Case | **E** | L | Xb | Xe = **peak** | EA-ST | **Δ** | vs paper |
+|---|---|---|---|---|---|---|---|
+| F2 case 1 | 1767 GPa | 10 D | 0.0394% | **0.9204%** | 0.887% | **+3.8%** | 98.3% |
+| F2 case 2 | 2555 GPa | 20 D | 0.0344% | **1.5214%** | 1.534% | **−0.8%** | 107.9% |
+
+Both sweep 100% of their travel. **The peak lands in the right place** —
+`s_material +8.4097` in both, against a body end at `+8.0000`: about one OD
+outboard, at the stiffness discontinuity, which is where EA-ST's `X_c` is
+defined. Same location, same mechanism. **Xb is negligible** (0.034–0.039%):
+at 8.4× and 12.2×, elastic, the body carries almost nothing and sheds it all
+outboard.
+
+### What twelve cases say about the method
+
+| `EI/EI_p` | family | n | peak deltas | mean |
+|---|---|---|---|---|
+| 1.664 | GD-TP | 3 | −1.9, −2.0, −2.4 | **−2.10** |
+| 3.248 | GD-TP | 4 | −3.0, −1.3, −1.9, (+9.4) | **−2.07** |
+| 4.366 | GD-TP | 3 | −3.3, −1.0, −2.7 | **−2.33** |
+| 8.415 | EA-ST | 1 | +3.8 | — |
+| 12.168 | EA-ST | 1 | −0.8 | — |
+
+**Accuracy does not degrade with stiffness ratio.** Over a factor of seven in
+EI — 1.66× to 12.17× — the peak error stays inside ±4%. That was the obvious
+thing to fear of a one-parameter reduction, and it is not happening.
+
+**The −2% bias is a GD-TP property, not a method property.** It sits at −2.10,
+−2.07, −2.33 across three stiffness groups — flat — with all nine on one side,
+while the two EA-ST cases straddle zero. So the offset does not follow the
+modulus; it follows the **family**, and limit 5 below must not be read as a
+blanket "simplified strains run 2% low".
+
+**A candidate, and it is a hypothesis on two points.** What differs between
+the families is the **shroud**: the GD-TP stand-in has one to reproduce lift,
+the EA-ST stand-in has none because there is no lift. So **matched depth is
+not matched contact geometry** — a GD-TP presents the roller a *cylinder* of
+radius 235.2 mm, the shroud a *flat* at the same depth, and as the pipe
+rotates through a roller the two do not track the same effective lift. Small,
+one-signed, present only where a shroud is used: the right signature.
+**Untested, and not to be cited as a cause until it is** (L113).
+
 ### Limits of this section
 
 1. **The mesh check was run on B1, and it found the opposite of what this
@@ -1235,7 +1315,9 @@ while matching the moment to 1%.
    measurement.
 4. **No case here has a published counterpart**, so none of it bears on the
    scorecard in §7 and none of it closes anything in §8.
-5. **The ~2% low bias on strain is unexplained.** Nine of ten sit in −1.0 to
+5. **The ~2% low bias on strain is unexplained, and belongs to the GD-TP
+   family rather than to the method** — the two EA-ST cases straddle zero.
+   Within GD-TP: Nine of ten sit in −1.0 to
    −3.3% with every one on the same side, against a moment that scatters
    about zero. That is a systematic offset with a single cause, and the
    first candidate to reach for — the stand-in's extreme-fibre distance — is
@@ -1432,6 +1514,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.7** | 8 Oct 2026 | **EA-ST F2 reduced and run — a second family, and a different reduction.** Stiffness MEASURED with a pure-bending rig (`EI_eq = M·L/Δθ`, closed form) because an EA structure has no section to read it off: 8.415× and 12.168× `EI_pipe`. Peak **+3.8%** and **−0.8%**, peak location reproduced. Body-only GD-Simple added (a top structure lifts nothing). Across twelve cases, **accuracy does not degrade with stiffness ratio** over a factor of seven, and the −2% bias is shown to be a **GD-TP family property, not the method's** |
 | **3.6** | 8 Oct 2026 | **Head-to-head table added: actual GD-TP against the simplified model, peak for peak and moment for moment.** It separates the two: **moment unbiased** (mean +0.05%, six high four low) against **strain biased low** (mean −2.15%, nine of nine on the same side). The bias is a systematic offset with a single unfound cause, not scatter, and the fibre-distance candidate is eliminated |
 | **3.5** | 8 Oct 2026 | **Five more GD-TP cases through ILS-SIMPLE, ten in all.** Chosen to close two length sweeps and a radius sweep rather than add scattered points. **Moment within 1.0% on all ten**; adjacent-pipe strain within 3.3% on **nine of ten**. Radius does not move the agreement and neither does length to 20 D, which pins B4's +9.4% to that case rather than to a trend |
 | **3.4** | 8 Oct 2026 | **The B1 mesh check, run.** Xb is mesh-INSENSITIVE (+1.8% over a 4 × refinement on two elements); Xe is not (+27%) — the reverse of what §6 first supposed. The agreement holds regardless, 96.7% → 95.8%, because the GD-TP compared against moves +28.1% with it |
