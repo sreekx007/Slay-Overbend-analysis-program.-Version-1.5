@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 110
+# entries: 111
 
 - id: L001
   area: kernel
@@ -2842,4 +2842,72 @@
     is worse than no docstring.
   detect: test_the_body_carries_the_PIPELINE_section_and_steps_nothing, test_at_E_equal_to_the_pipeline_and_no_yielding_the_body_vanishes, test_a_shroud_with_a_THICK_body_in_it_is_not_a_GD_Simple, test_an_override_that_matches_no_element_is_REFUSED_not_ignored
   refs: [rebuild/slay/define/simple.py, rebuild/slay/physics/sections.py, rebuild/slay/report/regions.py, tools/study_simple.py, rebuild/tests/test_simple_component.py]
+  date: 2026-10-08
+
+- id: L111
+  area: model
+  class: ruling
+  symptom: >-
+    A simplified ILS was wanted: take any real layout, reduce it to an
+    equivalent GD-Simple, and explore it before the hardware exists. The
+    exact equivalent of a GD-TP is a shroud with NO taper, and L2 = 0 cannot
+    be built.
+  cause: >-
+    `OffsetShroud.validate` refuses it -- "GD-SH: V, L1 and L2 must be
+    positive" -- in `component_spec.py`, which is MIRRORED (G7). The floor
+    cannot be moved here. Confirmed against the mirror directly rather than
+    inferred: L2 = 0 raises GeometryRuleError, L2 = 1e-9 is accepted.
+  rule: >-
+    `TAPER_MIN = 1.0e-4` m, which is `report.regions.FLAT_TOL` reused rather
+    than a second number chosen for the same job -- "far below any geometry
+    we model and far above float noise". A 0.1 mm taper is a step at every
+    scale the model works at, and `simple_geometry` measures such a shroud
+    as all-flat, which is the intent. A zero taper needs raising upstream;
+    `parameters(L2=0)` refuses with that reason attached, so the next reader
+    does not re-derive it.
+  rule_detail: >-
+    THREE EQUIVALENCES, AND THE THIRD DOES NOT HOLD. Length is exact and
+    depth is exact. Stiffness is exact in BENDING only: setting
+    E = E_steel * I_comp / I_pipe reproduces EI on the pipeline section, and
+    EA then comes out as E * A_pipe, which is not E_steel * A_comp because
+    A_comp/A_pipe and I_comp/I_pipe are different ratios. One modulus cannot
+    match two stiffnesses. The axial error is carried on the result
+    (`EA_error`) rather than left to be discovered, and it GROWS WITH THE
+    WALL because area grows faster than the second moment that sets E_equiv:
+    +6.2% at 32 mm, +12.0% at 42, +18.8% at 53, +26.6% at 65. EI is the one
+    matched because the overbend is displacement-controlled bending.
+  rule_detail_2: >-
+    EVERYTHING IS MEASURED OFF THE BUILT ASSEMBLY, never read from the spec
+    -- `section_at` for the section and its owner, `contact_at` for the
+    surface a roller would touch. The same rule `report.regions` follows,
+    and for the same reason: `ils_builder` is the author of what a component
+    IS (G7), so a reduction computed from the definition would describe the
+    component asked for rather than the one built. The payoff is that the
+    depth rule needs no formula: `contact_at` returns 235.2 mm for the 53 mm
+    wall, which IS OD_comp/2, without this module writing that down -- so
+    the same code reduces whatever the builder actually made.
+  rule_detail_3: >-
+    REFUSED RATHER THAN APPROXIMATED, each by name: a tapered body (GD-TT
+    carries 1005 diameters over its span, and which average is right depends
+    on where the curvature is), two section-owning bodies (combining
+    stiffnesses in series along the pipe has no implemented rule), a layout
+    with no section owner (a bare GD-SH or an EA structure -- nothing to
+    reduce), and a body that owns a section but no contact (ILS-SHTP's thick
+    pipe sits inside a shroud, so its depth is not what a roller touches and
+    reducing it as though it were would put the stand-in at the wrong
+    elevation). Each refusal names the missing rule, not just the failure.
+  rule_detail_4: >-
+    TWO FIGURE DEFECTS, BOTH FROM NOT MEASURING THE INSTRUMENT. The
+    reduction's self-check compared the built lifted length against the
+    asked length with a budget of two tapers plus FLAT_TOL, and refused a
+    CORRECT 2.5 D build that came back 0.508 mm short -- the budget left out
+    the sampling grid, whose two end samples each sit up to one interval
+    (0.254 mm) inside the true edge. The check was tighter than the
+    instrument. Separately the figure computed its own vertical exaggeration
+    as the reciprocal, from an axes box read BEFORE `tight_layout` moved it,
+    and printed "x0"; it is now measured after layout, and reported as a
+    scale ratio because on the 2.5 D cases it is 0.6 -- COMPRESSED, where
+    the word "exaggeration" would have been wrong.
+  detect: test_depth_is_the_bodys_OWN_contact_surface, test_bending_stiffness_is_reproduced_exactly, test_axial_stiffness_is_WRONG_and_reported, test_a_zero_taper_is_refused_with_the_reason, test_a_body_that_owns_no_contact_is_refused
+  refs: [rebuild/slay/define/simplify.py, tools/simplify_ils.py, tools/plot_simple_ils.py, rebuild/tests/test_simplify.py]
   date: 2026-10-08

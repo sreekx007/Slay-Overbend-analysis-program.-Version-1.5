@@ -177,6 +177,38 @@ was needed** and G6 stands. Regions are `Xb` (inside the body) and `Xe`
 (outside it, two spans) — drawn on the **body**, never the shroud, because
 their lengths are independent.
 
+### Simplified models — reducing a layout to a GD-Simple
+
+`simplify_ils.py` measures a real ILS and builds the GD-Simple that stands
+in for it; `plot_simple_ils.py` draws the two together. The reduction logic
+is `slay/define/simplify.py`.
+
+```
+simplify_ils.py                     # reduce -> docs/simple/<case>.json
+plot_simple_ils.py                  # read   -> docs/diagrams/simple_<case>.png
+```
+
+Same split as the generator/plotter pair above (G13): the reduction is
+written down, and the figure reads it.
+
+| Equivalence | Holds? |
+|---|---|
+| **Length** | exact |
+| **Depth** (and so the roller lift) | exact |
+| **Bending** `EI` | exact — `E = E_steel · I_comp/I_pipe` on the pipeline section |
+| **Axial** `EA` | **no.** One modulus cannot match both; the error is reported, +6.2% at 32 mm to +26.6% at 65 mm |
+
+Everything is measured off the **built assembly** (`section_at`,
+`contact_at`), never read from the spec — so the depth rule needs no
+formula, and the same code reduces whatever the builder actually made.
+Scope today is GD-TP; a tapered body, two bodies, a layout with no section
+owner, and a body that owns no contact surface are each **refused by name**
+with the missing rule stated.
+
+**`L2 = 0` is unbuildable** — the exact equivalent of a GD-TP's abrupt step
+is a shroud with no taper, and the mirrored `OffsetShroud.validate` refuses
+it. `TAPER_MIN` is 0.1 mm, reusing `regions.FLAT_TOL`. See L111.
+
 **The control is `--E 210 --R 250`, not `--E 210`.** Where nothing yields a
 non-yielding body at the pipeline's modulus must vanish, and does: Xb
 0.2031% against Xe 0.2031%. The same case at R = 85 gives 0.3161% against

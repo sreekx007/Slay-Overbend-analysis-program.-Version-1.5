@@ -1,0 +1,53 @@
+{
+  "R": 85.0,
+  "case": "B3",
+  "equivalent": {
+    "EA": 14594777610.261267,
+    "EA_equiv": 17343539088.612064,
+    "EA_error": 0.18833870249713192,
+    "EI": 322967395.89414316,
+    "EI_ratio": 3.2481610255741775,
+    "E_equiv": 682113815370.5773,
+    "E_steel": 210000000000.0,
+    "L": 8.128,
+    "L_D": 20.0,
+    "depth": 0.2352,
+    "depth_D": 0.5787401574803149,
+    "lift": 0.032
+  },
+  "notes": [
+    "EI is reproduced EXACTLY on the pipeline section; EA is not, and cannot be -- one modulus cannot match two stiffnesses. Axial stiffness is +18.8% out.",
+    "The extreme-fibre distance stays the PIPELINE half-OD, so the same curvature gives a lower strain than the original did.",
+    "The body is fully ELASTIC; the original is J2. That is the largest difference once the line yields.",
+    "L2 = 0.0001 m, not 0: a GD-TP steps abruptly and `OffsetShroud.validate` refuses a zero taper in a MIRRORED file (G7)."
+  ],
+  "reference": {
+    "gdtp_strain_pct": 1.2728,
+    "paper_strain_pct": 1.861
+  },
+  "simple": {
+    "E": 682113815370.5773,
+    "L1": 8.1278,
+    "L2": 0.0001,
+    "L_body": 8.128,
+    "V": 0.2352,
+    "centre_x": 0.0,
+    "extent": [
+      -4.064,
+      4.064
+    ],
+    "match": "total"
+  },
+  "source": {
+    "L_OD": 20.0,
+    "OD_comp": 0.4704,
+    "OD_pipe": 0.4064,
+    "archetype": "ILS-TP",
+    "code": "GD-TP",
+    "t_comp": 0.053,
+    "t_mm": 53,
+    "t_pipe": 0.021
+  },
+  "table": "XXIII",
+  "tension_mt": 100.0
+}
