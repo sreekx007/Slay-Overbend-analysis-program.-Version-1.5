@@ -1,0 +1,35 @@
+ILS-SIMPLE swept from the reductions in docs/simple/.  spacing 9 m, step 1 x OD
+  *** PREDICTION, no published counterpart. The GD-TP column is OUR OWN earlier
+      result for the layout each case was reduced from -- not a reference value.
+
+case     R  E/GPa        Xb        Xe  Xb/Xe    GD-TP  Xb/GDTP     Xb M   el b/e  passage
+A1     100    349   0.1575%   0.3682%  0.428  0.3771%    41.8%    1188k   2/126  full
+B1      70    917   0.0683%   0.8191%  0.083  0.8471%     8.1%    1363k   2/126  full
+B2      70    917   0.0795%   1.4025%  0.057  1.4161%     5.6%    1603k   4/126  full
+B3      85    682   0.1216%   1.2491%  0.097  1.2728%     9.6%    1837k  10/126  full
+B4      85    682   0.2089%   1.7962%  0.116  1.6413%    12.7%    3219k  20/126  full
+
+NOTE added after the run, 8 Oct 2026.
+The `Xb/GDTP` column printed above quotes the BODY's strain against the
+GD-TP peak, and that compares two different pieces of steel: a GD-TP's
+governing strain is at the PIPE-TO-COMPONENT JUNCTION, outboard of the
+body, which is Xe's territory and not Xb's. `study_simple.py` now prints
+Xe/GDTP instead. Recomputed from the figures above:
+
+  case   Xe/GD-TP    Xb moment   GD-TP body moment     dM
+  A1        97.6%      1188 kN.m          1182.7      +0.4%
+  B1        96.7%      1363                1352.0     +0.8%
+  B2        99.0%      1603                1604.0     -0.1%
+  B3        98.1%      1837                1848.0     -0.6%
+  B4       109.4%      3219                3253.0     -1.0%
+
+MOMENT IS REPRODUCED WITHIN 1% ON ALL FIVE, which is EI matching doing what
+it was set up to do and is the strongest result here. Adjacent-pipe strain
+lands within 3.3% on four of five; B4 is +9.4% and is already the outlier
+in the GD-TP set itself (the +13.0% moment overshoot, ledger Sec.7 item 6),
+so the anomaly tracks the case rather than the method.
+
+Xb is far below the GD-TP peak by construction, not by failure: a 917 GPa
+elastic body barely bends and sheds its curvature outboard. A1 and B1 carry
+TWO elements in Xb at this mesh, so their body strain reports a mesh rather
+than a strain field; Xe and the moments are unaffected.

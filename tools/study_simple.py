@@ -63,6 +63,7 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
 
 from slay.data.materials import material                    # noqa: E402
 from slay.define import simple as sp                        # noqa: E402
+import json                                                 # noqa: E402
 from slay.model.assemble import build_model                 # noqa: E402
 from slay.physics.problem import build_problem              # noqa: E402
 from slay.report import passage as rp                       # noqa: E402
@@ -71,6 +72,50 @@ from slay.study import sweep                                # noqa: E402
 
 D = 0.4064
 TON = 9.80665e3
+
+
+def run_reduction(rec, spacing, step_OD):
+    """Sweep one ILS-SIMPLE built from a reduction artifact.
+
+    THE SOLVED CASE IS THE ONE THAT WAS WRITTEN DOWN AND DRAWN. The five
+    parameters come out of `docs/simple/<case>.json` verbatim rather than
+    being recomputed here, so the figure, the artifact and this result
+    cannot describe three slightly different components.
+    """
+    s_, e_ = rec['simple'], rec['equivalent']
+    sm = sp.build(E=s_['E'], L_body=s_['L_body'], V=s_['V'], L1=s_['L1'],
+                  L2=s_['L2'], centre_x=s_['centre_x'])
+    return _sweep(sm, rec['R'], spacing, rec['tension_mt'], step_OD), sm, e_
+
+
+def _sweep(sm, R, spacing, tension_mt, step_OD):
+    """Solve the passage and measure it. Pure; prints nothing."""
+    L = sm.extent[1] - sm.extent[0]
+    scene = sweep.scene_for(R=R, spacing=spacing, L_comp=L)
+    s_centre = sweep.start_centre(scene, L)
+    pkw = dict(elastic_spans=sm.elastic_spans(s_centre),
+               E_by_owner=sm.E_by_owner())
+    positions = sweep.run(scene, sm.ils, L_comp=L, step=step_OD * D,
+                          tension=tension_mt * TON, material=material('j2'),
+                          **pkw)
+    recs = rp.measure(positions, scene, L_comp=L)
+    env = rp.envelope(recs)
+    model = build_model(scene, sm.ils, s_centre=s_centre,
+                        extra_stations=sweep._required_stations(scene))
+    p0 = build_problem(
+        model, scene, shift=positions[env.index].shift, s_centre=s_centre,
+        tension=tension_mt * TON, material=material('j2'),
+        **sweep.with_buffer(scene, pkw, assembly=sm.ils.assembly,
+                            ils=sm.ils))
+    geom = rg.simple_geometry(sm.ils, s_centre)
+    if geom is None:
+        raise SystemExit('simple_geometry did not recognise this assembly')
+    return dict(geom=geom,
+                peaks=rg.region_peaks(positions, p0, geom, env.zone_s_max),
+                done=sweep.completion(positions, L, clear_before=1.0,
+                                      clear_after=1.0),
+                env=env, n=len(positions),
+                n_ok=sum(1 for r in recs if r.converged))
 
 
 def run_case(E_GPa, L_body_D, V_D, L1_D, L2_D, R, spacing, tension_mt,
@@ -134,6 +179,55 @@ def main() -> int:
     def arg(flag, cast, default):
         return cast(sys.argv[sys.argv.index(flag) + 1]) \
             if flag in sys.argv else default
+
+    # --FROM-ARTIFACTS: sweep the reductions `simplify_ils.py` wrote.
+    if '--from-artifacts' in sys.argv:
+        src = REPO / 'docs' / 'simple'
+        only = arg('--case', str, '')
+        files = ([src / f'simple_{only.lower()}.json'] if only
+                 else sorted(src.glob('simple_*.json')))
+        spacing = arg('--spacing', float, 9.0)
+        # 1 x OD, matching `study_table_xxiii.py`'s own default. The GD-TP
+        # numbers these are compared against were swept at that advance, and
+        # a different one would change the envelope before any physics did.
+        step_OD = arg('--step-OD', float, 1.0)
+        print(f'ILS-SIMPLE swept from the reductions in docs/simple/.  '
+              f'spacing {spacing:.0f} m, step {step_OD:g} x OD')
+        print('  *** PREDICTION, no published counterpart. The GD-TP column '
+              'is OUR OWN earlier\n      result for the layout each case '
+              'was reduced from -- not a reference value.')
+        print()
+        # Xe AGAINST THE GD-TP PEAK, not Xb. A GD-TP's governing strain
+        # sits at the PIPE-TO-COMPONENT JUNCTION -- the ledger's TABLE XX
+        # note says so in as many words -- which is outboard of the body
+        # and therefore in Xe's territory, not Xb's. Quoting Xb against it
+        # compares two different pieces of steel and reads as a 90%
+        # shortfall that is really a change of location.
+        print(f'{"case":5s}{"R":>5s}{"E/GPa":>7s}{"Xb":>10s}{"Xe":>10s}'
+              f'{"Xb/Xe":>7s}{"GD-TP":>9s}{"Xe/GDTP":>9s}'
+              f'{"Xb M":>9s}{"el b/e":>9s}  passage')
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore')
+            for f in files:
+                rec = json.loads(f.read_text())
+                r, sm, e_ = run_reduction(rec, spacing, step_OD)
+                xb, xe = r['peaks']['Xb'], r['peaks']['Xe']
+                gdtp = rec['reference']['gdtp_strain_pct']
+                ratio = (xb['peak_strain'] / xe['peak_strain']
+                         if xe['measured'] and xe['peak_strain'] > 0 else 0.0)
+                print(f'{rec["case"]:5s}{rec["R"]:5.0f}'
+                      f'{e_["E_equiv"] / 1e9:7.0f}'
+                      f'{_cell(xb):>10s}{_cell(xe):>10s}{ratio:7.3f}'
+                      f'{gdtp:8.4f}%'
+                      # BOTH SIDES IN PER CENT. `peak_strain` is a
+                      # FRACTION and the recorded GD-TP figure is a per
+                      # cent, so dividing them raw under-reports by 100 --
+                      # this printed 0.4% for what is 41.8%.
+                      f'{100.0 * (100.0 * xe["peak_strain"]) / gdtp:8.1f}%'
+                      f'{xb["peak_moment"] / 1e3:8.0f}k'
+                      f'{xb["n_elements"]:4d}/{xe["n_elements"]:<4d} '
+                      f'{"full" if r["done"].complete else str(r["done"])}')
+        return 0
 
     R = arg('--R', float, 85.0)
     spacing = arg('--spacing', float, 9.0)
