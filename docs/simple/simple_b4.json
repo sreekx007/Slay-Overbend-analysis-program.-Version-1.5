@@ -22,6 +22,7 @@
     "L2 = 0.0001 m, not 0: a GD-TP steps abruptly and `OffsetShroud.validate` refuses a zero taper in a MIRRORED file (G7)."
   ],
   "reference": {
+    "gdtp_body_moment_kNm": 3253.0,
     "gdtp_strain_pct": 1.6413,
     "paper_strain_pct": 1.914
   },

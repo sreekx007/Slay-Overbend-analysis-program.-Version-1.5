@@ -1,6 +1,6 @@
 {
-  "R": 100.0,
-  "case": "A1",
+  "R": 85.0,
+  "case": "A1_R85",
   "equivalent": {
     "EA": 8368599643.373721,
     "EA_equiv": 8884441966.667728,
@@ -22,9 +22,9 @@
     "L2 = 0.0001 m, not 0: a GD-TP steps abruptly and `OffsetShroud.validate` refuses a zero taper in a MIRRORED file (G7)."
   ],
   "reference": {
-    "gdtp_body_moment_kNm": 1182.7,
-    "gdtp_strain_pct": 0.3771,
-    "paper_strain_pct": 0.339
+    "gdtp_body_moment_kNm": 1247.1,
+    "gdtp_strain_pct": 0.4804,
+    "paper_strain_pct": 0.473
   },
   "simple": {
     "E": 349421221145.1921,

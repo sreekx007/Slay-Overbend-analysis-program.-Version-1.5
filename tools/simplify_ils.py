@@ -46,19 +46,49 @@ from slay.define import simplify as sx                      # noqa: E402
 D = 0.4064
 OUT = REPO / 'docs' / 'simple'
 
-# (case, table, R, tension_mt, L_OD, t_mm, paper strain, our GD-TP strain)
+# (table, R, tension_mt, L_OD, t_mm, paper strain %, our GD-TP strain %,
+#  our GD-TP BODY moment kN.m)
+#
+# THE LAST TWO COLUMNS ARE OURS, NOT THE PAPER'S, and the moment is read on
+# the COMPONENT BODY, which is where TABLE XXI and XXIV report it. They are
+# Sec. 2's own rows, so a GD-Simple result is quoted against this build and
+# never against a published figure it has no counterpart for.
+#
+# THE FIRST FIVE KEYS ARE HISTORICAL and their names do not carry the
+# radius, because at the time only one radius of each was in play. The five
+# added 8 Oct spell the radius out. Renaming the originals would orphan
+# `docs/simple/simple_<case>.json` and the figures drawn from them, so the
+# inconsistency is recorded here rather than tidied away: `B2` is R = 70 at
+# 10 D / 65 mm while `B2_R85` is R = 85 at 10 D / 53 mm -- different wall as
+# well as different radius, because TABLE XXII specifies 65 mm at R = 70 and
+# 53 mm at R = 85, so the two radii are different components.
 CASES = {
-    'A1': ('XX',    100.0, 100.0,  2.5, 32, 0.339, 0.3771),
-    'B1': ('XXIII',  70.0, 100.0,  2.5, 65, 0.780, 0.8471),
-    'B2': ('XXIII',  70.0, 100.0, 10.0, 65, 1.499, 1.4161),
-    'B3': ('XXIII',  85.0, 100.0, 20.0, 53, 1.861, 1.2728),
-    'B4': ('XXIII',  85.0, 100.0, 40.0, 53, 1.914, 1.6413),
+    # -- run 8 Oct, first five ------------------------------------------
+    'A1':     ('XX',    100.0, 100.0,  2.5, 32, 0.339, 0.3771, 1182.7),
+    'B1':     ('XXIII',  70.0, 100.0,  2.5, 65, 0.780, 0.8471, 1352.0),
+    'B2':     ('XXIII',  70.0, 100.0, 10.0, 65, 1.499, 1.4161, 1604.0),
+    'B3':     ('XXIII',  85.0, 100.0, 20.0, 53, 1.861, 1.2728, 1848.0),
+    'B4':     ('XXIII',  85.0, 100.0, 40.0, 53, 1.914, 1.6413, 3253.0),
+    # -- added 8 Oct, completing two length sweeps and one radius sweep --
+    # A1 at 70 / 85 joins A1 at 100 above: the RADIUS axis at a fixed
+    # 32 mm wall and 2.5 D length.
+    'A1_R70': ('XX',     70.0, 100.0,  2.5, 32, 0.562, 0.6358, 1299.2),
+    'A1_R85': ('XX',     85.0, 100.0,  2.5, 32, 0.473, 0.4804, 1247.1),
+    # A3 at 85 gives a second WALL at that radius and length, against
+    # A1_R85.
+    'A3_R85': ('XX',     85.0, 100.0,  2.5, 53, 0.556, 0.6127, 1297.0),
+    # B3_R70 completes R = 70 / 65 mm: 2.5 D (B1), 10 D (B2), 20 D here.
+    # It is also the worst GD-TP disagreement against the paper, -21.4%.
+    'B3_R70': ('XXIII',  70.0, 100.0, 20.0, 65, 2.514, 1.9763, 2053.0),
+    # B2_R85 completes R = 85 / 53 mm: 2.5 D (A3_R85), 10 D here, 20 D
+    # (B3), 40 D (B4).
+    'B2_R85': ('XXIII',  85.0, 100.0, 10.0, 53, 1.104, 0.9267, 1494.0),
 }
 
 
 def reduce_case(name, L2_D, match):
     """One case: build the real GD-TP, reduce it, build the stand-in."""
-    table, R, tension, L_OD, t_mm, eps_paper, eps_ours = CASES[name]
+    table, R, tension, L_OD, t_mm, eps_paper, eps_ours, bm_ours = CASES[name]
     ils = gen.build_component_ils('ILS-TP', L_OD=L_OD, t_ratio=t_mm / 21.0)
     sm, eq = sx.simplify(ils, L2=L2_D * D if L2_D else sx.TAPER_MIN,
                          match=match)
@@ -67,7 +97,8 @@ def reduce_case(name, L2_D, match):
         source=dict(archetype='ILS-TP', code=eq.code, L_OD=L_OD, t_mm=t_mm,
                     OD_comp=eq.OD_comp, t_comp=eq.t_comp,
                     OD_pipe=eq.OD_pipe, t_pipe=eq.t_pipe),
-        reference=dict(paper_strain_pct=eps_paper, gdtp_strain_pct=eps_ours),
+        reference=dict(paper_strain_pct=eps_paper, gdtp_strain_pct=eps_ours,
+                       gdtp_body_moment_kNm=bm_ours),
         equivalent=dict(L=eq.L, L_D=eq.L / D, depth=eq.depth,
                         depth_D=eq.depth / D, lift=eq.lift,
                         EI=eq.EI, EI_ratio=eq.EI_ratio,

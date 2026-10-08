@@ -1,0 +1,53 @@
+ILS-SIMPLE against GD-TP -- ten cases, 8 Oct 2026
+=================================================
+
+`tools/simplify_ils.py` then `tools/study_simple.py --from-artifacts`.
+R and tension per case; spacing 9 m; sweep step 1 x OD, matching
+`study_table_xxiii.py`'s own default; mesh at the ruled 2 x OD (G10).
+ALL TEN SWEEP 100% OF THEIR TRAVEL.
+
+NOT VALIDATION. Neither paper defines a GD-Simple. The GD-TP columns are
+Sec. 2's own rows -- this build's earlier result for the layout each case
+was reduced from -- so every comparison here is internal. The GD-TP moment
+is read on the COMPONENT BODY, where TABLE XXI and XXIV report it.
+
+case        R   L/D   t     E       Xb       Xe  Xb/Xe    GD-TP  Xe/GDTP     dM
+B1         70   2.5  65   917  0.0683%  0.8191%  0.083  0.8471%    96.7%  +0.8%
+B2         70  10.0  65   917  0.0795%  1.4025%  0.057  1.4161%    99.0%  -0.1%
+B3_R70     70  20.0  65   917  0.0998%  1.9229%  0.052  1.9763%    97.3%  -0.9%
+A3_R85     85   2.5  53   682  0.0883%  0.5943%  0.149  0.6127%    97.0%  +0.8%
+B2_R85     85  10.0  53   682  0.1001%  0.9149%  0.109  0.9267%    98.7%  +0.1%
+B3         85  20.0  53   682  0.1216%  1.2491%  0.097  1.2728%    98.1%  -0.6%
+B4         85  40.0  53   682  0.2089%  1.7962%  0.116  1.6413%   109.4%  -1.0%
+A1_R70     70   2.5  32   349  0.1721%  0.6239%  0.276  0.6358%    98.1%  +0.5%
+A1_R85     85   2.5  32   349  0.1655%  0.4706%  0.352  0.4804%    98.0%  +0.4%
+A1        100   2.5  32   349  0.1575%  0.3682%  0.428  0.3771%    97.6%  +0.4%
+
+  E is the body modulus in GPa; dM is the Xb moment against the GD-TP body
+  moment. A1_R70 was swept before the dM column existed and its +0.5% is
+  computed from the printed 1306 kN.m against 1299.2.
+
+MOMENT WITHIN 1.0% ON ALL TEN, over 1188 to 3253 kN.m, three moduli, four
+lengths and three radii. That is the one equivalence the reduction claims to
+hold exactly, and it holds everywhere it has been asked.
+
+ADJACENT-PIPE STRAIN WITHIN 3.3% ON NINE OF TEN, the whole of 96.7 to 99.0%.
+B4 alone departs, at +9.4%.
+
+THE THREE SWEEPS THE SECOND FIVE WERE CHOSEN TO COMPLETE
+
+  length, R = 70 / 65 mm :  2.5 D 96.7% | 10 D 99.0% | 20 D 97.3%
+  length, R = 85 / 53 mm :  2.5 D 97.0% | 10 D 98.7% | 20 D 98.1% | 40 D 109.4%
+  radius, 32 mm / 2.5 D  :  R70 98.1%   | R85 98.0%  | R100 97.6%
+
+RADIUS DOES NOT MOVE THE AGREEMENT: 97.6 to 98.1% across 70, 85 and 100 m.
+LENGTH DOES NOT MOVE IT UP TO 20 D, on either wall. The single departure is
+B4 at 40 D, which is also the only case spanning nearly two roller bays and
+the only GD-TP in Paper 1 carrying a moment overshoot (+13.0%, Sec. 8
+item 6). Two independent length sweeps agreeing to 20 D and one breaking at
+40 D isolates the departure to that case rather than to the method.
+
+Xb/Xe falls as the modulus ratio rises -- 0.28 to 0.43 at 349 GPa, 0.10 to
+0.15 at 682, 0.05 to 0.08 at 917 -- which is the stiff-inclusion mechanism
+the control measures: a body that cannot yield sheds curvature outboard, and
+sheds more of it the stiffer it is.

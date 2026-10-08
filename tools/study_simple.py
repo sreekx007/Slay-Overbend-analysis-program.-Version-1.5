@@ -216,7 +216,7 @@ def main() -> int:
         # shortfall that is really a change of location.
         print(f'{"case":5s}{"R":>5s}{"E/GPa":>7s}{"Xb":>10s}{"Xe":>10s}'
               f'{"Xb/Xe":>7s}{"GD-TP":>9s}{"Xe/GDTP":>9s}'
-              f'{"Xb M":>9s}{"el b/e":>9s}  passage')
+              f'{"Xb M":>9s}{"dM":>7s}{"el b/e":>9s}  passage')
         with warnings.catch_warnings():
             warnings.simplefilter('ignore')
             for f in files:
@@ -224,6 +224,7 @@ def main() -> int:
                 r, sm, e_ = run_reduction(rec, spacing, step_OD, mesh_OD)
                 xb, xe = r['peaks']['Xb'], r['peaks']['Xe']
                 gdtp = rec['reference']['gdtp_strain_pct']
+                bm = rec['reference']['gdtp_body_moment_kNm']
                 ratio = (xb['peak_strain'] / xe['peak_strain']
                          if xe['measured'] and xe['peak_strain'] > 0 else 0.0)
                 print(f'{rec["case"]:5s}{rec["R"]:5.0f}'
@@ -236,6 +237,9 @@ def main() -> int:
                       # this printed 0.4% for what is 41.8%.
                       f'{100.0 * (100.0 * xe["peak_strain"]) / gdtp:8.1f}%'
                       f'{xb["peak_moment"] / 1e3:8.0f}k'
+                      # Against the GD-TP BODY moment, which is where
+                      # TABLE XXI and XXIV report it and what Sec. 2 records.
+                      f'{100.0 * (xb["peak_moment"] / 1e3 / bm - 1.0):+6.1f}%'
                       f'{xb["n_elements"]:4d}/{xe["n_elements"]:<4d} '
                       f'{"full" if r["done"].complete else str(r["done"])}')
         return 0

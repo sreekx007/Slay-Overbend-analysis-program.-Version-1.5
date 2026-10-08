@@ -1025,7 +1025,7 @@ span as whatever the shroud happened to be. `SimpleGeometry` subclasses
 that `body_peaks` and `peak_on_shroud` already read, and only `bounds`
 differs. `body_covers_shroud` says whether Xb contains the whole elevated
 zone; where it is false, part of the lift sits in Xe and the two regions stop
-being "component" and "pipeline". **For all five cases below it is true.**
+being "component" and "pipeline". **Checked on all ten cases below: true for every one**, which the `match='total'` reduction rule guarantees by construction and the check confirms rather than assumes.
 
 ### The control, and why the obvious control is wrong
 
@@ -1043,20 +1043,33 @@ outboard while taking more moment. Against a bare shroud of the same V, L1
 and L2, which peaks at 0.8223%, inserting a non-yielding body of the
 pipeline's *own* section makes the adjacent pipe **35% worse**.
 
-### The five GD-TP cases
+### The ten GD-TP cases
 
-Selected from §2 to span the axes: length 2.5 → 40 D, radius 70/85/100,
-`I_comp/I_pipe` 1.66 → 4.37. B3 carries the worst strain disagreement in the
-ledger and B4 the only moment overshoot, so the two open items in §2 are both
-represented.
+Selected from §2 to span the axes and, in the second five, to **close three
+sweeps** rather than add scattered points: length 2.5 → 40 D on two
+different walls, and radius 70/85/100 at a fixed wall and length. B3 carries
+the worst strain disagreement in the ledger and B4 the only moment
+overshoot, so both open items in §2 are represented.
 
 | Case | Table | R | L | wall | `EI/EI_p` | body **E** | V | lift |
 |---|---|---|---|---|---|---|---|---|
-| **A1** | XX | 100 m | 2.5 D | 32 mm | 1.664 | **349 GPa** | 0.527 D | 11.0 mm |
-| **B1** | XXIII | 70 m | 2.5 D | 65 mm | 4.366 | **917 GPa** | 0.608 D | 44.0 mm |
-| **B2** | XXIII | 70 m | 10 D | 65 mm | 4.366 | **917 GPa** | 0.608 D | 44.0 mm |
-| **B3** | XXIII | 85 m | 20 D | 53 mm | 3.248 | **682 GPa** | 0.579 D | 32.0 mm |
-| **B4** | XXIII | 85 m | 40 D | 53 mm | 3.248 | **682 GPa** | 0.579 D | 32.0 mm |
+| **B1** | XXIII | 70 m | 2.5 D | 65 mm | 4.366 | 917 GPa | 0.608 D | 44.0 mm |
+| **B2** | XXIII | 70 m | 10 D | 65 mm | 4.366 | 917 GPa | 0.608 D | 44.0 mm |
+| **B3_R70** | XXIII | 70 m | 20 D | 65 mm | 4.366 | 917 GPa | 0.608 D | 44.0 mm |
+| **A3_R85** | XX | 85 m | 2.5 D | 53 mm | 3.248 | 682 GPa | 0.579 D | 32.0 mm |
+| **B2_R85** | XXIII | 85 m | 10 D | 53 mm | 3.248 | 682 GPa | 0.579 D | 32.0 mm |
+| **B3** | XXIII | 85 m | 20 D | 53 mm | 3.248 | 682 GPa | 0.579 D | 32.0 mm |
+| **B4** | XXIII | 85 m | 40 D | 53 mm | 3.248 | 682 GPa | 0.579 D | 32.0 mm |
+| **A1_R70** | XX | 70 m | 2.5 D | 32 mm | 1.664 | 349 GPa | 0.527 D | 11.0 mm |
+| **A1_R85** | XX | 85 m | 2.5 D | 32 mm | 1.664 | 349 GPa | 0.527 D | 11.0 mm |
+| **A1** | XX | 100 m | 2.5 D | 32 mm | 1.664 | 349 GPa | 0.527 D | 11.0 mm |
+
+*The first five keys do not carry a radius and the second five do. Renaming
+would orphan the artifacts and figures already drawn from them, so the
+inconsistency is recorded rather than tidied: `B2` is R = 70 at 10 D / 65 mm
+while `B2_R85` is R = 85 at 10 D / 53 mm — different wall as well as
+radius, because TABLE XXII specifies 65 mm at R = 70 and 53 mm at R = 85, so
+the two radii are different components and not one component at two radii.*
 
 *Figures: `docs/diagrams/simple_<case>.png` — the original GD-TP dashed over
 the stand-in filled, so the claim is visual: they start and stop together and
@@ -1067,39 +1080,55 @@ reach the same depth, and what they do not share is the wall.*
 *`tools/study_simple.py --from-artifacts`, 8 Oct 2026. Step 1 × OD, matching
 `study_table_xxiii.py`'s own default — the GD-TP numbers were swept at that
 advance, and a different one would move the envelope before any physics did.
-The five parameters come out of the reduction artifacts verbatim, so the
-figure, the artifact and the result are the same component. **All five sweep
-100% of their travel.***
+Mesh at the ruled 2 × OD. The five parameters come out of the reduction
+artifacts verbatim, so the figure, the artifact and the result are the same
+component. **All ten sweep 100% of their travel.***
 
-| Case | body **E** | **Xb** | **Xe** | Xb/Xe | GD-TP peak | **Xe / GD-TP** |
-|---|---|---|---|---|---|---|
-| A1 | 349 GPa | 0.1575% | 0.3682% | 0.428 | 0.3771% | **97.6%** |
-| B1 | 917 GPa | 0.0683% | 0.8191% | 0.083 | 0.8471% | **96.7%** |
-| B2 | 917 GPa | 0.0795% | 1.4025% | 0.057 | 1.4161% | **99.0%** |
-| B3 | 682 GPa | 0.1216% | 1.2491% | 0.097 | 1.2728% | **98.1%** |
-| B4 | 682 GPa | 0.2089% | 1.7962% | 0.116 | 1.6413% | **109.4%** |
+| Case | R | L | **E** | **Xb** | **Xe** | Xb/Xe | GD-TP | **Xe / GD-TP** | Xb moment | **ΔM** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| B1 | 70 m | 2.5 D | 917 | 0.0683% | 0.8191% | 0.083 | 0.8471% | **96.7%** | 1363 kN·m | **+0.8%** |
+| B2 | 70 m | 10 D | 917 | 0.0795% | 1.4025% | 0.057 | 1.4161% | **99.0%** | 1603 kN·m | **−0.1%** |
+| B3_R70 | 70 m | 20 D | 917 | 0.0998% | 1.9229% | 0.052 | 1.9763% | **97.3%** | 2035 kN·m | **−0.9%** |
+| A3_R85 | 85 m | 2.5 D | 682 | 0.0883% | 0.5943% | 0.149 | 0.6127% | **97.0%** | 1307 kN·m | **+0.8%** |
+| B2_R85 | 85 m | 10 D | 682 | 0.1001% | 0.9149% | 0.109 | 0.9267% | **98.7%** | 1496 kN·m | **+0.1%** |
+| B3 | 85 m | 20 D | 682 | 0.1216% | 1.2491% | 0.097 | 1.2728% | **98.1%** | 1837 kN·m | **−0.6%** |
+| B4 | 85 m | 40 D | 682 | 0.2089% | 1.7962% | 0.116 | 1.6413% | **109.4%** | 3219 kN·m | **−1.0%** |
+| A1_R70 | 70 m | 2.5 D | 349 | 0.1721% | 0.6239% | 0.276 | 0.6358% | **98.1%** | 1306 kN·m | **+0.5%** |
+| A1_R85 | 85 m | 2.5 D | 349 | 0.1655% | 0.4706% | 0.352 | 0.4804% | **98.0%** | 1252 kN·m | **+0.4%** |
+| A1 | 100 m | 2.5 D | 349 | 0.1575% | 0.3682% | 0.428 | 0.3771% | **97.6%** | 1188 kN·m | **+0.4%** |
 
-| Case | Xb moment | GD-TP body moment | **Δ** |
-|---|---|---|---|
-| A1 | 1188 kN·m | 1182.7 kN·m | **+0.4%** |
-| B1 | 1363 kN·m | 1352.0 kN·m | **+0.8%** |
-| B2 | 1603 kN·m | 1604.0 kN·m | **−0.1%** |
-| B3 | 1837 kN·m | 1848.0 kN·m | **−0.6%** |
-| B4 | 3219 kN·m | 3253.0 kN·m | **−1.0%** |
+*`E` in GPa; `ΔM` is the Xb moment against §2's GD-TP **body** moment, which
+is where TABLE XXI and XXIV report it. A1_R70 was swept before that column
+existed and its +0.5% is computed from the printed 1306 against 1299.2.*
+
+### The three sweeps, and what they isolate
+
+| sweep | held fixed | result |
+|---|---|---|
+| **length** | R = 70, 65 mm | 2.5 D **96.7%** · 10 D **99.0%** · 20 D **97.3%** |
+| **length** | R = 85, 53 mm | 2.5 D **97.0%** · 10 D **98.7%** · 20 D **98.1%** · 40 D **109.4%** |
+| **radius** | 32 mm, 2.5 D | R70 **98.1%** · R85 **98.0%** · R100 **97.6%** |
+
+**Radius does not move the agreement** — 97.6 to 98.1% across 70, 85 and
+100 m. **Length does not move it up to 20 D**, on either wall. The single
+departure is B4 at 40 D. Two independent length sweeps agreeing to 20 D and
+one breaking at 40 D **isolates the departure to that case rather than to
+the method**, which three scattered points could not have done.
 
 ### What the results say
 
-**Moment is reproduced within 1% on all five.** That is the headline, and it
+**Moment is reproduced within 1.0% on all ten.** That is the headline, and it
 is EI matching doing precisely what it was set up to do: the one equivalence
-the reduction claims to hold exactly is the one that holds. It also holds
-across the whole range — 1188 to 3253 kN·m, three moduli, four lengths — so
-it is not a coincidence of one configuration.
+the reduction claims to hold exactly is the one that holds. It holds across
+the whole range — 1188 to 3253 kN·m, three moduli, four lengths and three
+radii — so it is not a coincidence of one configuration.
 
-**Adjacent-pipe strain lands within 3.3% on four of five**, 96.7 to 99.0%.
-B4 is the exception at +9.4%, and B4 is already the outlier inside the GD-TP
-set itself: it carries the only moment overshoot in Paper 1 (+13.0%, §8
-item 6) and spans nearly two roller bays. The anomaly tracks the case, not
-the method.
+**Adjacent-pipe strain lands within 3.3% on nine of ten**, the whole of 96.7
+to 99.0%. B4 is the single exception at +9.4%, and B4 is already the outlier
+inside the GD-TP set itself: it carries the only moment overshoot in Paper 1
+(+13.0%, §8 item 6) and spans nearly two roller bays. With both length
+sweeps now closed to 20 D, the anomaly is pinned to that case rather than to
+a trend with length.
 
 **Xb is far below the GD-TP peak, and that is a change of location rather
 than a shortfall.** A GD-TP's governing strain sits at the
@@ -1110,7 +1139,8 @@ exactly that when first written and read as a 90% shortfall, which is why the
 column now prints `Xe/GDTP`. Xb being low is construction: a 917 GPa body
 that cannot yield barely bends and sheds its curvature outboard, which is the
 same mechanism the control measures and the reason **Xb/Xe falls as the
-modulus ratio rises** — 0.428 at 349 GPa, 0.057 at 917 GPa.
+modulus ratio rises** — 0.28–0.43 at 349 GPa, 0.10–0.15 at 682, 0.05–0.08 at
+917. Ten cases make that a trend rather than two points.
 
 **So what the simplification reproduces is the quantity that governs.** The
 strain that decides a design sits in the pipe beside the component, not in
@@ -1156,6 +1186,11 @@ while matching the moment to 1%.
    measurement.
 4. **No case here has a published counterpart**, so none of it bears on the
    scorecard in §7 and none of it closes anything in §8.
+5. **TABLE XXVI's three two-component cases are not reducible** and are the
+   only published GD-TP rows absent from the ten. A layout with two
+   section-owning bodies is refused by name, so the ten are every single-body
+   GD-TP case in Paper 1 that this method can express — not a selection from
+   a larger reducible set.
 
 ---
 
@@ -1340,6 +1375,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.5** | 8 Oct 2026 | **Five more GD-TP cases through ILS-SIMPLE, ten in all.** Chosen to close two length sweeps and a radius sweep rather than add scattered points. **Moment within 1.0% on all ten**; adjacent-pipe strain within 3.3% on **nine of ten**. Radius does not move the agreement and neither does length to 20 D, which pins B4's +9.4% to that case rather than to a trend |
 | **3.4** | 8 Oct 2026 | **The B1 mesh check, run.** Xb is mesh-INSENSITIVE (+1.8% over a 4 × refinement on two elements); Xe is not (+27%) — the reverse of what §6 first supposed. The agreement holds regardless, 96.7% → 95.8%, because the GD-TP compared against moves +28.1% with it |
 | **3.3** | 8 Oct 2026 | **§6 added: simplified models (GD-Simple).** A layout reduced to an equivalent elastic body on a shroud — EI, length and depth matched exactly, EA not and reported. Five GD-TP cases reduced, drawn and swept; **moment within 1% on all five**, adjacent-pipe strain within 3.3% on four. Methodology, the control, and the four refused layout classes written up. Nothing published is scored by it, so §7's count is unchanged. Sections renumbered: Scorecard 6→7, What is not settled 7→8 |
 | **3.2** | 7 Oct 2026 | **Paper 2 supplied and audited.** Both papers now cited in full. Case-table transcription verified correct throughout §5, which *eliminates* it as the cause of the EA-SB scatter. **L107: every Paper 2 case had been running at 120 MT against the paper's stated 100** — all twelve figures re-run, runners corrected. EA-ST tightened to (−5.3, +8.8); EA-SB scatter survives all three eliminations. §8 down to ten open items |
