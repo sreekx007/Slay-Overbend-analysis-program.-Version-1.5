@@ -122,7 +122,7 @@ L107 is what that cost.
 from Paper 2:
 
 * *"Nominal Strains at element integration points are reported here."* This
-  settles what the reference quantity is; see §7 item 2 for why it does not
+  settles what the reference quantity is; see §8 item 2 for why it does not
   close the gap.
 * *"Bulkheads and thick inline components required to physically anchor
   structures to the pipeline are intentionally NOT modelled… Reported strains
@@ -156,6 +156,13 @@ a single-position solve at the start.
 * *Mesh.* No component case is converged at 2 × OD, and refinement moves the
   answer. Where a region holds one or two elements the figure is reporting a
   mesh rather than a strain field, and the element count is given.
+
+**§6 is not validation.** Every other section compares this build against a
+published number. §6 reduces a layout to a simplified stand-in and compares
+it against §2's own rows, because neither paper defines the component. It is
+kept in this file because it is measured on the same build and would
+otherwise have nowhere honest to live, not because it carries the same
+weight.
 
 **A dash means not measured, never zero.** A region that holds no elements
 at a given mesh is shown `—`.
@@ -424,7 +431,7 @@ and that is now the clean statement of what is left. It is one-sided LOW,
 which is the opposite direction to every other strain disagreement in this
 file, and it cannot be the envelope offset — an envelope cannot read low.
 
-That it is strain-only, with the moments right, points back at §7's
+That it is strain-only, with the moments right, points back at §8's
 local-strain-recovery question rather than away from it. A section force
 that is correct while the extreme-fibre strain derived from it is 20–30% low
 over long stiff bodies is what a recovery convention mismatch looks like —
@@ -744,7 +751,7 @@ the second run.*
 >
 > **What the correction moved.** EA-ST **tightened**, from (−3.5, +13.5) to
 > (−5.3, +8.8). All four EA-SB cases moved 2–5 points further low. The
-> scatter that §7 item 1 is about is **unchanged in character** — −14.4%
+> scatter that §8 item 1 is about is **unchanged in character** — −14.4%
 > beside −45.4%, −42.8% and −61.3% — so the tension was never its cause.
 >
 > | | X_c at 120 MT | X_c at 100 MT |
@@ -767,7 +774,7 @@ was supplied: EA-ST F2 (P_c1 10 D / 20 D, kT 2.22 / 2.85, published
 P_l2 2.5 D, P_v 2 D, kB 3.20, published 2.30 / 1.41) and EA-SB F2 Cases 1–3
 (2.24 / 0.086 / 1.45, 2.40 / 0.086 / 1.52, 2.53 / 0.085 / 1.60) all match.
 **So transcription is eliminated as the cause of the EA-SB scatter**, which
-was §7 item 2 and was the candidate it named first.
+was §8 item 2 and was the candidate it named first.
 
 | Case | Paper X_c | ours | Δ | Paper X_i | ours | Δ | Paper X_e | ours | Δ |
 |---|---|---|---|---|---|---|---|---|---|
@@ -793,7 +800,7 @@ disagreement in the ledger at −61.3%. **The inversion is not new and was
 recorded here as holding "in all six cases" through two earlier revisions;
 that was wrong at 120 MT too** (0.941 against 1.117%), and is corrected here.
 Whatever is suppressing EA-SB's X_c is strongest exactly where the structure
-has one attachment point, which is a sharper statement of §7 item 1 than
+has one attachment point, which is a sharper statement of §8 item 1 than
 "connector placement" and the reason the placement sweep should start with
 F1.
 
@@ -889,7 +896,246 @@ a G9 violation routed around rather than respected.*
 
 ---
 
-## 6. Scorecard
+## 6. Simplified models — GD-Simple
+
+*New 8 Oct 2026. **Nothing in this section is validation.** Neither paper
+defines a GD-Simple, so there is no published counterpart and no delta
+against a reference. What the "GD-TP" column holds is **our own earlier
+result** for the layout each case was reduced from — §2's numbers, produced
+by this same build — so every comparison here is internal.*
+
+### What a simplified model is for
+
+A real inline structure is a specific piece of hardware: a wall thickness, a
+bore, an outside diameter, a taper, sometimes a frame. Most of that detail
+never reaches the overbend answer, which responds to three things — how
+**stiff** the assembly is, how **long** it is, and how far it holds the pipe
+**off** the rollers. A simplified model states those three directly and
+nothing else, so a layout can be explored before its hardware exists.
+
+**GD-Simple** is that model: a bounded length of pipe carrying the
+**pipeline's own section**, whose elastic modulus is a free parameter and
+which never yields, riding an offset shroud that takes the roller contact.
+
+    real layout             measured              ILS-SIMPLE
+    --------------------    ------------------    -------------------------
+    GD-TP, t 53 mm, 20 D    EI / EI_pipe 3.248    body: E 682 GPa, pipe
+    OD_comp 470.4 mm        L    8.128 m          section, fully elastic
+                            depth 235.2 mm        shroud: V 235.2 mm,
+                                                  L1 + 2·L2 = 8.128 m
+
+**It is a composite, not a mirrored component.** There is no `GD-Simple`
+class and there must not be one here: `component_spec.py`, `ils_builder.py`
+*and* `fixtures/standard_ils_layouts.json` are all mirrored and hashed (G7).
+It is assembled in `slay/define/simple.py` out of two codes the mirror
+already has — a **neutral `GD-TP`** (`t_comp == t_pipe` exactly, so no
+section step, legal since the 5 Sep 2026 relaxation) over a **`GD-SH`** —
+and handed to the mirrored builder, which stays the author of what a
+component *is*.
+
+### The reduction, rule by rule
+
+`slay/define/simplify.py` measures a layout and derives the five parameters;
+`tools/simplify_ils.py` is the command line and writes
+`docs/simple/<case>.json`; `tools/plot_simple_ils.py` reads that file and
+draws the two components together. Same generator/reader split as the
+profile pair (G13) — the reduction is written down, and the figure reads it
+rather than re-deriving it.
+
+**Everything is measured off the built assembly, never read from the spec.**
+`section_at` gives the section and its owner at any station; `contact_at`
+gives the surface a roller would touch. This is the rule `report.regions`
+already follows, and for the same reason: `ils_builder` is the author of what
+a component *is*, so a reduction computed from the definition would describe
+the component we asked for rather than the one the builder made. The payoff
+is concrete — **the depth rule needs no formula.** `contact_at` returns
+235.2 mm for the 53 mm wall, which *is* `OD_comp/2`, without the module ever
+writing that down. The same code therefore reduces whatever was actually
+built.
+
+| Quantity | Rule | Holds? |
+|---|---|---|
+| **Length** | the body spans what the original spanned, and the shroud's **total** footprint `L1 + 2·L2` matches it too | **exact** |
+| **Depth** | the shroud's bottom flat goes where the original's own contact surface was, so the roller sees the same elevation | **exact** |
+| **Bending** | `E = E_steel · I_comp / I_pipe` reproduces `EI` on the pipeline section | **exact** |
+| **Axial** | `EA` then comes out as `E · A_pipe` | **no** |
+
+**`EA` cannot be matched as well, and that is arithmetic rather than a
+defect.** One modulus on a fixed section cannot satisfy two stiffnesses at
+once, because `A_comp/A_pipe` and `I_comp/I_pipe` are different ratios. `EI`
+is the one chosen because the overbend is displacement-controlled bending.
+The error is carried on the result (`EA_error`) rather than left to be
+discovered, and it **grows with the wall** — area grows faster than the
+second moment that sets `E_equiv`:
+
+| wall | `I_comp/I_pipe` | `A_comp/A_pipe` | `EA` error |
+|---|---|---|---|
+| 32 mm | 1.664 | 1.567 | **+6.2%** |
+| 42 mm | 2.363 | 2.109 | +12.0% |
+| 53 mm | 3.248 | 2.733 | **+18.8%** |
+| 65 mm | 4.366 | 3.449 | **+26.6%** |
+
+**Two further differences are deliberate, not errors.** The stand-in keeps
+the **pipeline's** extreme-fibre distance (203.2 mm, not `OD_comp/2`), so the
+same curvature gives a lower strain than the original's section would; and
+the body is **elastic** where the original is J2. Both are what make the
+model simple: stiffness is the only thing that moved.
+
+**`L2 = 0` is unbuildable.** The exact equivalent of a GD-TP's abrupt step is
+a shroud with no taper, and the mirrored `OffsetShroud.validate` refuses it —
+*"GD-SH: V, L1 and L2 must be positive"*. Checked against the mirror
+directly: `L2 = 0` raises, `L2 = 1e-9` is accepted. `TAPER_MIN` is **0.1 mm**,
+reusing `regions.FLAT_TOL` rather than choosing a second number for the same
+job; `simple_geometry` measures such a shroud as all-flat, which is the
+intent. A true zero taper needs raising upstream (L111).
+
+**A sharp taper raises no contact problem, and this was measured rather than
+assumed.** The contact normal comes from the *station* —
+`to_model_frame(st.normal)`, the roller's arc normal — and the component
+contributes only a scalar `lift = contact_at(x).y − OD/2` to the target.
+`ContactAdvice`, the thing that says a taper's normal tilts, has **no
+consumers anywhere in the codebase**. Across the 0.1 mm taper the lift ramps
+linearly and continuously (0 → 8 → 16 → 24 → 32 mm), and the GD-TP it
+replaces is **sharper still** — a true step, 32 mm at the end and 0 mm one
+micron later. GD-SH's geometry nodes are `PREFERRED`, not `MANDATORY`, so no
+node is forced at the tip and none is needed.
+
+**Refused rather than approximated**, each by name and with the missing rule
+stated: a tapered body (GD-TT carries 1005 diameters over its span, and which
+average is right depends on where the curvature is); two section-owning
+bodies (combining stiffnesses in series has no implemented rule); a layout
+with no section owner (a bare GD-SH, an EA structure — nothing to reduce);
+and a body that owns a section but no contact (ILS-SHTP's thick pipe sits
+*inside* a shroud, so its depth is not what a roller touches).
+
+### Regions — Xb and Xe
+
+Two regions, and the boundary is the **body's** extent, not the shroud's:
+
+* **Xb** — inside the body of the component: the elastic span, carrying the
+  pipeline section at the body modulus.
+* **Xe** — outside it: the pipeline either side. **Two spans, not one** — it
+  is the complement of Xb, so no single interval names it and `region_peaks`
+  carries both in `spans`.
+
+Drawn on the body because `L_body` and the shroud's `L1`/`L2` are
+independent by construction; keying Xb on the shroud would report the elastic
+span as whatever the shroud happened to be. `SimpleGeometry` subclasses
+`OffsetGeometry` so the inherited `s_*` fields stay the **shroud** footprint
+that `body_peaks` and `peak_on_shroud` already read, and only `bounds`
+differs. `body_covers_shroud` says whether Xb contains the whole elevated
+zone; where it is false, part of the lift sits in Xe and the two regions stop
+being "component" and "pipeline". **For all five cases below it is true.**
+
+### The control, and why the obvious control is wrong
+
+At `E = E_steel` the body differs from plain pipe in exactly one way — it
+cannot yield — so **where nothing yields it must be indistinguishable**.
+Measured at R = 250 m: **Xb 0.2031% against Xe 0.2031%, ratio 1.000.** That
+single figure verifies the whole chain at once: the modulus override landed,
+the elastic law landed, and the region boundary is where the body is.
+
+The same case at R = 85 m gives Xb 0.3161% against Xe 1.1110%, ratio 0.285 —
+and that is a **result, not a defect**. The pipe either side is plastic at
+1.1% with its tangent collapsed to `E·H/(E+H)`; the body cannot yield, stays
+on the full 210 GPa, becomes the far stiffer member and sheds curvature
+outboard while taking more moment. Against a bare shroud of the same V, L1
+and L2, which peaks at 0.8223%, inserting a non-yielding body of the
+pipeline's *own* section makes the adjacent pipe **35% worse**.
+
+### The five GD-TP cases
+
+Selected from §2 to span the axes: length 2.5 → 40 D, radius 70/85/100,
+`I_comp/I_pipe` 1.66 → 4.37. B3 carries the worst strain disagreement in the
+ledger and B4 the only moment overshoot, so the two open items in §2 are both
+represented.
+
+| Case | Table | R | L | wall | `EI/EI_p` | body **E** | V | lift |
+|---|---|---|---|---|---|---|---|---|
+| **A1** | XX | 100 m | 2.5 D | 32 mm | 1.664 | **349 GPa** | 0.527 D | 11.0 mm |
+| **B1** | XXIII | 70 m | 2.5 D | 65 mm | 4.366 | **917 GPa** | 0.608 D | 44.0 mm |
+| **B2** | XXIII | 70 m | 10 D | 65 mm | 4.366 | **917 GPa** | 0.608 D | 44.0 mm |
+| **B3** | XXIII | 85 m | 20 D | 53 mm | 3.248 | **682 GPa** | 0.579 D | 32.0 mm |
+| **B4** | XXIII | 85 m | 40 D | 53 mm | 3.248 | **682 GPa** | 0.579 D | 32.0 mm |
+
+*Figures: `docs/diagrams/simple_<case>.png` — the original GD-TP dashed over
+the stand-in filled, so the claim is visual: they start and stop together and
+reach the same depth, and what they do not share is the wall.*
+
+### Results
+
+*`tools/study_simple.py --from-artifacts`, 8 Oct 2026. Step 1 × OD, matching
+`study_table_xxiii.py`'s own default — the GD-TP numbers were swept at that
+advance, and a different one would move the envelope before any physics did.
+The five parameters come out of the reduction artifacts verbatim, so the
+figure, the artifact and the result are the same component. **All five sweep
+100% of their travel.***
+
+| Case | body **E** | **Xb** | **Xe** | Xb/Xe | GD-TP peak | **Xe / GD-TP** |
+|---|---|---|---|---|---|---|
+| A1 | 349 GPa | 0.1575% | 0.3682% | 0.428 | 0.3771% | **97.6%** |
+| B1 | 917 GPa | 0.0683% | 0.8191% | 0.083 | 0.8471% | **96.7%** |
+| B2 | 917 GPa | 0.0795% | 1.4025% | 0.057 | 1.4161% | **99.0%** |
+| B3 | 682 GPa | 0.1216% | 1.2491% | 0.097 | 1.2728% | **98.1%** |
+| B4 | 682 GPa | 0.2089% | 1.7962% | 0.116 | 1.6413% | **109.4%** |
+
+| Case | Xb moment | GD-TP body moment | **Δ** |
+|---|---|---|---|
+| A1 | 1188 kN·m | 1182.7 kN·m | **+0.4%** |
+| B1 | 1363 kN·m | 1352.0 kN·m | **+0.8%** |
+| B2 | 1603 kN·m | 1604.0 kN·m | **−0.1%** |
+| B3 | 1837 kN·m | 1848.0 kN·m | **−0.6%** |
+| B4 | 3219 kN·m | 3253.0 kN·m | **−1.0%** |
+
+### What the results say
+
+**Moment is reproduced within 1% on all five.** That is the headline, and it
+is EI matching doing precisely what it was set up to do: the one equivalence
+the reduction claims to hold exactly is the one that holds. It also holds
+across the whole range — 1188 to 3253 kN·m, three moduli, four lengths — so
+it is not a coincidence of one configuration.
+
+**Adjacent-pipe strain lands within 3.3% on four of five**, 96.7 to 99.0%.
+B4 is the exception at +9.4%, and B4 is already the outlier inside the GD-TP
+set itself: it carries the only moment overshoot in Paper 1 (+13.0%, §8
+item 6) and spans nearly two roller bays. The anomaly tracks the case, not
+the method.
+
+**Xb is far below the GD-TP peak, and that is a change of location rather
+than a shortfall.** A GD-TP's governing strain sits at the
+**pipe-to-component junction** — §2's TABLE XX note says so in as many words
+— which is outboard of the body and therefore in Xe's territory, not Xb's.
+Quoting Xb against it compares two different pieces of steel; the runner did
+exactly that when first written and read as a 90% shortfall, which is why the
+column now prints `Xe/GDTP`. Xb being low is construction: a 917 GPa body
+that cannot yield barely bends and sheds its curvature outboard, which is the
+same mechanism the control measures and the reason **Xb/Xe falls as the
+modulus ratio rises** — 0.428 at 349 GPa, 0.057 at 917 GPa.
+
+**So what the simplification reproduces is the quantity that governs.** The
+strain that decides a design sits in the pipe beside the component, not in
+the component, and that is the one the stand-in gets right to within 3.3%
+while matching the moment to 1%.
+
+### Limits of this section
+
+1. **A1 and B1 carry two elements in Xb** at the ruled 2 × OD mesh, so their
+   body strain is reporting a mesh rather than a strain field — §8 item 8's
+   complaint in a new place. Xe and the moments are unaffected. A 0.5 × OD
+   check on B1 would measure that sensitivity rather than assume it; it has
+   not been run.
+2. **Only GD-TP is reducible today.** Four other layout classes are refused
+   by name, and the rules that would admit them do not exist yet.
+3. **The axial stiffness is wrong by +6.2 to +26.6%** and nothing here
+   measures what that costs. It does not show up in these results because
+   the overbend is bending-governed, which is an argument rather than a
+   measurement.
+4. **No case here has a published counterpart**, so none of it bears on the
+   scorecard in §7 and none of it closes anything in §8.
+
+---
+
+## 7. Scorecard
 
 *Every row below was produced by the current program on 7 Oct 2026. Before
 that date the ledger mixed results from four different builds, which is the
@@ -917,6 +1163,11 @@ and Paper 2 are both complete, and both papers are now cited in full under
 what L107 cost. Six PS cases are run as prediction, having no published
 counterpart; F1D and F2D remain refused under G9.
 
+*§6's GD-Simple cases are NOT in this table and must not be added to it.
+They have no published counterpart, so they cannot be scored against one;
+the comparisons there are against §2's own rows. The count below is of
+PUBLISHED cases and is unchanged by them.*
+
 *Tensions are per-table and were audited against both PDFs on 7 Oct, not
 assumed: Paper 1's TABLE X is 120 MT and its S1 shroud series is 120 MT,
 while its component, spacing and S2 series are 100 MT; all of Paper 2 is
@@ -935,7 +1186,7 @@ slip chooses between were built side by side and agree on every field.
 That is a coincidence, not a safeguard, which is why it has three tests
 now.*
 
-## 7. What is not settled
+## 8. What is not settled
 
 *Rewritten 7 Oct, after the re-run campaign, and again the same day after
 Paper 2 was supplied. **Six** entries from the previous lists are closed and
@@ -1065,8 +1316,9 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
-| **3.2** | 7 Oct 2026 | **Paper 2 supplied and audited.** Both papers now cited in full. Case-table transcription verified correct throughout §5, which *eliminates* it as the cause of the EA-SB scatter. **L107: every Paper 2 case had been running at 120 MT against the paper's stated 100** — all twelve figures re-run, runners corrected. EA-ST tightened to (−5.3, +8.8); EA-SB scatter survives all three eliminations. §7 down to ten open items |
-| **3.1** | 7 Oct 2026 | **Every case re-run on the current program** after L101, L105, L106 and the strain guard. All 50 published cases now carry a number from this build, Paper 1 and Paper 2 complete. TABLE XXVI, XXXIX and XLI run for the first time; six PS cases added as prediction. §7 rewritten: four entries closed |
+| **3.3** | 8 Oct 2026 | **§6 added: simplified models (GD-Simple).** A layout reduced to an equivalent elastic body on a shroud — EI, length and depth matched exactly, EA not and reported. Five GD-TP cases reduced, drawn and swept; **moment within 1% on all five**, adjacent-pipe strain within 3.3% on four. Methodology, the control, and the four refused layout classes written up. Nothing published is scored by it, so §7's count is unchanged. Sections renumbered: Scorecard 6→7, What is not settled 7→8 |
+| **3.2** | 7 Oct 2026 | **Paper 2 supplied and audited.** Both papers now cited in full. Case-table transcription verified correct throughout §5, which *eliminates* it as the cause of the EA-SB scatter. **L107: every Paper 2 case had been running at 120 MT against the paper's stated 100** — all twelve figures re-run, runners corrected. EA-ST tightened to (−5.3, +8.8); EA-SB scatter survives all three eliminations. §8 down to ten open items |
+| **3.1** | 7 Oct 2026 | **Every case re-run on the current program** after L101, L105, L106 and the strain guard. All 50 published cases now carry a number from this build, Paper 1 and Paper 2 complete. TABLE XXVI, XXXIX and XLI run for the first time; six PS cases added as prediction. §8 rewritten: four entries closed |
 | **3.0** | 6 Oct 2026 | Restructured on the papers' own table numbering. Rebuild against the papers only. **Bending moment added for every case.** Shroud + thick pipe run for the first time |
 | 2.0 | 6 Oct 2026 | Re-measured on the physical contact surface after L095–L098 |
 | 1.0 | 6 Oct 2026 | First consolidated ledger, all results on the superseded contact surface |
