@@ -1101,6 +1101,55 @@ component. **All ten sweep 100% of their travel.***
 is where TABLE XXI and XXIV report it. A1_R70 was swept before that column
 existed and its +0.5% is computed from the printed 1306 against 1299.2.*
 
+### Actual GD-TP simulation against the simplified model
+
+*Both columns are runs of this build: **actual** is the real GD-TP layout
+swept as §2 records it, **simplified** is the ILS-SIMPLE stand-in reduced
+from that same layout. **Peak against peak** — the simplified model's overall
+peak is its Xe in all ten, so no region is being chosen to flatter it.
+Moment against moment on the **component body**, where TABLE XXI and XXIV
+report it.*
+
+| | | | | **peak strain** | | | **body moment** | | |
+|---|---|---|---|---|---|---|---|---|---|
+| Case | R | L | wall | actual | simplified | **Δ** | actual | simplified | **Δ** |
+| B1 | 70 m | 2.5 D | 65 mm | 0.8471% | 0.8191% | **−3.3%** | 1352.0 | 1363 | **+0.8%** |
+| B2 | 70 m | 10 D | 65 mm | 1.4161% | 1.4025% | **−1.0%** | 1604.0 | 1603 | **−0.1%** |
+| B3_R70 | 70 m | 20 D | 65 mm | 1.9763% | 1.9229% | **−2.7%** | 2053.0 | 2035 | **−0.9%** |
+| A3_R85 | 85 m | 2.5 D | 53 mm | 0.6127% | 0.5943% | **−3.0%** | 1297.0 | 1307 | **+0.8%** |
+| B2_R85 | 85 m | 10 D | 53 mm | 0.9267% | 0.9149% | **−1.3%** | 1494.0 | 1496 | **+0.1%** |
+| B3 | 85 m | 20 D | 53 mm | 1.2728% | 1.2491% | **−1.9%** | 1848.0 | 1837 | **−0.6%** |
+| B4 | 85 m | 40 D | 53 mm | 1.6413% | 1.7962% | **+9.4%** | 3253.0 | 3219 | **−1.0%** |
+| A1_R70 | 70 m | 2.5 D | 32 mm | 0.6358% | 0.6239% | **−1.9%** | 1299.2 | 1306 | **+0.5%** |
+| A1_R85 | 85 m | 2.5 D | 32 mm | 0.4804% | 0.4706% | **−2.0%** | 1247.1 | 1252 | **+0.4%** |
+| A1 | 100 m | 2.5 D | 32 mm | 0.3771% | 0.3682% | **−2.4%** | 1182.7 | 1188 | **+0.4%** |
+
+*Moments in kN·m.*
+
+**The two columns behave differently, and that is the most useful thing in
+the table.**
+
+| | moment | strain |
+|---|---|---|
+| band | −1.0 to +0.8% | −1.0 to −3.3% (nine of ten) |
+| mean | **+0.05%** | **−2.15%** |
+| signs | 6 high, 4 low | **9 of 9 low** |
+| reading | **scatter about zero** | **a systematic offset** |
+
+**The moment is unbiased.** Scatter about zero is the signature of a quantity
+being reproduced, with the residual being mesh and discretisation rather than
+a modelling difference.
+
+**The strain is biased low.** A band as tight as 2.3 points with every one of
+the nine on the same side is one cause, not ten. B4 is the only case on the
+other side, at +9.4%.
+
+So the simplification **reproduces the moment outright and the strain with a
+roughly 2% shortfall that has a cause worth finding.** Nothing here
+identifies that cause, and the obvious candidate — the stand-in keeping the
+pipeline's extreme-fibre distance — **does not explain it**: the peak sits in
+pipeline-section steel in both models, where the fibre distance is the same.
+
 ### The three sweeps, and what they isolate
 
 | sweep | held fixed | result |
@@ -1186,7 +1235,15 @@ while matching the moment to 1%.
    measurement.
 4. **No case here has a published counterpart**, so none of it bears on the
    scorecard in §7 and none of it closes anything in §8.
-5. **TABLE XXVI's three two-component cases are not reducible** and are the
+5. **The ~2% low bias on strain is unexplained.** Nine of ten sit in −1.0 to
+   −3.3% with every one on the same side, against a moment that scatters
+   about zero. That is a systematic offset with a single cause, and the
+   first candidate to reach for — the stand-in's extreme-fibre distance — is
+   already eliminated, because the peak is in pipeline-section steel in both
+   models. Until it is found, a simplified strain should be read as a lower
+   bound of roughly 2%, which is the one thing in this section a user needs
+   to carry into a design.
+6. **TABLE XXVI's three two-component cases are not reducible** and are the
    only published GD-TP rows absent from the ten. A layout with two
    section-owning bodies is refused by name, so the ten are every single-body
    GD-TP case in Paper 1 that this method can express — not a selection from
@@ -1375,6 +1432,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.6** | 8 Oct 2026 | **Head-to-head table added: actual GD-TP against the simplified model, peak for peak and moment for moment.** It separates the two: **moment unbiased** (mean +0.05%, six high four low) against **strain biased low** (mean −2.15%, nine of nine on the same side). The bias is a systematic offset with a single unfound cause, not scatter, and the fibre-distance candidate is eliminated |
 | **3.5** | 8 Oct 2026 | **Five more GD-TP cases through ILS-SIMPLE, ten in all.** Chosen to close two length sweeps and a radius sweep rather than add scattered points. **Moment within 1.0% on all ten**; adjacent-pipe strain within 3.3% on **nine of ten**. Radius does not move the agreement and neither does length to 20 D, which pins B4's +9.4% to that case rather than to a trend |
 | **3.4** | 8 Oct 2026 | **The B1 mesh check, run.** Xb is mesh-INSENSITIVE (+1.8% over a 4 × refinement on two elements); Xe is not (+27%) — the reverse of what §6 first supposed. The agreement holds regardless, 96.7% → 95.8%, because the GD-TP compared against moves +28.1% with it |
 | **3.3** | 8 Oct 2026 | **§6 added: simplified models (GD-Simple).** A layout reduced to an equivalent elastic body on a shroud — EI, length and depth matched exactly, EA not and reported. Five GD-TP cases reduced, drawn and swept; **moment within 1% on all five**, adjacent-pipe strain within 3.3% on four. Methodology, the control, and the four refused layout classes written up. Nothing published is scored by it, so §7's count is unchanged. Sections renumbered: Scorecard 6→7, What is not settled 7→8 |
