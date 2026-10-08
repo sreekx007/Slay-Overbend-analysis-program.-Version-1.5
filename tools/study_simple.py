@@ -74,7 +74,7 @@ D = 0.4064
 TON = 9.80665e3
 
 
-def run_reduction(rec, spacing, step_OD):
+def run_reduction(rec, spacing, step_OD, mesh_OD=None):
     """Sweep one ILS-SIMPLE built from a reduction artifact.
 
     THE SOLVED CASE IS THE ONE THAT WAS WRITTEN DOWN AND DRAWN. The five
@@ -85,23 +85,32 @@ def run_reduction(rec, spacing, step_OD):
     s_, e_ = rec['simple'], rec['equivalent']
     sm = sp.build(E=s_['E'], L_body=s_['L_body'], V=s_['V'], L1=s_['L1'],
                   L2=s_['L2'], centre_x=s_['centre_x'])
-    return _sweep(sm, rec['R'], spacing, rec['tension_mt'], step_OD), sm, e_
+    return (_sweep(sm, rec['R'], spacing, rec['tension_mt'], step_OD,
+                   mesh_OD), sm, e_)
 
 
-def _sweep(sm, R, spacing, tension_mt, step_OD):
-    """Solve the passage and measure it. Pure; prints nothing."""
+def _sweep(sm, R, spacing, tension_mt, step_OD, mesh_OD=None):
+    """Solve the passage and measure it. Pure; prints nothing.
+
+    `mesh_OD` is the ELEMENT LENGTH in diameters, not the sweep advance.
+    The two are independent and are easy to confuse: `step_OD` is how far
+    the pipe moves between positions, `mesh_OD` is how finely it is cut up.
+    None leaves the mesher on its ruled density (G10, 2 x OD).
+    """
     L = sm.extent[1] - sm.extent[0]
     scene = sweep.scene_for(R=R, spacing=spacing, L_comp=L)
     s_centre = sweep.start_centre(scene, L)
     pkw = dict(elastic_spans=sm.elastic_spans(s_centre),
                E_by_owner=sm.E_by_owner())
+    mkw = {} if mesh_OD is None else dict(target_len=mesh_OD * D)
     positions = sweep.run(scene, sm.ils, L_comp=L, step=step_OD * D,
                           tension=tension_mt * TON, material=material('j2'),
-                          **pkw)
+                          **pkw, **mkw)
     recs = rp.measure(positions, scene, L_comp=L)
     env = rp.envelope(recs)
     model = build_model(scene, sm.ils, s_centre=s_centre,
-                        extra_stations=sweep._required_stations(scene))
+                        extra_stations=sweep._required_stations(scene),
+                        **mkw)
     p0 = build_problem(
         model, scene, shift=positions[env.index].shift, s_centre=s_centre,
         tension=tension_mt * TON, material=material('j2'),
@@ -191,8 +200,10 @@ def main() -> int:
         # numbers these are compared against were swept at that advance, and
         # a different one would change the envelope before any physics did.
         step_OD = arg('--step-OD', float, 1.0)
+        mesh_OD = arg('--mesh-OD', float, 0.0) or None
         print(f'ILS-SIMPLE swept from the reductions in docs/simple/.  '
-              f'spacing {spacing:.0f} m, step {step_OD:g} x OD')
+              f'spacing {spacing:.0f} m, step {step_OD:g} x OD, mesh '
+              f'{"ruled 2 x OD" if mesh_OD is None else f"{mesh_OD:g} x OD"}')
         print('  *** PREDICTION, no published counterpart. The GD-TP column '
               'is OUR OWN earlier\n      result for the layout each case '
               'was reduced from -- not a reference value.')
@@ -210,7 +221,7 @@ def main() -> int:
             warnings.simplefilter('ignore')
             for f in files:
                 rec = json.loads(f.read_text())
-                r, sm, e_ = run_reduction(rec, spacing, step_OD)
+                r, sm, e_ = run_reduction(rec, spacing, step_OD, mesh_OD)
                 xb, xe = r['peaks']['Xb'], r['peaks']['Xe']
                 gdtp = rec['reference']['gdtp_strain_pct']
                 ratio = (xb['peak_strain'] / xe['peak_strain']

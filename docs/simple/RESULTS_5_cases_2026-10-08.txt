@@ -33,3 +33,25 @@ Xb is far below the GD-TP peak by construction, not by failure: a 917 GPa
 elastic body barely bends and sheds its curvature outboard. A1 and B1 carry
 TWO elements in Xb at this mesh, so their body strain reports a mesh rather
 than a strain field; Xe and the moments are unaffected.
+
+MESH CHECK ON B1, 8 Oct 2026.
+`study_simple.py --from-artifacts --case B1 [--mesh-OD N]`, and the GD-TP it
+is compared against re-run through `emit_profile.py --mesh` at the same two
+densities. Step held at 1 x OD throughout.
+
+  mesh        Xb        Xb el     Xe     GD-TP peak   Xe/GD-TP   Xb moment
+  2 x OD    0.0683%       2    0.8191%    0.8470%       96.7%      1363 kN.m
+  1 x OD    0.0683%       2    0.9501%      --            --       1363 kN.m
+  0.5 x OD  0.0695%       6    1.0399%    1.0852%       95.8%      1388 kN.m
+
+Xb moves +1.8% across a four-fold refinement, and its moment the same +1.8%.
+Two elements were enough: a nearly rigid body that cannot yield has little
+for a finer mesh to resolve. Xe moves +27% and is nowhere near converged --
+which is true of every component case at 2 x OD and is stated in the
+ledger's "How to read this".
+
+THE AGREEMENT SURVIVES BECAUSE BOTH SIDES MOVE TOGETHER: the GD-TP rises
++28.1% against Xe's +27.0%, so Xe/GD-TP holds at 96.7% -> 95.8%, one point
+across a 4x refinement. The 2 x OD GD-TP run came back 0.8470% against the
+ledger's recorded 0.8471% from a different tool, which is the cross-check
+that the two are the same case.

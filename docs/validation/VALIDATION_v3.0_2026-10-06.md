@@ -1119,11 +1119,35 @@ while matching the moment to 1%.
 
 ### Limits of this section
 
-1. **A1 and B1 carry two elements in Xb** at the ruled 2 × OD mesh, so their
-   body strain is reporting a mesh rather than a strain field — §8 item 8's
-   complaint in a new place. Xe and the moments are unaffected. A 0.5 × OD
-   check on B1 would measure that sensitivity rather than assume it; it has
-   not been run.
+1. **The mesh check was run on B1, and it found the opposite of what this
+   entry first claimed.** The worry was that A1 and B1 carry only two
+   elements in Xb at the ruled mesh, so their body strain would be
+   reporting a mesh rather than a strain field (§8 item 8's complaint in a
+   new place). **Xb turns out to be the mesh-insensitive one**, and Xe the
+   sensitive one:
+
+   | mesh | Xb | Xb elements | Xe | GD-TP peak | **Xe / GD-TP** |
+   |---|---|---|---|---|---|
+   | ruled 2 × OD | 0.0683% | 2 | 0.8191% | 0.8470% | **96.7%** |
+   | 1 × OD | 0.0683% | 2 | 0.9501% | — | — |
+   | 0.5 × OD | 0.0695% | 6 | 1.0399% | 1.0852% | **95.8%** |
+
+   Xb moves **+1.8%** across a four-fold refinement and its moment moves the
+   same +1.8% (1363 → 1388 kN·m), so two elements were enough: a body that
+   is nearly rigid and cannot yield has little for a finer mesh to resolve.
+   Xe moves **+27%** — it is nowhere near converged, which is what *How to
+   read this* already says of every component case at 2 × OD.
+
+   **The agreement survives anyway, because both sides move together.** The
+   GD-TP this is compared against was refined too, and rises +28.1% against
+   Xe's +27.0%, so `Xe / GD-TP` holds at **96.7% → 95.8%** — one point
+   across a 4 × refinement. That is the useful statement: the ledger's
+   convention of comparing two un-converged numbers at the same density is
+   sound here, and the simplification's agreement is a property of the
+   method rather than of the mesh it was measured on. *Both GD-TP figures
+   are fresh runs; the 2 × OD one came back 0.8470% against §2's recorded
+   0.8471% from a different tool, which is the cross-check that they are the
+   same case.*
 2. **Only GD-TP is reducible today.** Four other layout classes are refused
    by name, and the rules that would admit them do not exist yet.
 3. **The axial stiffness is wrong by +6.2 to +26.6%** and nothing here
@@ -1316,6 +1340,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.4** | 8 Oct 2026 | **The B1 mesh check, run.** Xb is mesh-INSENSITIVE (+1.8% over a 4 × refinement on two elements); Xe is not (+27%) — the reverse of what §6 first supposed. The agreement holds regardless, 96.7% → 95.8%, because the GD-TP compared against moves +28.1% with it |
 | **3.3** | 8 Oct 2026 | **§6 added: simplified models (GD-Simple).** A layout reduced to an equivalent elastic body on a shroud — EI, length and depth matched exactly, EA not and reported. Five GD-TP cases reduced, drawn and swept; **moment within 1% on all five**, adjacent-pipe strain within 3.3% on four. Methodology, the control, and the four refused layout classes written up. Nothing published is scored by it, so §7's count is unchanged. Sections renumbered: Scorecard 6→7, What is not settled 7→8 |
 | **3.2** | 7 Oct 2026 | **Paper 2 supplied and audited.** Both papers now cited in full. Case-table transcription verified correct throughout §5, which *eliminates* it as the cause of the EA-SB scatter. **L107: every Paper 2 case had been running at 120 MT against the paper's stated 100** — all twelve figures re-run, runners corrected. EA-ST tightened to (−5.3, +8.8); EA-SB scatter survives all three eliminations. §8 down to ten open items |
 | **3.1** | 7 Oct 2026 | **Every case re-run on the current program** after L101, L105, L106 and the strain guard. All 50 published cases now carry a number from this build, Paper 1 and Paper 2 complete. TABLE XXVI, XXXIX and XLI run for the first time; six PS cases added as prediction. §8 rewritten: four entries closed |
