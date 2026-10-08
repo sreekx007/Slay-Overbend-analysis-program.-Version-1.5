@@ -147,6 +147,41 @@ plotter.
 studies (GD-ST layouts, deadband gaps, ILS-EAST/EASB). **Not lay-position
 sweeps.**
 
+`study_simple.py` — **GD-Simple**, and this one *is* a lay-position sweep.
+No published counterpart: neither paper defines the component, so every
+number it prints is a prediction and the useful comparisons are internal.
+
+### GD-Simple — a composite, not a mirrored component
+
+An elastic pipe body of the pipeline's own section, with a free modulus,
+riding an offset shroud. Declared in **`slay/define/simple.py`** out of two
+codes the mirror already has — a neutral `GD-TP` (`t_comp == t_pipe`, so no
+section step) over a `GD-SH` — and handed to the mirrored builder.
+
+**There is no `GD-Simple` class and there must not be one here.**
+`component_spec.py`, `ils_builder.py` *and*
+`fixtures/standard_ils_layouts.json` are all mirrored and hashed (G7), and
+the fixture being mirrored **data** is the part easy to miss: adding an
+archetype there looks like configuration rather than code, and is still a
+violation. Needed upstream → raise it, don't patch.
+
+The two things the mirror cannot carry live in our layers:
+
+| Need | Where | Why not `stiffness_ratio` |
+|---|---|---|
+| a free modulus | `physics.sections`, `E_by_owner` | a ratio scales EA and EI on an **unchanged yield surface**, so the yield *strain* would move with E |
+| no plasticity | `Problem.elastic_spans` | already existed, for the feedstock buffer |
+
+The kernel already keys materials by `(E, elastic)`, so **no kernel change
+was needed** and G6 stands. Regions are `Xb` (inside the body) and `Xe`
+(outside it, two spans) — drawn on the **body**, never the shroud, because
+their lengths are independent.
+
+**The control is `--E 210 --R 250`, not `--E 210`.** Where nothing yields a
+non-yielding body at the pipeline's modulus must vanish, and does: Xb
+0.2031% against Xe 0.2031%. The same case at R = 85 gives 0.3161% against
+1.1110% — a result, not a defect. See L110.
+
 ---
 
 ## 4. Registers — the project's memory

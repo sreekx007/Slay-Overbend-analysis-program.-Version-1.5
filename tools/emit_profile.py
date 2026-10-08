@@ -98,7 +98,7 @@ def _ea_ils(arch_id, P_c1, kT, L_top, system=None, extra=None):
 def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
          L_OD=None, t_ratio=None, step=None, out=None, samples=None,
          case_id=None, target_len=None, P_c1=None, kT=None, L_top=None,
-         system=None, extra=None):
+         system=None, extra=None, ils_override=None, problem_kw=None):
     """Solve the passage and write the tables. Returns the summary.
 
     `extra` carries a component's own dimensions -- GD-SB's `P_l1`, `P_l2`,
@@ -131,9 +131,17 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     # An S connector is enforced by solve.passage's co-rotating frame, so
     # the mesher's opt-in is taken on here rather than evaded (G9).
     mesh_kw['emit_unenforced_conn_types'] = frozenset({'S'})
+    # ONE dict, TWO consumers. `problem_kw` reaches the sweep that SOLVES
+    # and the re-pose that REPORTS, because `differs_only_in_contact`
+    # compares `sections` and `elastic_spans` -- give the two different
+    # moduli or different elastic spans and they are not the same problem,
+    # which is the correct complaint and an annoying one to debug. GD-Simple
+    # is the first caller that needs it: `E_by_owner` for its body's
+    # modulus, `elastic_spans` for its body not yielding.
+    problem_kw = dict(problem_kw or {})
     positions = sweep.run(sc, ils, L_comp=L, step=step,
                           tension=tension_mt * TON, material=material('j2'),
-                          **mesh_kw)
+                          **problem_kw, **mesh_kw)
     recs = rp.measure(positions, sc, L_comp=L)
     env = rp.envelope(recs)
 
@@ -146,17 +154,16 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     # in the sections table name a different element.
     m = build_model(sc, ils, s_centre=s_centre,
                     extra_stations=sweep._required_stations(sc), **mesh_kw)
-    lo, hi = sweep.buffer_span(sc)
-
     built = {}
 
     def model_of(pos):
         if pos.shift not in built:
-            p = build_problem(m, sc, shift=pos.shift, assembly=ils.assembly,
-                              ils=ils, s_centre=s_centre,
+            p = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
                               tension=tension_mt * TON,
-                              material=material('j2'), vertical_at=(lo,),
-                              elastic_spans=((lo, hi),))
+                              material=material('j2'),
+                              **sweep.with_buffer(
+                                  sc, problem_kw, assembly=ils.assembly,
+                                  ils=ils))
             ms, _mdl, _ix = mesh_of_problem(p)
             built[pos.shift] = (m, ms, pos.result.U, p)
         return built[pos.shift]

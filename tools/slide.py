@@ -159,12 +159,18 @@ def _problem_at(scene, ils, pos, L_comp, **kw):
     model = build_model(scene, ils, s_centre=c,
                         extra_stations=sweep._required_stations(scene),
                         emit_unenforced_conn_types=emit)
-    lo, hi = sweep.buffer_span(scene)
     extra = {}
     if ils is not None:
         extra = dict(assembly=ils.assembly, ils=ils)
-    if hi > lo + 1e-9:
-        extra.update(vertical_at=(lo,), elastic_spans=((lo, hi),))
+    # THE SAME MERGE THE SOLVE USED. `sweep.with_buffer` adds the buffer's
+    # support and elastic span to whatever the caller asked for, instead of
+    # replacing it (L109) -- and this re-pose has to agree with the solved
+    # problem or `differs_only_in_contact` will say they are not the same
+    # problem, correctly.
+    extra = sweep.with_buffer(scene, extra,
+                              **{k: kw.pop(k) for k in
+                                 ('vertical_at', 'elastic_spans')
+                                 if k in kw})
     # `OD` is NOT taken separately here: it already travels in `kw` when the
     # case is off the default pipe. Passing it both ways is a TypeError that
     # only fires on a non-default diameter -- invisible on the baseline.

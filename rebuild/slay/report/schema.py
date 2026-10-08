@@ -44,7 +44,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
-SCHEMA_VERSION = '1.3.0'
+SCHEMA_VERSION = '1.4.0'
+# 1.4.0  GD-Simple's Xb/Xe region scheme: the `x*` patterns admit `xb`/`xe`,
+#        `x[be]_frac_of_xb` replaces `_frac_of_x2` for that scheme (which
+#        has no X2 to divide by), and the measured `body_*` columns describe
+#        the pipe body, which is a DIFFERENT span from the shroud the
+#        existing `offset_*` columns describe.
 # 1.3.0  `n_seeded`: positions that only converged via the staged seed.
 #        Non-zero rows would previously have been FAILED.
 # 1.2.0  the offset REGION scheme: `region_scheme`, the measured `offset_*`
@@ -232,7 +237,10 @@ DERIVED = [
           "which region scheme the `x*` columns follow, or empty when the "
           "case has none. 'X1-X5/offset' is the five-region scheme for an "
           'offset body: taper+beyond, then the deep section in thirds from '
-          'the catenary side, then taper+beyond'),
+          "the catenary side, then taper+beyond. 'Xb-Xe/simple' is "
+          'GD-Simple\'s two-region scheme: Xb inside the pipe body, Xe the '
+          'pipeline either side of it. The two schemes never both apply, '
+          'and the column says which set of `x*` columns to read'),
     Field('offset_L1', 'float', M, 'length', 'derived',
           'DEEP SECTION length of the offset body -- the part at full depth. '
           'X2/X3/X4 are its thirds'),
@@ -249,6 +257,28 @@ DERIVED = [
           'diameter (33% too much at V = 2D)'),
     Field('offset_owner', 'str', NONE, 'name', 'derived',
           'the component that owns the offset, e.g. GD-SH'),
+
+    # GD-SIMPLE ONLY, and a DIFFERENT SPAN from the `offset_*` columns
+    # above. Those describe the shroud; these describe the pipe body riding
+    # on it. The two are independently sized by decision, so neither one
+    # can be derived from the other and both are written.
+    Field('body_L', 'float', M, 'length', 'derived',
+          'GD-Simple: length of the PIPE BODY -- the elastic span carrying '
+          'the pipeline section at its own modulus. Xb is drawn on this, '
+          'NOT on the shroud: the two are independently sized'),
+    Field('body_owner', 'str', NONE, 'name', 'derived',
+          'GD-Simple: the component that owns the body section, e.g. GD-TP '
+          'built neutral (t_comp == t_pipe, so no section step)'),
+    Field('body_s_cat', 'float', M, 'length', 'location',
+          'GD-Simple: body end on the CATENARY side (high s), material '
+          'coordinates -- the Xb/Xe boundary at that end'),
+    Field('body_s_ves', 'float', M, 'length', 'location',
+          'GD-Simple: body end on the VESSEL side (low s), material '
+          'coordinates'),
+    Field('body_covers_shroud', 'bool', NONE, 'flag', 'derived',
+          'GD-Simple: Xb contains the WHOLE elevated zone. FALSE means part '
+          'of the shroud lift sits in Xe, so Xe is not plain unlifted pipe '
+          'and the two regions are no longer "component" and "pipeline"'),
 ]
 
 PEAKS = (
@@ -332,31 +362,37 @@ PATTERNS = [
     # for a case that HAS an offset body, and how many there are depends on
     # the scheme rather than on anything fixed here. A shroud has no junction
     # to probe -- it steps no section -- so the region is its reporting unit.
-    Field(r'x\d_peak_strain', 'float', NONE, 'strain', 'value',
+    Field(r'x[\dbe]_peak_strain', 'float', NONE, 'strain', 'value',
           'worst strain in that region over the WHOLE passage (MAX over '
           'positions, never a sum). X2, the catenary-side third of the deep '
           'section, is the peak in every case measured and is the region '
           'that governs design', pattern=True),
-    Field(r'x\d_peak_strain_s_material', 'float', M, 'length', 'location',
+    Field(r'x[\dbe]_peak_strain_s_material', 'float', M, 'length', 'location',
           'material coordinate of that peak -- a point on the PIPE, which '
           'travels with it', pattern=True),
-    Field(r'x\d_peak_strain_s_station', 'float', M, 'length', 'location',
+    Field(r'x[\dbe]_peak_strain_s_station', 'float', M, 'length', 'location',
           'station coordinate of that peak at the step it occurred',
           pattern=True),
-    Field(r'x\d_peak_strain_step', 'int', IDX, 'count', 'step',
+    Field(r'x[\dbe]_peak_strain_step', 'int', IDX, 'count', 'step',
           'passage position index at which the region peaked; -1 if the '
           'region never had an element inside the reporting band',
           pattern=True),
-    Field(r'x\d_peak_strain_shift', 'float', M, 'length', 'step',
+    Field(r'x[\dbe]_peak_strain_shift', 'float', M, 'length', 'step',
           'travel at that position', pattern=True),
-    Field(r'x\d_peak_moment', 'float', NM, 'moment', 'value',
+    Field(r'x[\dbe]_peak_moment', 'float', NM, 'moment', 'value',
           'worst bending moment magnitude in that region over the passage',
           pattern=True),
-    Field(r'x\d_frac_of_x2', 'float', NONE, 'ratio', 'derived',
+    Field(r'x[\dbe]_frac_of_xb', 'float', NONE, 'ratio', 'derived',
+          "GD-Simple: the region peak over Xb's. Xe/Xb below 1 is the "
+          'component carrying the worst of it, which is the whole question '
+          'the scheme is drawn to answer. Named for its DENOMINATOR, '
+          'because the five-region scheme divides by X2 instead and a '
+          'single column name for both would hide which', pattern=True),
+    Field(r'x[\dbe]_frac_of_x2', 'float', NONE, 'ratio', 'derived',
           'the region peak over X2. The reference puts X3 at 0.65-0.75 and '
           'X4 lower still, so this is the column that says whether a case '
           'behaves like the published scheme', pattern=True),
-    Field(r'x\d_peak_on_shroud', 'bool', NONE, 'flag', 'location',
+    Field(r'x[\dbe]_peak_on_shroud', 'bool', NONE, 'flag', 'location',
           'the region peak landed within the shroud footprint. X1 and X5 '
           'each lump a TAPER together with the plain pipe beyond it, and the '
           'reference calls both "governed by the plain-pipe catenary" -- '
@@ -364,15 +400,15 @@ PATTERNS = [
           'migrates onto the catenary-side taper. Without this column a '
           'reader cannot tell which of the two an X1 peak happened on',
           pattern=True),
-    Field(r'x\d_s_lo', 'float', M, 'length', 'location',
+    Field(r'x[\dbe]_s_lo', 'float', M, 'length', 'location',
           'region lower bound in MATERIAL coordinates -- fixed on the steel, '
           'so it names the same pipe at every position. EMPTY where the '
           'region is unbounded (X5 runs back toward the vessel)',
           pattern=True),
-    Field(r'x\d_s_hi', 'float', M, 'length', 'location',
+    Field(r'x[\dbe]_s_hi', 'float', M, 'length', 'location',
           'region upper bound, material coordinates. EMPTY where unbounded '
           '(X1 runs out toward the stinger tip)', pattern=True),
-    Field(r'x\d_n_elements', 'int', NONE, 'count', 'derived',
+    Field(r'x[\dbe]_n_elements', 'int', NONE, 'count', 'derived',
           'elements the region contains. A region with one or two elements '
           'is reporting a mesh, not a strain field', pattern=True),
 ]

@@ -189,7 +189,6 @@ def passage_cases(arch_id='ILS-TP', R=85.0, spacing=9.0,
                           tension=tension_mt * TON, material=material('j2'))
     recs = rp.measure(positions, sc, L_comp=L)
     env = rp.envelope(recs)
-    lo, hi = sweep.buffer_span(sc)
     m = build_model(sc, ils, s_centre=s_centre,
                     extra_stations=sweep._required_stations(sc))
     out = []
@@ -197,10 +196,10 @@ def passage_cases(arch_id='ILS-TP', R=85.0, spacing=9.0,
         if not pos.converged:
             out.append(None)
             continue
-        pr = build_problem(m, sc, shift=pos.shift, assembly=ils.assembly,
-                           ils=ils, s_centre=s_centre,
+        pr = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
                            tension=tension_mt * TON, material=material('j2'),
-                           vertical_at=(lo,), elastic_spans=((lo, hi),))
+                           **sweep.with_buffer(sc, assembly=ils.assembly,
+                                               ils=ils))
         ms, _mdl, _ix = mesh_of_problem(pr)
         out.append(dict(problem=pr, ms=ms, position=pos))
     return dict(scene=sc, model=m, steps=out, records=recs, envelope=env,
@@ -242,11 +241,10 @@ def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
 
     m = build_model(sc, ils, s_centre=s_centre,
                     extra_stations=sweep._required_stations(sc))
-    lo, hi = sweep.buffer_span(sc)
-    p = build_problem(m, sc, shift=pos.shift, assembly=ils.assembly, ils=ils,
-                      s_centre=s_centre, tension=tension_mt * TON,
-                      material=material('j2'), vertical_at=(lo,),
-                      elastic_spans=((lo, hi),))
+    p = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
+                      tension=tension_mt * TON, material=material('j2'),
+                      **sweep.with_buffer(sc, assembly=ils.assembly,
+                                          ils=ils))
     ms, _mdl, _ix = mesh_of_problem(p)
     slots = ctc.slots_from_targets(p.contacts, ms)
     return dict(scene=sc, model=m, problem=p, result=pos.result, ms=ms,

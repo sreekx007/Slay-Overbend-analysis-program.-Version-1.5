@@ -109,7 +109,7 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
                   s_centre: float = 0.0, tension: float = 0.0,
                   material=None, gravity: bool = True,
                   OD: float = None, t_wall: float = None,
-                  E: float = None, vertical_at=(),
+                  E: float = None, E_by_owner=None, vertical_at=(),
                   elastic_spans=(),
                   contact_surface: str = DEFAULT_SURFACE) -> Problem:
     """Pose one lay position.
@@ -126,6 +126,12 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
     CONTACT and of nothing else, so two Problems differing only in it still
     satisfy `differs_only_in_contact`.
 
+    `E_by_owner` gives one body its own elastic modulus, keyed on the
+    element owner tag -- see `physics.sections`. It needs no field on the
+    Problem because the modulus lands in `sections`, which
+    `differs_only_in_contact` already compares: a modulus that moved
+    between two positions of one passage would be caught there.
+
     `elastic_spans` names arc spans whose elements take a LINEAR ELASTIC
     material whatever `material` says. Distinct from `elastic_zones`, which
     this layer still only carries: applying those would change every
@@ -134,7 +140,8 @@ def build_problem(model, scene, *, assembly=None, ils=None, shift: float = 0.0,
     feedstock and must never be allowed to yield.
     """
     sections = bind_sections(model, assembly=assembly, s_centre=s_centre,
-                             OD=OD, t_wall=t_wall, E=E)
+                             OD=OD, t_wall=t_wall, E=E,
+                             E_by_owner=E_by_owner)
     loads = list(self_weight(model, sections)) if gravity else []
     if ils is not None and gravity:
         loads += point_mass_loads(model, ils, s_centre=s_centre)

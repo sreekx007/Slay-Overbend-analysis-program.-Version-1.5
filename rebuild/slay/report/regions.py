@@ -59,7 +59,18 @@ N_SAMPLES = 4000
 
 REGIONS = ('X1', 'X2', 'X3', 'X4', 'X5')
 
+# GD-Simple's scheme. TWO regions, and the boundary is the BODY's end --
+# not the shroud's deep section, because the body and the shroud are
+# independently sized and either may be the longer. See `SimpleGeometry`.
+SIMPLE_REGIONS = ('Xe', 'Xb')
+
 ABOUT = {
+    'Xb': 'INSIDE the body of the component -- the elastic span, carrying '
+          'the pipeline section at the body modulus',
+    'Xe': 'OUTSIDE the body, both sides -- plain pipeline on the case '
+          'material. NOT an interval: it is the complement of Xb, so its '
+          'bounds read as the whole model and its `spans` names the two '
+          'pieces',
     'X1': 'taper on the CATENARY side, and the pipe beyond the body -- '
           'governed by the plain-pipe catenary, not by the body',
     'X2': 'deep section, CATENARY-side third -- the peak strain location, '
@@ -110,6 +121,96 @@ class OffsetGeometry:
     @property
     def symmetric(self) -> bool:
         return abs(self.L2_cat - self.L2_ves) < FLAT_TOL
+
+
+@dataclass(frozen=True)
+class SimpleGeometry(OffsetGeometry):
+    """GD-Simple: an offset shroud PLUS the pipe body sitting on it.
+
+    Subclasses `OffsetGeometry` on purpose rather than standing alongside
+    it. The inherited four `s_*` fields are the SHROUD's footprint, which is
+    exactly what `body_peaks` and the `peak_on_shroud` column already read,
+    so both keep working unchanged. The two new fields are the BODY's
+    extent, and they are what `bounds` partitions on.
+
+    THEY ARE NOT THE SAME SPAN and must not be conflated. `L_body` and the
+    shroud's `L1`/`L2` are independent by decision, so the body may be
+    longer than the shroud it rides (then Xb contains the whole shroud and
+    some plain-contact pipe either side) or shorter (then part of the
+    elevated zone is in Xe). Keying Xb on the shroud would report the
+    elastic span as whatever the shroud happened to be.
+    """
+    s_body_cat: float = 0.0     # body end, catenary side (highest s)
+    s_body_ves: float = 0.0     # body end, vessel side (lowest s)
+    body_owner: str = ''
+
+    @property
+    def L_body(self) -> float:
+        return self.s_body_cat - self.s_body_ves
+
+    @property
+    def body_covers_shroud(self) -> bool:
+        """Does Xb contain the whole elevated zone? When False, some of the
+        lift is in Xe and the two regions are not "component" and "pipe"."""
+        return (self.s_body_cat >= self.s_cat_end - FLAT_TOL
+                and self.s_body_ves <= self.s_ves_end + FLAT_TOL)
+
+
+def simple_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
+    """Measure a GD-Simple, or None if this assembly is not one.
+
+    A GD-Simple is recognised by its SHAPE and never by an archetype name:
+    a body that owns the section over a span while changing it by nothing,
+    sitting on a different body that owns the contact. That is a pair of
+    facts about the built assembly, which is the same rule
+    `offset_geometry` follows and for the same reason -- `ils_builder` is
+    the author of what a component IS (G7), so a scheme read off the spec
+    would describe the component we asked for rather than the one we
+    solved.
+
+    Returns None for anything else, INCLUDING a shroud with a genuinely
+    thick body inside it. That case steps the section, so it has junctions
+    to report at and `offset_geometry`'s five regions to go with them;
+    giving it Xb/Xe as well would put one strain in two schemes and invite
+    them to disagree.
+    """
+    base = offset_geometry(ils, s_centre, OD=OD, n=n)
+    if base is None:
+        return None
+    lo_x, hi_x = ils.extent
+    OD_pipe = ils.assembly.pipe.OD_pipe if OD is None else OD
+
+    # WHERE DOES A BODY OWN THE SECTION WITHOUT CHANGING IT? Sampled, not
+    # read from the spec. `section_at` names the owner at every station and
+    # the OD it carries there; a neutral body is the span where the owner is
+    # not the bare pipe and the OD has not moved.
+    xs = [lo_x + (hi_x - lo_x) * k / (n - 1) for k in range(n)]
+    on = []
+    owners = set()
+    for k, x in enumerate(xs):
+        sec = ils.assembly.section_at(x)
+        if sec is None:
+            continue
+        own = getattr(sec, 'owner', 'pipe')
+        if own == 'pipe' or own == base.owner:
+            continue                 # bare pipe, or the shroud itself
+        if abs(getattr(sec, 'OD', OD_pipe) - OD_pipe) > 1.0e-9:
+            return None              # a STEP. That is a junction case.
+        on.append(k)
+        owners.add(own)
+    if not on or len(owners) != 1:
+        return None
+
+    # s = s_centre - x, so the lowest index is the highest s.
+    s_cat = s_centre - xs[min(on)]
+    s_ves = s_centre - xs[max(on)]
+    if s_cat - s_ves <= FLAT_TOL:
+        return None
+    return SimpleGeometry(
+        s_cat_end=base.s_cat_end, s_deep_cat=base.s_deep_cat,
+        s_deep_ves=base.s_deep_ves, s_ves_end=base.s_ves_end,
+        V=base.V, lift_max=base.lift_max, OD=base.OD, owner=base.owner,
+        s_body_cat=s_cat, s_body_ves=s_ves, body_owner=owners.pop())
 
 
 def offset_geometry(ils, s_centre, OD=None, n=N_SAMPLES):
@@ -210,6 +311,17 @@ def bounds(geom):
     """
     if geom is None:
         return []
+    if isinstance(geom, SimpleGeometry):
+        # GD-Simple. Xe appears TWICE, once each side, and that is not a
+        # bug to be tidied into one row: Xe is the complement of Xb, so it
+        # is two disjoint pieces of pipe and any single interval naming it
+        # would be a lie. `region_peaks` merges them under one name and
+        # keeps both intervals in `spans`.
+        return [
+            ('Xe', geom.s_body_cat, float('inf')),
+            ('Xb', geom.s_body_ves, geom.s_body_cat),
+            ('Xe', float('-inf'), geom.s_body_ves),
+        ]
     third = geom.L1 / 3.0
     return [
         ('X1', geom.s_deep_cat, float('inf')),
@@ -231,7 +343,10 @@ def classify(s_material, geom) -> str:
     for name, lo, hi in bounds(geom):
         if lo <= s_material < hi:
             return name
-    return 'X5'     # only reachable at -inf; keeps the function total
+    # Only reachable at exactly -inf; keeps the function total. The name has
+    # to come from the SCHEME -- returning 'X5' for a GD-Simple would put a
+    # strain in a region that case does not have.
+    return 'Xe' if isinstance(geom, SimpleGeometry) else 'X5'
 
 
 def region_of_element(s0, s1, geom) -> str:
@@ -259,10 +374,20 @@ def region_peaks(positions, problem, geom, zone_s_max, shift_of=None) -> dict:
     ends = {idx: sorted((s_of[n1], s_of[n2]))
             for (idx, n1, n2, _o, _l) in problem.elements}
 
-    out = {name: dict(peak_strain=0.0, peak_moment=0.0, s_material=0.0,
-                      s_station=0.0, step=-1, shift=0.0, n_elements=0,
-                      s_lo=lo, s_hi=hi)
-           for name, lo, hi in bounds(geom)}
+    # BUILT BY MERGING, because a region may be more than one interval:
+    # GD-Simple's Xe is the pipe either side of the body, two disjoint
+    # pieces under one name. `spans` keeps them exactly; `s_lo`/`s_hi` are
+    # the outer envelope, which for Xe is the whole model and is written
+    # EMPTY by `case_columns` rather than as a misleading pair of numbers.
+    out = {}
+    for name, lo, hi in bounds(geom):
+        r = out.setdefault(name, dict(
+            peak_strain=0.0, peak_moment=0.0, s_material=0.0,
+            s_station=0.0, step=-1, shift=0.0, n_elements=0, spans=()))
+        r['spans'] = r['spans'] + ((lo, hi),)
+    for r in out.values():
+        r['s_lo'] = min(lo for lo, _hi in r['spans'])
+        r['s_hi'] = max(hi for _lo, hi in r['spans'])
     # Element counts come off the GEOMETRY, once. Counting them inside the
     # position loop would count an element as often as it is inside the
     # band, which varies with the shift and is not a property of the region.
@@ -307,10 +432,22 @@ def region_peaks(positions, problem, geom, zone_s_max, shift_of=None) -> dict:
     for r in out.values():
         r['measured'] = r['n_elements'] > 0 and r['step'] >= 0
 
-    x2r = out.get('X2', {})
-    x2 = x2r.get('peak_strain', 0.0) if x2r.get('measured') else 0.0
+    # THE GOVERNING REGION, whose peak every other region is quoted against.
+    # X2 in the five-region scheme; Xb in GD-Simple's, where the body is the
+    # whole point of the component and the pipe outside it is the reference
+    # condition. Named per scheme rather than hard-coded, because quoting a
+    # GD-Simple against a region it has no X2 for would divide by zero and
+    # report 0.0 for every region at once.
+    ref_name = 'Xb' if isinstance(geom, SimpleGeometry) else 'X2'
+    refr = out.get(ref_name, {})
+    ref = refr.get('peak_strain', 0.0) if refr.get('measured') else 0.0
     for r in out.values():
-        r['frac_of_x2'] = (r['peak_strain'] / x2) if x2 > 0 else 0.0
+        # KEY NAMED FOR THE FIVE-REGION SCHEME, VALUE GOVERNED BY WHICHEVER
+        # SCHEME IS IN FORCE. The key stays `frac_of_x2` because it is part
+        # of this dict's contract and callers build the shape by hand; what
+        # `ref_name` changes is the DENOMINATOR, and `case_columns` emits it
+        # under a column named for the region it divided by.
+        r['frac_of_x2'] = (r['peak_strain'] / ref) if ref > 0 else 0.0
         # X1 and X5 each lump together a TAPER and the plain pipe beyond it.
         # The reference calls both "governed by the plain-pipe catenary",
         # and at its own 2xOD mesh that holds. Refined, it does not: the
@@ -392,10 +529,18 @@ def case_columns(geom, peaks) -> dict:
     """
     if geom is None:
         return {}
-    out = dict(region_scheme='X1-X5/offset', offset_L1=geom.L1,
+    simple = isinstance(geom, SimpleGeometry)
+    out = dict(region_scheme='Xb-Xe/simple' if simple else 'X1-X5/offset',
+               offset_L1=geom.L1,
                offset_L2=0.5 * (geom.L2_cat + geom.L2_ves),
                offset_L2_cat=geom.L2_cat, offset_L2_ves=geom.L2_ves,
                offset_V=geom.V, offset_owner=geom.owner)
+    if simple:
+        # The SHROUD columns above still describe the shroud. These describe
+        # the body, which is a different span and the one Xb is drawn on.
+        out.update(body_L=geom.L_body, body_owner=geom.body_owner,
+                   body_s_cat=geom.s_body_cat, body_s_ves=geom.s_body_ves,
+                   body_covers_shroud=geom.body_covers_shroud)
     for name, r in peaks.items():
         k = name.lower()
         out[f'{k}_peak_strain'] = r['peak_strain']
@@ -404,7 +549,13 @@ def case_columns(geom, peaks) -> dict:
         out[f'{k}_peak_strain_step'] = r['step']
         out[f'{k}_peak_strain_shift'] = r['shift']
         out[f'{k}_peak_moment'] = r['peak_moment']
-        out[f'{k}_frac_of_x2'] = r['frac_of_x2']
+        # `frac_of_x2` only where there IS an X2. GD-Simple quotes against
+        # Xb, and writing that under a column named for X2 would mislabel
+        # the denominator in the artifact itself.
+        if simple:
+            out[f'{k}_frac_of_xb'] = r['frac_of_x2']
+        else:
+            out[f'{k}_frac_of_x2'] = r['frac_of_x2']
         out[f'{k}_peak_on_shroud'] = r['peak_on_shroud']
         # X1 and X5 are unbounded on their outer side. Written EMPTY rather
         # than as `inf`: a blank is a value a reader will not average, and

@@ -340,6 +340,33 @@ def buffer_span(scene) -> tuple:
     return (min(scene.extent), min(st.s_arc for st in scene.stations))
 
 
+def with_buffer(scene, problem_kw=None, **more) -> dict:
+    """`problem_kw` with the buffer's support and elastic span ADDED.
+
+    THE BUFFER IS NOT AN ALTERNATIVE TO WHAT THE CALLER WANTS, it is in
+    addition to it, and this function exists because expressing that as
+    `setdefault` got it exactly backwards for four months (L109). Feedstock
+    that is allowed to yield forms a plastic hinge in pipe which is not part
+    of the answer, and in mode A the chained state carries that hinge into
+    every later position.
+
+    Idempotent and order-free: spans are de-duplicated, so calling it twice,
+    or passing the buffer span yourself, adds nothing the second time. Use
+    it from EVERY site that poses a problem for this scene -- the solve and
+    the reporting re-pose alike, or `differs_only_in_contact` will rightly
+    say the two are not the same problem.
+    """
+    out = dict(problem_kw or {})
+    out.update(more)
+    lo, hi = buffer_span(scene)
+    if hi > lo + 1e-9:
+        out['vertical_at'] = tuple(dict.fromkeys(
+            (*out.get('vertical_at', ()), lo)))
+        out['elastic_spans'] = tuple(dict.fromkeys(
+            (*(tuple(z) for z in out.get('elastic_spans', ())), (lo, hi))))
+    return out
+
+
 def check_reach(scene, total: float) -> None:
     """Refuse a sweep the model cannot feed.
 
@@ -478,10 +505,17 @@ def run(scene, ils=None, *, L_comp=0.0, step=None,
     problem_kw['s_centre'] = s_centre
 
     # The buffer supports itself and stays elastic, for the whole passage.
-    lo, hi = buffer_span(scene)
-    if hi > lo + 1e-9:
-        problem_kw.setdefault('vertical_at', (lo,))
-        problem_kw.setdefault('elastic_spans', ((lo, hi),))
+    #
+    # ADDED TO WHAT THE CALLER ASKED FOR, NOT `setdefault`ed OVER IT (L109).
+    # Until 8 Oct these were two `setdefault` calls, which read as "the
+    # buffer unless the caller has an opinion" -- and the two are not
+    # alternatives. A caller with its own elastic span (GD-Simple's body is
+    # the first) would REPLACE the buffer's, and the buffer is feedstock:
+    # once it can yield, a plastic hinge forms in pipe that is not part of
+    # the answer and mode A carries it forward into every later position.
+    # Silently, because a buffer hinge shows up as a slightly different
+    # number downstream and never as a failure.
+    problem_kw = with_buffer(scene, problem_kw)
 
     # `s_centre` is a MATERIAL coordinate and does not move with the sweep.
     # The component stays where it is in the pipe; `shift` is what carries

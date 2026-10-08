@@ -71,32 +71,85 @@ class ElementSection:
 
 def bind_sections(model, assembly=None, s_centre: float = 0.0,
                   OD: float = None, t_wall: float = None,
-                  E: float = None) -> dict:
+                  E: float = None, E_by_owner=None) -> dict:
     """{element index -> ElementSection} for every non-connector element.
 
     `assembly` is needed only where an element declares `'section_at'`; a
     model with no such element resolves without one.
+
+    `E_by_owner` GIVES ONE BODY ITS OWN MODULUS, keyed on the element
+    `owner` tag, and leaves every other element on the base `E`. GD-Simple
+    is what needs it: a bounded span carrying the PIPELINE's section whose
+    modulus is the free parameter of the study, so there is no section
+    difference to carry the stiffness and nothing else in this module that
+    could. A declared section states OD and wall and says nothing about
+    what it is made of.
+
+    IT IS NOT `stiffness_ratio`, and the distinction is the whole reason
+    this argument exists rather than reusing that one. A ratio scales EA and
+    EI together on an unchanged YIELD SURFACE -- fine for a structural
+    member that is only ever a stiffness, wrong for a body whose modulus
+    moves while its steel stays the same strength, because the yield strain
+    would move with it. GD-Simple is sound only because it is also forced
+    elastic (`Problem.elastic_spans`), where there is no yield surface left
+    to be inconsistent with. Supplying an override for an element that
+    carries a ratio is therefore refused outright rather than multiplied.
     """
     OD = config.OD_PIPE_DEF if OD is None else OD
     t_wall = config.T_WALL_DEF if t_wall is None else t_wall
     E = config.STEEL_E if E is None else E
+    E_by_owner = dict(E_by_owner or {})
+    for owner, E_own in E_by_owner.items():
+        if not E_own > 0.0:
+            raise ValueError(
+                f'E_by_owner[{owner!r}] = {E_own!r}: a modulus must be '
+                'positive.')
 
     at = {n.index: n for n in model.nodes}
+    # EVERY OVERRIDE MUST LAND ON SOMETHING. A key that matches no element
+    # is a typo, a renamed component `id`, or a body that did not make it
+    # into this model -- and all three fail by giving the body the
+    # pipeline's modulus, which is a plausible answer to a question nobody
+    # asked. Collected here and refused below, after the loop, so the error
+    # can name what the model actually holds.
+    used = set()
+
+    def modulus(owner, e) -> float:
+        if owner not in E_by_owner:
+            return E
+        if e.stiffness_ratio is not None:
+            raise ValueError(
+                f'element {e.index} ({e.line_id}) is owned by {owner!r}, '
+                f'which E_by_owner gives an explicit modulus, AND declares '
+                f'stiffness_ratio={e.stiffness_ratio}. Those are two ways '
+                f'of saying the same thing and multiplying them would be a '
+                f'guess -- a ratio is a stiffness relative to plain pipe, '
+                f'an explicit E is a material property. Pick one.')
+        used.add(owner)
+        return E_by_owner[owner]
+
     out = {}
     for e in model.elements:
         if e.connector is not None:
             continue                       # prescribed, not sectioned
         if e.section is not None:
+            owner = getattr(e.section, 'owner', e.owner)
+            # KEYED ON THE ELEMENT's owner, not the section's. A declared
+            # section may carry its own owner tag for reporting, but the
+            # modulus belongs to the body that owns the STEEL, which is the
+            # element. They agree for GD-Simple; where they do not, the
+            # element is the one the override is written against.
             out[e.index] = ElementSection(
-                e.index, e.section.OD, e.section.t, E,
-                getattr(e.section, 'owner', e.owner), 'declared')
+                e.index, e.section.OD, e.section.t,
+                modulus(e.owner, e), owner, 'declared')
         elif e.stiffness_ratio is not None:
             # Same section, scaled modulus. EA and EI scale together, which
             # is what "a multiple of a plain pipe element of the same length"
             # means -- so it is NOT a thicker pipe, and reporting it as one
             # would put the wrong fibre distance on every stress it produces.
             out[e.index] = ElementSection(
-                e.index, OD, t_wall, e.stiffness_ratio * E, e.owner,
+                e.index, OD, t_wall,
+                e.stiffness_ratio * modulus(e.owner, e), e.owner,
                 'ratio', ratio=e.stiffness_ratio)
         elif e.stiffness_rule == 'section_at':
             if assembly is None:
@@ -109,10 +162,23 @@ def bind_sections(model, assembly=None, s_centre: float = 0.0,
             x_local = s_centre - 0.5 * (a.s + b.s)
             sec = assembly.section_at(x_local)
             out[e.index] = ElementSection(
-                e.index, sec.OD, sec.t, E, sec.owner, 'section_at')
+                e.index, sec.OD, sec.t, modulus(e.owner, e), sec.owner,
+                'section_at')
         else:
-            out[e.index] = ElementSection(e.index, OD, t_wall, E, 'pipe',
+            out[e.index] = ElementSection(e.index, OD, t_wall,
+                                          modulus(e.owner, e), 'pipe',
                                           'pipe')
+
+    missed = sorted(set(E_by_owner) - used)
+    if missed:
+        have = sorted({e.owner for e in model.elements
+                       if e.connector is None})
+        raise ValueError(
+            f'E_by_owner names {missed} and no element is owned by any of '
+            f'them. This model holds {have}. An override that matches '
+            f'nothing leaves the body on the pipeline modulus and reports '
+            f'a number for the wrong material, so it is refused rather '
+            f'than ignored.')
     return out
 
 

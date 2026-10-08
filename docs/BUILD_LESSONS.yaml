@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 108
+# entries: 110
 
 - id: L001
   area: kernel
@@ -2730,3 +2730,116 @@
   detect: test_a_flag_matches_whatever_case_it_is_written_in, test_the_flags_the_shroud_RUNNERS_ACTUALLY_PASS_are_picked_up, test_every_component_dimension_has_a_flag_that_round_trips
   refs: [tools/emit_profile.py, rebuild/tests/test_emit_profile_cli.py]
   date: 2026-10-07
+
+- id: L109
+  area: solve
+  class: defect
+  symptom: >-
+    `sweep.run` forced the feedstock buffer elastic and supported with two
+    `setdefault` calls on `problem_kw`. A caller passing its own
+    `elastic_spans` therefore REPLACED the buffer's span rather than adding
+    to it, and the buffer became plastic. Latent until 8 Oct 2026, because
+    no caller had ever passed one -- GD-Simple's elastic body is the first.
+  cause: >-
+    `setdefault` reads as "the buffer unless the caller has an opinion", and
+    the buffer is not an alternative to anything the caller wants: it is 20 m
+    of feedstock that is not part of the answer. Four tools re-posed the same
+    problem for reporting with the same two values hard-coded, so the same
+    assumption was made in five places and could be broken in five places.
+  cause_detail: >-
+    WHAT IT WOULD HAVE COST, had it fired: a plastic hinge in the buffer,
+    carried forward by mode A's chained state into every later position, and
+    visible nowhere. `sweep`'s own docstring already said why the buffer must
+    stay elastic -- "a plastic hinge in the buffer would be carried forward
+    into every later position by the chained state" -- so the requirement was
+    written down correctly and implemented in a way that could silently drop
+    it. It would also have broken the reporting re-pose against the solve:
+    `differs_only_in_contact` compares `elastic_spans`, so the two would
+    rightly be judged different problems.
+  rule: >-
+    THE BUFFER IS ADDED, NEVER DEFAULTED. `sweep.with_buffer(scene,
+    problem_kw, **more)` is now the single place both values are merged --
+    spans de-duplicated, so it is idempotent and order-free -- and every site
+    that poses a problem for a scene goes through it: `sweep.run` and the
+    four reporting re-poses in `slide.py`, `emit_profile.py` and
+    `plot_stinger.py` (twice). `emit_profile.emit` gained one `problem_kw`
+    passthrough reaching BOTH its sweep and its re-pose, because handing the
+    two different spans or different moduli makes them different problems.
+    Generally: where a driver adds something the physics requires, merge it
+    with what the caller asked for; `setdefault` silently makes the two
+    alternatives.
+  detect: test_with_buffer_ADDS_the_buffer_span_instead_of_replacing_it, test_with_buffer_is_idempotent_and_order_free, test_the_kernel_gets_THREE_materials_the_body_elastic_at_its_own_E
+  refs: [rebuild/slay/study/sweep.py, tools/slide.py, tools/emit_profile.py, tools/plot_stinger.py, rebuild/tests/test_simple_component.py]
+  date: 2026-10-08
+
+- id: L110
+  area: model
+  class: ruling
+  symptom: >-
+    GD-Simple was specified as a new component type -- an elastic pipe body
+    of the pipeline's own section, with a free modulus, over an offset
+    shroud -- and "ils_builder needs to include this component". It cannot,
+    here.
+  cause: >-
+    `component_spec.py`, `ils_builder.py` AND
+    `fixtures/standard_ils_layouts.json` are all mirrored from
+    Slay-ILS-Designer-V1.0 and hashed in `fixtures/mirror_provenance.json`
+    (G7). A new component class, a new builder branch and a new archetype in
+    the fixture are each a guardrail violation, caught by
+    `test_config_ownership.py`. The fixture being mirrored DATA is the part
+    easy to miss: adding an archetype looks like configuration, not code.
+  rule: >-
+    GD-SIMPLE IS A COMPOSITE DECLARED IN `slay/define/simple.py`, out of two
+    codes the mirror already has, handed to the mirrored builder. No mirrored
+    file is touched and `ils_builder` stays the author of what a component
+    IS. The pipe body is a NEUTRAL GD-TP -- `t_comp == t_pipe` exactly, which
+    `ThickPipeBody.validate` was relaxed from `>` to `>=` on 5 Sep 2026
+    expressly to allow: "EQUAL is now legal and means a NEUTRAL section". It
+    owns the section over its span without stepping it, which is what gives
+    the body an `owner` tag for the modulus and an extent for the regions.
+    Ownership must be LOWEST, not STRICT, since body and shroud both claim
+    contact where they overlap.
+  rule_detail: >-
+    THE TWO HALVES GD-SIMPLE NEEDS ARE NOT IN THE MIRROR AND MUST NOT BE
+    FAKED WITH `stiffness_ratio`. A ratio scales EA and EI together on an
+    UNCHANGED yield surface -- right for a structural member that is only
+    ever a stiffness, wrong for a body whose modulus moves while its steel
+    keeps its strength, because the yield STRAIN would move with it. So the
+    modulus is a per-owner override in `physics.sections` (`E_by_owner`) and
+    the constitutive law comes from `Problem.elastic_spans`, which the kernel
+    already keys materials by -- `(E, elastic)` -- so NO kernel change was
+    needed and G6 stands. Supplying both a ratio and an explicit modulus for
+    one owner is refused rather than multiplied, and an override matching no
+    element is refused rather than ignored: it would otherwise leave the body
+    on the pipeline modulus and report a number for the wrong material.
+  rule_detail_2: >-
+    THE REGION SCHEME IS Xb / Xe AND IT IS DRAWN ON THE BODY, NOT THE SHROUD.
+    `L_body` and the shroud's `L1`/`L2` are independent by decision, so
+    keying Xb on the shroud would report the elastic span as whatever the
+    shroud happened to be. `SimpleGeometry` subclasses `OffsetGeometry` so
+    the inherited four `s_*` fields stay the SHROUD footprint that
+    `body_peaks` and the `peak_on_shroud` column already read, and only
+    `bounds` differs. Xe appears TWICE in that partition, once each side, and
+    is kept that way: it is the complement of Xb, so no single interval names
+    it and `region_peaks` carries both in `spans`. `body_covers_shroud` says
+    whether Xb contains the whole elevated zone; FALSE means part of the lift
+    is in Xe and the two regions are no longer "component" and "pipeline".
+  rule_detail_3: >-
+    THE CONTROL IS E = STEEL_E AT A RADIUS THAT DOES NOT YIELD, and the
+    obvious control is wrong. At the pipeline's own modulus the body differs
+    from plain pipe in one way only -- it cannot yield -- so where nothing
+    yields it must vanish: measured Xb 0.2031% against Xe 0.2031%, ratio
+    1.000, at R = 250 m. The SAME case at R = 85 m gives Xb 0.3161% against
+    Xe 1.1110%, ratio 0.285, and that is a RESULT and not a defect: the pipe
+    either side is plastic at 1.1% with its tangent collapsed to E*H/(E+H),
+    while the body stays on the full 210 GPa, becomes the far stiffer member,
+    takes more moment (1451 against 1361 kN.m) and sheds curvature outboard.
+    A bare shroud of the same V, L1 and L2 peaks at 0.8223%, so inserting a
+    non-yielding body of the pipeline's OWN section makes the adjacent pipe
+    35% worse. Xb < Xe is therefore the normal reading once the line is
+    plastic. `tools/study_simple.py` said the opposite when first written and
+    was corrected the same day; a docstring that calls a real result a defect
+    is worse than no docstring.
+  detect: test_the_body_carries_the_PIPELINE_section_and_steps_nothing, test_at_E_equal_to_the_pipeline_and_no_yielding_the_body_vanishes, test_a_shroud_with_a_THICK_body_in_it_is_not_a_GD_Simple, test_an_override_that_matches_no_element_is_REFUSED_not_ignored
+  refs: [rebuild/slay/define/simple.py, rebuild/slay/physics/sections.py, rebuild/slay/report/regions.py, tools/study_simple.py, rebuild/tests/test_simple_component.py]
+  date: 2026-10-08
