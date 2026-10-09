@@ -1,0 +1,134 @@
+P_v SWEEP on EA-SB F2 Case 2 -- does the +8% bias track the lift?
+==================================================================
+
+NOT VALIDATION. Paper 2 publishes P_v = 2 D only. Every other row here is a
+PREDICTION on both sides, and the comparison being made is internal: the
+simplified model against the full model of the same layout, not either
+against the paper.
+
+THE QUESTION. The EA-SB family biases +8.4% high and does so with one sign
+across all three published cases. Of the two candidate mechanisms left
+standing after L113 was withdrawn, both are about how roller load reaches
+the pipe -- continuously along a clamped shroud in the stand-in, through two
+connectors in the real frame. If the offset DEPTH is what sets the size of
+that error, the bias must move when the depth moves. This sweep moves it.
+
+ONE PARAMETER MOVES. Case 2's layout is held exactly -- P_l1 = 10 D,
+P_l2 = 2.5 D, P_c1 = 10 D, kB = 3.1, F2 connectors -- and only `P_v` runs
+from 1 D to 4 D. P_v is measured from the pipe CENTRELINE, so the lift the
+pipe actually gets is `P_v - OD/2`: 0.5 D to 3.5 D, a factor of seven.
+4 D is `BaseStructure`'s shipped default and 2 D is the published case.
+
+FOUR RUNS PER ROW, not two:
+  - `tools/stiffness_rig.py` on the real ILS          -> EI_eq, E_eq
+  - the contact profile on the real ILS               -> V, L1, L2
+  - the real ILS-EASB through a full passage          -> X_c, X_i, X_e
+  - the GD-Simple stand-in through a full passage     -> Xb, Xe
+
+The real side goes through `study_easb_cases.run_case` UNCHANGED, not a copy
+of it, so the reference column is the same code path Sec. 5's table came
+from.
+
+THE MEASUREMENTS
+----------------
+R = 85 m, 9 m spacing, 100 MT, step 1 x OD, mesh ruled 2 x OD.
+
+ P_v/D  lift/D   L_span  EI/EIp    E_eq       lin      bnd     ctrl    L1/D  L2/D   tot/D
+   1.0     0.5   4.0640   7.177   1507G   +0.043%  -0.000% +0.0000%   9.996 1.249  12.494
+   1.5     1.0   4.0640   7.675   1612G   +0.033%  -0.000% +0.0000%   9.996 1.665  13.327
+   2.0     1.5   4.0640   7.870   1653G   +0.026%  -0.000% +0.0000%   9.996 1.875  13.747
+   2.5     2.0   4.0640   7.913   1662G   +0.021%  -0.000% +0.0000%   9.996 1.999  13.995
+   3.0     2.5   4.0640   7.881   1655G   +0.018%  -0.000% +0.0000%   9.996 2.082  14.160
+   4.0     3.5   4.0640   7.725   1622G   +0.014%  -0.000% +0.0000%   9.996 2.187  14.370
+
+All three rig checks clean on every row: linearity under +0.05%, boundary
+exact to the printed digits, plain-pipe control +0.0000%. The two tapers are
+symmetric in every row (L2 catenary side = L2 vessel side to six decimals),
+so one L2 is reported.
+
+THE FRAME STIFFNESS IS NOT MONOTONIC IN P_v, which the rig found without
+being asked. It peaks at P_v = 2.5 D (7.913 x EI_pipe) and falls off BOTH
+ways -- 7.177 at 1 D, 7.725 at 4 D. The span is 4.0640 m throughout and kB
+is 3.1 throughout, so this is geometry: the taper is fixed at P_l2 = 2.5 D
+while the depth it has to climb grows, and past about 2.5 D the frame is
+paying more in taper angle than it gains in depth. The range is only +10%
+low-to-peak, which matters for reading the result below -- the stiffness is
+very nearly a constant across this sweep while the lift changes sevenfold.
+
+THE LIFTED FOOTPRINT GROWS AND THE TAPER GROWS FASTER. L1 is the component's
+own deep length and does not move (9.996 D). L2 is measured off the contact
+profile, not assumed, and it runs 1.249 -> 2.187 D, a 75% increase, because
+a deeper offset takes longer to come back down to the arc. Total footprint
+12.494 -> 14.370 D. `body_covers_shroud` is FALSE in all six: the stiffened
+span is 10 D and the lifted footprint is 12.5 to 14.4 D.
+
+THE RESULTS
+-----------
+ALL SIX SWEEP 100% OF THEIR TRAVEL, on both the real and the simplified
+side.
+
+ P_v/D  lift/D | real X_c  real X_i  real X_e |  sim Xb   sim Xe  sim peak |  ratio
+   1.0     0.5 |   1.305%   0.1131%    0.584% | 0.0465%  1.3809%   1.3809% | 105.8%
+   1.5     1.0 |   1.652%   0.1145%    0.738% | 0.0452%  1.7567%   1.7567% | 106.3%
+   2.0     1.5 |   2.053%   0.1167%    0.828% | 0.0444%  2.1854%   2.1854% | 106.4%
+   2.5     2.0 |   2.462%   0.1192%    0.917% | 0.0453%  2.6098%   2.6098% | 106.0%
+   3.0     2.5 |   2.800%   0.1203%    1.001% | 0.0457%  2.9675%   2.9675% | 106.0%
+   4.0     3.5 |   3.390%   0.1244%    1.164% | 0.0468%  3.5864%   3.5864% | 105.8%
+
+`ratio` is the simplified peak against the real model's X_c, which is the
+real peak in all six. The simplified peak is in Xe in all six -- the
+simplified model has no connector, so it has no X_c to put a peak in; that
+is the comparison Sec. 6 has used throughout and it is not changed here.
+
+THE BIAS IS FLAT. +5.8% to +6.4%, a band of 0.6 POINTS, across a sevenfold
+change in lift. Meanwhile the thing being predicted moves by a factor of
+2.60: real X_c 1.305% -> 3.390%, simplified peak 1.3809% -> 3.5864%, and the
+two multiply by 2.597 and 2.597 respectively. The reduction tracks a 160%
+change in the answer and keeps its error constant to within half a point.
+
+WHAT THIS RULES OUT. Any mechanism whose magnitude scales with the offset
+depth, with the lift, with the taper severity, or with the lifted footprint.
+All four change substantially over this sweep -- lift 7x, taper footprint
++75%, total footprint +15% -- and the bias does not move. In particular the
+contact geometry over the lifted span cannot be the driver: a flat standing
+in for a cylinder is a fixed geometric difference, but its CONSEQUENCE would
+have to grow with how much of the pipe is sitting on it, and it does not.
+
+WHAT THIS DOES NOT TOUCH. Both surviving candidates are about WHERE load
+enters the pipe, not how deep the structure is, and neither predicts any
+dependence on P_v:
+
+  THE LOAD PATH. The real roller bears on the frame and reaches the pipe at
+  two connectors; the stand-in's shroud is clamped and transfers
+  continuously over 12.5 to 14.4 D. That difference exists in full at every
+  P_v in this table. A flat bias is CONSISTENT with it and is not evidence
+  for it.
+
+  THE STIFFENED SPAN. The reduction stiffens between the connectors only.
+  Whether a base bearing along its whole length also puts bending stiffness
+  into the pipe outside that span is untested, and nothing here tests it.
+
+Testing either one needs the span or the attachment changed, not the depth.
+`P_c1` against `P_l1` is the sweep that separates them and it has not been
+run.
+
+A SECOND, SMALLER READING. X_i -- the pipe between the two connectors,
+shielded by the frame spanning over it -- moves +10% (0.1131% -> 0.1244%)
+while X_c moves +160%. The interior is almost indifferent to how deep the
+structure is, which is what "shielded" should mean and is the first time it
+has been measured across a depth range.
+
+CONTROL
+-------
+P_v = 2 D reproduces the published Case 2 row on all four numbers already on
+record: EI/EIp 7.870, E_eq 1653 G, real X_c 2.053%, simplified Xe 2.1855%.
+
+The simplified figure prints 2.1854 here against 2.1855 on record, and the
+difference is the INPUTS, not the code. The recorded row was run from the
+measurement table's printed values (E = 1653 GPa, L1 = 9.996 D, L2 = 1.875 D);
+this sweep feeds the measurement's own floats through. Run both ways on this
+build: rounded inputs 2.185482%, measured floats 2.185435%, a difference of
+4.7e-5 percentage points, with E low by 0.386 GPa and L1 and L2 rounded up
+by 2.5e-4 and 4.7e-4 D. `sweep.repose` landed one commit before this sweep
+and a refactor of a re-pose can move a number quietly, so it was ruled out
+rather than assumed.

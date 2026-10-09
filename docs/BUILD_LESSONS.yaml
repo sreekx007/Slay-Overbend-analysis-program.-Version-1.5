@@ -3233,3 +3233,72 @@
   detect: test_every_published_archetype_builds, test_a_dimension_goes_to_the_component_that_HAS_it, test_a_dimension_no_component_carries_is_refused, test_the_fixture_is_read_per_call_not_cached
   refs: [rebuild/slay/define/archetypes.py, tools/plot_stinger.py, tools/emit_profile.py, tools/simplify_ils.py, rebuild/tests/test_simplify.py, docs/TOOLCHAIN.md]
   date: 2026-10-09
+
+- id: L118
+  area: measure
+  class: finding
+  symptom: >-
+    The EA-SB family's simplified models bias +8.4% high with ONE SIGN across
+    all three published cases, and after L113 was withdrawn the two surviving
+    candidates were both about the load path. Neither had been tested, and a
+    third possibility had not even been stated: that the error scales with
+    how deep the structure holds the pipe.
+  cause: >-
+    It does not. `P_v` swept 1 D to 4 D on F2 Case 2 -- a SEVENFOLD change in
+    lift, 0.5 D to 3.5 D, with `P_l1`, `P_l2`, `P_c1`, `kB` and the
+    connection system all held exactly -- moves the bias from +5.8% to +6.4%
+    and no further. Band 0.6 POINTS. Over the same sweep the quantity being
+    predicted moves by a FACTOR OF 2.60: real X_c 1.305% to 3.390%,
+    simplified peak 1.3809% to 3.5864%, multiplying by 2.598 and 2.597.
+  cause_detail: >-
+    WHAT THAT ELIMINATES is any mechanism whose magnitude scales with the
+    offset depth, the lift, the taper severity or the lifted footprint. All
+    four move substantially across the sweep -- lift x7, taper footprint
+    `L2` 1.249 to 2.187 D (+75%), total footprint 12.494 to 14.370 D -- and
+    the bias does not. The contact geometry over the lifted span is
+    specifically ruled out: a flat standing in for a cylinder is a FIXED
+    geometric difference, but its consequence would have to grow with how
+    much pipe is sitting on it, and it does not.
+  cause_detail_2: >-
+    WHAT IT DOES NOT TOUCH is either surviving candidate, and this is the
+    part to be careful with. The load path (continuous transfer along a
+    clamped shroud against two discrete connectors) and the stiffened span
+    (between the connectors only, against a base bearing along its whole
+    length) are both about WHERE load enters the pipe. Neither predicts any
+    `P_v` dependence, so a flat bias is CONSISTENT WITH them and is not
+    EVIDENCE FOR them. Separating those two needs `P_c1` swept against
+    `P_l1`; it has not been run.
+  rule: >-
+    A characterisation sweep moves ONE parameter and runs BOTH models at
+    every point. Four runs per row here -- the stiffness rig and the contact
+    profile on the real ILS, then a full passage on each of the real and the
+    simplified model -- and the real side goes through
+    `study_easb_cases.run_case` UNCHANGED rather than a copy, so the
+    reference column is the same code path Sec. 5's table was produced by.
+    The published point is included as a CONTROL, not skipped as already
+    known.
+  rule_detail: >-
+    TWO SIDE FINDINGS, both from instruments that were not asked the
+    question. The rig reads the frame stiffness as NOT MONOTONIC in `P_v`:
+    it peaks at 2.5 D (7.913 x EI_pipe) and falls off both ways, 7.177 at
+    1 D and 7.725 at 4 D, because `P_l2` is fixed at 2.5 D while the depth
+    the taper must climb grows -- past about 2.5 D the frame pays more in
+    taper angle than it gains in depth. The range is only +10%
+    low-to-peak, which is what makes the table readable as a lift sweep at
+    near-constant stiffness. Separately X_i moves +10% while X_c moves
+    +160%, so the pipe between the connectors is nearly indifferent to the
+    structure's depth -- what "shielded by the frame" should mean, measured
+    across a depth range for the first time.
+  rule_detail_2: >-
+    THE CONTROL'S LAST DIGIT WAS CHASED RATHER THAN WAVED THROUGH. The 2 D
+    row printed a simplified 2.1854% against 2.1855% on record. It is the
+    INPUTS: the recorded row was run from the measurement table's PRINTED
+    values (E = 1653 GPa, L1 = 9.996 D, L2 = 1.875 D), the sweep from the
+    measurement's own floats. Run both ways on this build -- rounded
+    2.185482%, measured 2.185435%, 4.7e-5 points apart, with E low by 0.386
+    GPa. `sweep.repose` (L116) had landed one commit earlier and a re-pose
+    refactor is exactly the kind that can move a number without failing
+    anything, so it was ruled out by measurement rather than by argument.
+  detect: docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt
+  refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt, tools/study_easb_cases.py, tools/stiffness_rig.py, rebuild/slay/define/simple.py]
+  date: 2026-10-09

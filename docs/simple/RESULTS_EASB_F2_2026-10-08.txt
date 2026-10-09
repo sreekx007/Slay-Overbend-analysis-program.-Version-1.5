@@ -76,3 +76,11 @@ WHAT IS LEFT, stated as candidates and not as findings:
 
 Both are testable and neither has been tested. Nothing in this file should be
 read as explaining the EA-SB offset.
+
+ADDED 9 Oct 2026. A THIRD candidate -- that the error scales with how deep
+the structure holds the pipe -- has since been tested on Case 2 and
+ELIMINATED: `P_v` swept 1 D to 4 D, a sevenfold change in lift, moves the
+bias from +5.8% to +6.4% while the quantity predicted moves by a factor of
+2.60. See `RESULTS_EASB_PV_SWEEP_2026-10-09.txt`. The two candidates above
+are untouched by it -- neither predicts a `P_v` dependence -- and both are
+still untested.

@@ -1306,17 +1306,89 @@ from GD-TP's −2.2%.** One mechanism in the shroud cannot be negative in one
 family and positive in another. Recorded as withdrawn in L113 rather than
 quietly dropped; L114 carries what replaced it.
 
-**Two candidates remain, both untested, neither to be cited as a cause.**
-*The load path*, which differs only for EA-SB: the real roller bears on the
-**frame** and reaches the pipe only at the two connectors, while the stand-in's
-shroud is clamped to the pipe and transfers roller load **continuously** over
-13.7 D. *The stiffened span*: the reduction stiffens only between the
-connectors, which is right for a structure attached at two points and is not
-established for a base bearing along its whole length.
+**Two candidates remain, neither to be cited as a cause.** *The load path*,
+which differs only for EA-SB: the real roller bears on the **frame** and
+reaches the pipe only at the two connectors, while the stand-in's shroud is
+clamped to the pipe and transfers roller load **continuously** over 13.7 D.
+*The stiffened span*: the reduction stiffens only between the connectors,
+which is right for a structure attached at two points and is not established
+for a base bearing along its whole length. **A third candidate has now been
+tested and eliminated** — the offset depth — in the sweep below.
 
 **What is usable now** is the per-family correction, and the two go opposite
 ways: a simplified **GD-TP** peak runs about **2% low**, a simplified
 **EA-SB** peak about **8% high**, and **EA-ST** needs none.
+
+### The P_v sweep — the lift is not the mechanism
+
+**Prediction on both sides but one.** Paper 2 publishes `P_v = 2 D` only, so
+every other row is a prediction of the full model as much as of the simplified
+one. The comparison is internal and that is the point: it asks whether the
+**size of the reduction's error** depends on how deep the structure is.
+
+Case 2's layout is held exactly — `P_l1 = 10 D`, `P_l2 = 2.5 D`,
+`P_c1 = 10 D`, `kB = 3.1`, F2 — and only `P_v` moves, 1 D to 4 D. `P_v` is
+measured from the pipe **centreline**, so the lift is `P_v − OD/2`: **0.5 D to
+3.5 D, a factor of seven.** `BaseStructure`'s shipped default is the 4 D row;
+the published case is the 2 D row. Four runs per row — the stiffness rig and
+the contact profile on the real ILS, then a full passage on each of the real
+and the simplified model. The real side goes through
+`study_easb_cases.run_case` unchanged, so the reference column is the code
+path §5's table came from. All twelve passages complete 100% of their travel.
+
+| `P_v`/D | lift/D | EI/EI<sub>p</sub> | `E_eq` | real X_c | real X_i | real X_e | sim Xb | sim Xe | **ratio** |
+|---|---|---|---|---|---|---|---|---|---|
+| 1.0 | 0.5 | 7.177 | 1507 G | 1.305% | 0.1131% | 0.584% | 0.0465% | 1.3809% | **105.8%** |
+| 1.5 | 1.0 | 7.675 | 1612 G | 1.652% | 0.1145% | 0.738% | 0.0452% | 1.7567% | **106.3%** |
+| **2.0** | **1.5** | **7.870** | **1653 G** | **2.053%** | 0.1167% | 0.828% | 0.0444% | **2.1854%** | **106.4%** |
+| 2.5 | 2.0 | 7.913 | 1662 G | 2.462% | 0.1192% | 0.917% | 0.0453% | 2.6098% | **106.0%** |
+| 3.0 | 2.5 | 7.881 | 1655 G | 2.800% | 0.1203% | 1.001% | 0.0457% | 2.9675% | **106.0%** |
+| 4.0 | 3.5 | 7.725 | 1622 G | 3.390% | 0.1244% | 1.164% | 0.0468% | 3.5864% | **105.8%** |
+
+*(Bold row = the published case, reproduced as a control. Rig checks clean on
+every row: linearity under +0.05%, boundary exact, plain-pipe control
++0.0000%. `body_covers_shroud` false throughout.)*
+
+**The bias is flat: +5.8% to +6.4%, a band of 0.6 points.** Over the same
+sweep the quantity being predicted moves by a factor of **2.60** — real X_c
+1.305% → 3.390%, simplified peak 1.3809% → 3.5864%, the two multiplying by
+2.598 and 2.597. The reduction tracks a 160% change in the answer and holds
+its error constant to within half a point.
+
+**What that eliminates** is any mechanism whose magnitude scales with the
+offset depth, the lift, the taper severity, or the lifted footprint. All four
+move substantially here — lift ×7, taper footprint `L2` 1.249 → 2.187 D
+(+75%), total footprint 12.494 → 14.370 D — and the bias does not. The
+contact geometry over the lifted span in particular cannot be the driver: a
+flat standing in for a cylinder is a fixed geometric difference, but its
+*consequence* would have to grow with how much pipe is sitting on it.
+
+**What it does not touch** is either surviving candidate. Both are about
+*where* load enters the pipe, not how deep the structure is, and neither
+predicts any `P_v` dependence — so a flat bias is **consistent with** them and
+is not evidence **for** them. Separating those two needs `P_c1` swept against
+`P_l1`, which has not been run.
+
+**Two side findings, both from instruments that were not asked the question.**
+The rig reads the frame stiffness as **not monotonic** in `P_v`: it peaks at
+2.5 D (7.913) and falls off both ways, because `P_l2` is fixed at 2.5 D while
+the depth the taper must climb grows, so past about 2.5 D the frame pays more
+in taper angle than it gains in depth. The range is only +10% low-to-peak,
+which is what makes the table above readable as a lift sweep at near-constant
+stiffness. And **X_i moves +10% while X_c moves +160%** — the pipe between the
+connectors is nearly indifferent to the structure's depth, which is what
+"shielded by the frame" should mean and is the first time it has been measured
+across a depth range.
+
+**The control's last digit.** The 2 D row prints a simplified 2.1854% against
+2.1855% on record. That is the **inputs**, not the code: the recorded row was
+run from the measurement table's printed values, this sweep from the
+measurement's own floats. Both ways on this build — rounded 2.185482%,
+measured 2.185435%, a difference of 4.7 × 10⁻⁵ points, `E` low by 0.386 GPa.
+`sweep.repose` landed one commit earlier and a re-pose refactor can move a
+number quietly, so it was ruled out rather than assumed.
+
+Full record: `docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt`.
 
 ### Limits of this section
 
@@ -1551,6 +1623,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.9** | 9 Oct 2026 | **`P_v` swept on EA-SB F2 Case 2 — the lift is eliminated as the mechanism.** Offset depth 1 D to 4 D, a **sevenfold** change in lift, with the rest of Case 2 held exactly. The quantity predicted moves by a factor of **2.60**; the bias stays **+5.8 to +6.4%**, a band of **0.6 points**. That rules out anything scaling with depth, lift, taper severity or lifted footprint, and leaves the two load-path candidates untouched — neither predicts a `P_v` dependence, so a flat bias is consistent with them and is not evidence for them. Side findings: frame stiffness is **not monotonic** in `P_v` (peaks at 2.5 D), and X_i moves +10% while X_c moves +160% |
 | **3.8** | 8 Oct 2026 | **EA-SB F2 reduced and run — the first genuinely combined case** (measured stiffness AND a measured lift, with `body_covers_shroud` False for the first time on real geometry). Peak **+10.2 / +6.5 / +8.4%**. **The shroud hypothesis from v3.7 is refuted**: EA-SB has a shroud and biases the opposite way from GD-TP. Fifteen cases, three families, three signatures; the usable output is a per-family correction, not a single one |
 | **3.7** | 8 Oct 2026 | **EA-ST F2 reduced and run — a second family, and a different reduction.** Stiffness MEASURED with a pure-bending rig (`EI_eq = M·L/Δθ`, closed form) because an EA structure has no section to read it off: 8.415× and 12.168× `EI_pipe`. Peak **+3.8%** and **−0.8%**, peak location reproduced. Body-only GD-Simple added (a top structure lifts nothing). Across twelve cases, **accuracy does not degrade with stiffness ratio** over a factor of seven, and the −2% bias is shown to be a **GD-TP family property, not the method's** |
 | **3.6** | 8 Oct 2026 | **Head-to-head table added: actual GD-TP against the simplified model, peak for peak and moment for moment.** It separates the two: **moment unbiased** (mean +0.05%, six high four low) against **strain biased low** (mean −2.15%, nine of nine on the same side). The bias is a systematic offset with a single unfound cause, not scatter, and the fibre-distance candidate is eliminated |
