@@ -179,6 +179,11 @@ their lengths are independent.
 
 ### Simplified models — reducing a layout to a GD-Simple
 
+**Physics:** `docs/modules/T10_simplified_model_physics.md` — what is being
+abstracted and why, the two routes to `EI`, what is matched and what cannot
+be, the control, and what fifteen cases across three families established.
+
+
 `simplify_ils.py` measures a real ILS and builds the GD-Simple that stands
 in for it; `plot_simple_ils.py` draws the two together. The reduction logic
 is `slay/define/simplify.py`.
@@ -208,6 +213,12 @@ with the missing rule stated.
 **`L2 = 0` is unbuildable** — the exact equivalent of a GD-TP's abrupt step
 is a shroud with no taper, and the mirrored `OffsetShroud.validate` refuses
 it. `TAPER_MIN` is 0.1 mm, reusing `regions.FLAT_TOL`. See L111.
+
+**An EA structure keeps its stiffness in a frame, not in the pipe wall**, so
+there is no section to read it off and `simplify` refuses it by name.
+`stiffness_rig.py` measures it instead — pure bending between the connector
+nodes, `EI_eq = M·L/Δθ` in closed form, with linearity, boundary and
+plain-pipe-control checks printed on every run. See L112 and T10.
 
 **The control is `--E 210 --R 250`, not `--E 210`.** Where nothing yields a
 non-yielding body at the pipeline's modulus must vanish, and does: Xb
