@@ -1,9 +1,20 @@
 """The four-step staged analysis, and what it reproduces.
 
-`tools/stage_run.py` is a TOOL, not a package module: it reaches across
-layers freely (scene, physics, solve in one file), which `check_layers`
-permits there and rejects inside `slay/`. Importing it from a test exercises
-the rig, exactly as `test_mesher_rig.py` does.
+THE SEQUENCE IS `slay.study.staged`, a workflow in the package and policed
+by `check_layers` like any other. It moved there on 9 Oct 2026 from
+`tools/stage_run.py`, where nothing but that script could call it and where
+it carried three copies of library code to work -- `all_bidirectional`
+(which `scene.scene` already had and `sweep` already imported), the
+reporting window, and `DROP_AT_TIP`. The copies were not equivalent: the
+library's `report.passage.zone` raises on a scene with too few stinger
+rollers where the copy silently indexed `sr[-3]`.
+
+What is still imported from `tools/stage_run.py` is what a tool is for --
+`peak_in_zone` and `station_profile`, which present `result.strains` for a
+reader rather than measuring anything.
+
+EVERY NUMBER BELOW IS UNCHANGED BY THAT MOVE, and was checked bit-identical
+at R = 70, 85 and 105 before the tests were repointed.
 
 WHAT THIS PINS. The staged sequence reproduces the reference program
 `slay_overbend_v1_50.run_slay` to within 1.7% at every stinger radius, with
@@ -20,6 +31,8 @@ pytest.importorskip('numpy')
 pytest.importorskip('nlfea_v4')
 
 import stage_run                                    # noqa: E402  (tools/)
+from slay.report.passage import zone                # noqa: E402
+from slay.study.staged import run as staged_run     # noqa: E402
 
 # run_slay, 8 m spacing, 120 MT, J2, one_sided -- quoted, not recomputed.
 REFERENCE_J2 = {70.0: 0.5271, 85.0: 0.3937, 105.0: 0.2903}
@@ -29,7 +42,7 @@ REFERENCE_J2 = {70.0: 0.5271, 85.0: 0.3937, 105.0: 0.2903}
 def staged():
     """R = 85 at the REFERENCE's own 8 m spacing, so the comparison is like
     for like. `slay_config.yaml` ships 9 m, which is the paper's."""
-    return stage_run.run(R=85.0, tension_mt=120.0, spacing=8.0, verbose=False)
+    return staged_run(R=85.0, tension_mt=120.0, spacing=8.0)
 
 
 def test_every_step_converges(staged):
@@ -37,8 +50,8 @@ def test_every_step_converges(staged):
     this case diverged on the first Newton iteration at every radius."""
     _sc, out, _state = staged
     assert len(out) == 4
-    for label, _p, r in out:
-        assert r.converged, f'{label}: {r.status}'
+    for st in out:
+        assert st.converged, f'{st.label}: {st.result.status}'
 
 
 def test_step_one_holds_every_roller(staged):
@@ -46,7 +59,7 @@ def test_step_one_holds_every_roller(staged):
     so with no tension yet the stinger rollers would release and the pipe
     would never reach the arc."""
     _sc, out, _state = staged
-    _label, _p, first = out[0]
+    first = out[0].result
     assert all(first.active) and not first.released
 
 
@@ -54,7 +67,7 @@ def test_lift_off_activates_at_step_two(staged):
     """Step 2 hands the active set its real rule, and rollers do release --
     which is the difference between step 1's scene and every later one."""
     _sc, out, _state = staged
-    assert sum(out[1][2].active) < sum(out[0][2].active)
+    assert sum(out[1].result.active) < sum(out[0].result.active)
 
 
 def test_it_reproduces_the_reference_program(staged):
@@ -75,15 +88,13 @@ def test_it_reproduces_the_reference_program(staged):
     quantity scaled.
     """
     sc, out, _state = staged
-    s_max, _zone = stage_run.report_zone(sc)
-    s_pk, eps = stage_run.peak_in_zone(out[-1][2], s_max)
+    s_max, _zone = zone(sc)
+    s_pk, eps = stage_run.peak_in_zone(out[-1].result, s_max)
     assert 100 * eps == pytest.approx(0.38848, abs=5e-5)
 
-    legacy = stage_run.run(R=85.0, tension_mt=120.0, spacing=8.0,
-                           verbose=False, contact_surface='centreline')
-    lsc, lout, _ls = legacy
-    _lpk, leps = stage_run.peak_in_zone(lout[-1][2],
-                                        stage_run.report_zone(lsc)[0])
+    lsc, lout, _ls = staged_run(R=85.0, tension_mt=120.0, spacing=8.0,
+                                contact_surface='centreline')
+    _lpk, leps = stage_run.peak_in_zone(lout[-1].result, zone(lsc)[0])
     assert 100 * leps == pytest.approx(0.38839, abs=5e-5)
     assert abs(100 * leps / REFERENCE_J2[85.0] - 1.0) < 0.02
     assert abs(100 * eps / REFERENCE_J2[85.0] - 1.0) < 0.02
@@ -100,13 +111,13 @@ def test_the_excluded_zone_is_load_bearing(staged):
     answer, so the zone travels with the number everywhere it is printed.
     """
     sc, out, _state = staged
-    s_max, _zone = stage_run.report_zone(sc)
-    _s_pk, eps = stage_run.peak_in_zone(out[-1][2], s_max)
-    profile = stage_run.station_profile(sc, out[-1][2])
+    s_max, _zone = zone(sc)
+    _s_pk, eps = stage_run.peak_in_zone(out[-1].result, s_max)
+    profile = stage_run.station_profile(sc, out[-1].result)
 
     assert s_max == pytest.approx(sc.by_name('SR5').s_arc)
     assert profile['SR6'] > eps, 'the excluded tip is the higher number'
-    whole_model = max(e for (_i, _s, e) in out[-1][2].strains)
+    whole_model = max(e for (_i, _s, e) in out[-1].result.strains)
     assert whole_model > eps
 
 
@@ -141,12 +152,12 @@ def test_staged_and_single_solve_agree_at_the_same_metric(staged):
         gravity=True, tension=120.0 * 9806.65))
     assert r.converged, r.status
 
-    s_max, _zone = stage_run.report_zone(sc)
+    s_max, _zone = zone(sc)
     _s, single_band = stage_run.peak_in_zone(r, s_max)
     _ws, single_whole = r.peak_strain()
 
     _sc, out, _st = staged
-    _ss, staged_band = stage_run.peak_in_zone(out[-1][2], s_max)
+    _ss, staged_band = stage_run.peak_in_zone(out[-1].result, s_max)
 
     assert single_band == pytest.approx(staged_band, rel=0.01), \
         'staging is a CONVERGENCE aid, not an accuracy gain'

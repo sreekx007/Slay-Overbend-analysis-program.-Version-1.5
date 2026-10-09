@@ -25,7 +25,8 @@ LAYERS = (
     'model',      # nodes and elements; discretisation only
     'physics',    # sections, contact targets, loads, BCs -> Problem
     'solve',      # Newton + contact active set + increments
-    'study',      # Mode A / Mode B sweeps
+    'study',      # ordered series of Problems, chained state:
+                  # Mode A / Mode B sweeps, Mode S staged
     'report',     # strains, checks, plots, IO
     'entry',      # case gate, CLI
 )

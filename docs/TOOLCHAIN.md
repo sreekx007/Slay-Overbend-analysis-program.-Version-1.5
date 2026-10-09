@@ -137,7 +137,7 @@ plotter.
 
 | Tool | What it does |
 |---|---|
-| `stage_run.py` | **the four-step staged sequence** — displacements (all rollers held) → gravity (lift-off active) → tension → J2. Runs on the REBUILD. Reproduces `run_slay` within 1.7%. |
+| `stage_run.py` | **CLI** for the four-step staged sequence — displacements (all rollers held) → gravity (lift-off active) → tension → J2. The sequence itself is **`slay.study.staged`** (Mode S); this is argument parsing and printing. Reproduces `run_slay` within 1.7%. |
 | `slide_plain.py` | sequential sliding for plain pipe. Runs on the **ORIGINAL**. Predates `slay.study.sweep`; kept as the cross-check against it. Uses a neutral component to pass `run_passage_sliding`'s guard. |
 
 ### Archetype studies

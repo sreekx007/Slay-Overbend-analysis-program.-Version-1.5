@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 114
+# entries: 115
 
 - id: L001
   area: kernel
@@ -3064,3 +3064,59 @@
   detect: '-'
   refs: [docs/simple/RESULTS_EASB_F2_2026-10-08.txt, docs/simple/RESULTS_EAST_F2_2026-10-08.txt, docs/validation/VALIDATION_v3.0_2026-10-06.md]
   date: 2026-10-08
+
+- id: L115
+  area: process
+  class: ruling
+  symptom: >-
+    The four-step staged sequence -- the cross-check that reproduces the
+    reference `run_slay` within 1.7% and is quoted in RESULTS.md, two
+    validation ledgers, T5 and this register -- lived entirely in
+    `tools/stage_run.py`. Nothing but that script could call it,
+    `check_layers` did not police it, and it carried THREE copies of library
+    code to work.
+  cause: >-
+    It was written as a driver and grew into a workflow without moving. The
+    copies: `all_bidirectional`, which `scene.scene` already had and which
+    `study.sweep` already imported; the reporting window `report_zone`; and
+    the constant `DROP_AT_TIP`. THE COPIES WERE NOT EQUIVALENT --
+    `report.passage.zone` RAISES on a scene with too few stinger rollers,
+    where the copy silently indexed `sr[-3]` -- so the weaker of each pair
+    was the one in use. `scene.all_bidirectional`'s own docstring already
+    cited "step 1 of the staged sequence", so the library knew about the
+    workflow that had never adopted it.
+  rule: >-
+    `study` IS WHERE AN ORDERED SERIES OF PROBLEMS SOLVED WITH CHAINED STATE
+    LIVES. That is what `sweep.run` is and the staged sequence has the same
+    shape; it differs only in what varies between steps -- a sweep moves the
+    pipe, this turns loads and the material on. It is now
+    `slay.study.staged` (Mode S), and `_layers.py` says so rather than
+    naming only sweeps. The split that remained: the CLI, the printing and
+    `station_profile` stayed in `tools/stage_run.py`, because presenting
+    `result.strains` for a reader is a tool's job and measuring is not.
+  rule_detail: >-
+    THE LAYER RULE DID THE DESIGN WORK. `report` is ABOVE `study`, so
+    `study.staged` CANNOT call `report.passage.zone`. That is why the
+    duplicate window was DELETED rather than moved: it was never this
+    layer's to own. The sequence returns posed Problems and Results and the
+    caller reports them, exactly as `sweep.run` does. A rule that forces a
+    better shape is worth more than one that merely forbids a worse one.
+  rule_detail_2: >-
+    POSING IS SEPARATE FROM SOLVING. `problems()` returns the four Problems
+    unsolved, so the sequence can be inspected, diffed or re-posed without a
+    solver -- and that is what made the new assertions possible: steps 3 and
+    4 differ ONLY in the material, checked field by field, where before
+    "everything else held" was a docstring claim nobody could test. `STEPS`
+    is a tuple rather than a function body so a caller can read what is
+    about to run.
+  rule_detail_3: >-
+    THE ACCEPTANCE TEST EXISTED BEFORE THE REFACTOR, which is what made it
+    safe rather than speculative. `test_stage_run.py` pins the numbers that
+    reproduce `run_slay`. Baseline captured first at R = 70, 85 and 105;
+    afterwards all three were BIT-IDENTICAL -- 0.519722%, 0.388478%,
+    0.287668% at the same s to six decimals, with the same active-set counts
+    per step. The six gate tests were repointed at the library for what
+    moved and still assert every number they did before.
+  detect: test_the_module_reports_nothing, test_it_uses_the_LIBRARY_all_bidirectional, test_steps_three_and_four_differ_ONLY_in_the_material, test_it_reproduces_the_reference_program
+  refs: [rebuild/slay/study/staged.py, tools/stage_run.py, rebuild/tests/test_staged.py, rebuild/tests/test_stage_run.py, rebuild/slay/_layers.py]
+  date: 2026-10-09
