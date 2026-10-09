@@ -3302,3 +3302,86 @@
   detect: docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt
   refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt, tools/study_easb_cases.py, tools/stiffness_rig.py, rebuild/slay/define/simple.py]
   date: 2026-10-09
+
+- id: L119
+  area: measure
+  class: finding
+  symptom: >-
+    Two candidates were left for the EA-SB family's high bias after L114
+    refuted the shroud and L118 eliminated the lift: the LOAD PATH (the
+    stand-in's clamped shroud transfers roller load continuously, the real
+    frame reaches the pipe at two connectors) and the STIFFENED SPAN (the
+    reduction stiffens between the connectors only, while a real base bears
+    along its whole length). Both would show as a dependence on how far the
+    base reaches beyond the connectors, so neither could be tested by
+    varying one layout dimension at a time.
+  cause: >-
+    THE DISCRIMINATOR IS THE MATCHED LINE. At `P_c1 = P_l1` there is no base
+    outboard of the connectors, so the stiffened-span candidate predicts the
+    bias GOES AWAY there and the load-path candidate predicts it SURVIVES.
+    Nine points on three lines through (P_c1, P_l1), crossing at the
+    published Case 2, with P_l2 = 2.5 D, P_v = 2 D, kB = 3.1 and F2 held.
+    Four lengths at c/l = 1.00 -- 5, 10, 16, 20 D -- give +3.7, +6.4, +6.4
+    and +2.5%. NOT ONE POINT IS NEAR ZERO. The stiffened span is eliminated
+    AS A SOLE CAUSE: it cannot produce the offset, because the offset is
+    there when the thing it blames is absent by construction. It is NOT
+    eliminated as a contributor to the scatter.
+  cause_detail: >-
+    AND THE BIAS DOES NOT ORDER BY c/l, which is a second and independent
+    strike at the same explanation. Ratio line (P_l1 = 10 D fixed), c/l
+    1.00 -> 0.75 -> 0.50: +6.4, +5.1, +10.5. Base line (P_c1 = 10 D fixed),
+    1.00 -> 0.80 -> 0.67 -> 0.50: +6.4, +4.6, +8.4, +0.4. Neither is
+    monotone and the two disagree about which end is worse. Over all nine,
+    mean +5.3% against the real peak with a 10.1-point spread.
+  cause_detail_2: >-
+    WHAT IS LEFT IS THE LOAD PATH, AND THAT IS A STATEMENT ABOUT THE LIST,
+    NOT ABOUT THE MECHANISM. It is the only one of the three still standing
+    and the only one that predicts a bias present at every point of the grid
+    including the matched line, since the stand-in transfers continuously
+    along 8.7 to 23.7 D of clamped shroud everywhere. It is not written down
+    as a cause in the ledger or in the results file. Testing it needs the
+    TRANSFER changed -- a stand-in tied at two points rather than bearing
+    along a shroud -- which is a different reduction, not a different
+    layout, and is not in this program.
+  rule: >-
+    "PEAK AGAINST PEAK" MEANS THE MAXIMUM OVER REGIONS ON THE REAL SIDE, not
+    X_c. At (10 D, 20 D) the full model's peak LEAVES THE CONNECTOR: X_e
+    1.203% against X_c 1.173%, a 2.5% margin, the first point in the EA-SB
+    set where the two differ. It moves the quoted figure from +2.9% against
+    X_c to +0.4% against the real peak. Until this grid the two were the
+    same number at every EA-SB point, so nothing in the method
+    distinguished them and X_c was quoted as though it were the peak. Both
+    columns are now carried side by side rather than one chosen silently.
+  rule_detail: >-
+    THE 15 D HOLE IS A CORRECT REFUSAL, FULLY LOCATED. `P_c1 = P_l1 = 15 D`
+    raises `AssemblyError` -- frame nodes of degree > 2 -- on an exact
+    coincidence in the mirrored `BaseStructure`: the outer connector slot
+    sits at `P_c1/2 + P_c2 = (2/3) P_c1` (P_c2 is derived as P_c1/6) and the
+    frame's top corner at `P_l1/2 + P_l2`. Equal when
+    `(2/3) P_c1 = P_l1/2 + P_l2`, which on the matched line at P_l2 = 2.5 D
+    is `P = 6 * P_l2 = 15 D` exactly. Two frame nodes then land on one
+    position, the closed outline gets a node where three members meet, and
+    `assemble._chains` cannot order the chain. It is a coincidence of this
+    grid and NOT a property of the matched line: (10 D, 15 D) is Case 3's own
+    layout and runs fine, outer slot 6.667 D against a corner at 10 D.
+  rule_detail_2: >-
+    THE REFUSED BAND HAS WIDTH, because part nodes merge within
+    `parts.MERGE_TOL` = 0.01 m rather than only when exactly coincident.
+    `|slot - corner| = |P_c1/6 - P_l2|`, so the band is `P in (14.852,
+    15.148) D`, width 0.295 D. Measured, not derived twice: refused at 14.9,
+    15.0 and 15.1 D (gaps -6.8, 0.0, +6.8 mm), clean at 14.8 and 15.2 D
+    (-13.6, +13.6 mm). 16 D was used in place of 15 D on the matched line
+    and the hole is recorded; nothing was nudged into or out of the band.
+  rule_detail_3: >-
+    THE MEASURED STIFFNESS IS NOT ORDERED BY kB, which is held at 3.1 at
+    every point while the rig reads EI/EI_pipe from 5.015 to 9.586 -- nearly
+    a factor of two. It rises with P_c1 at fixed P_l1, falls with P_l1 at
+    fixed P_c1, and on the matched line turns over between 16 and 20 D
+    (5.855, 7.870, 9.586, 9.269). Same character as L118's P_v
+    non-monotonicity and the same cause: kB specifies a ratio PER MEMBER and
+    the frame's geometry decides what that is worth in bending across the
+    span. Anything that treats kB as a stand-in for the assembly's stiffness
+    is reading it wrong.
+  detect: docs/simple/RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt
+  refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, docs/simple/RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt, tools/study_easb_cases.py, tools/stiffness_rig.py, rebuild/slay/model/parts.py, rebuild/slay/model/assemble.py]
+  date: 2026-10-09

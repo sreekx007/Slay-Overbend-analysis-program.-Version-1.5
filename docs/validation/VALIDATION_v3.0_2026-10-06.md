@@ -1306,14 +1306,19 @@ from GD-TP's −2.2%.** One mechanism in the shroud cannot be negative in one
 family and positive in another. Recorded as withdrawn in L113 rather than
 quietly dropped; L114 carries what replaced it.
 
-**Two candidates remain, neither to be cited as a cause.** *The load path*,
-which differs only for EA-SB: the real roller bears on the **frame** and
-reaches the pipe only at the two connectors, while the stand-in's shroud is
-clamped to the pipe and transfers roller load **continuously** over 13.7 D.
-*The stiffened span*: the reduction stiffens only between the connectors,
-which is right for a structure attached at two points and is not established
-for a base bearing along its whole length. **A third candidate has now been
-tested and eliminated** — the offset depth — in the sweep below.
+**Three candidates have been stated for this family and two more have now
+been eliminated, leaving one.** *The shroud* — refuted by L114, since EA-SB
+has one and biases the opposite way from GD-TP. *The offset depth* —
+eliminated below: swept sevenfold, the bias does not move. *The stiffened
+span*, that the reduction stiffens only between the connectors while a real
+base bears along its whole length — eliminated below **as a sole cause**: the
+bias survives on the matched line where there is no base beyond the
+connectors at all, and it does not order by the overhang either. What is left
+is *the load path*: the real roller bears on the **frame** and reaches the
+pipe only at the two connectors, while the stand-in's shroud is clamped and
+transfers roller load **continuously** over 8.7 to 23.7 D. **Being the last
+candidate standing is a statement about the list, not about the mechanism**,
+and it is not written down as a cause anywhere in this ledger.
 
 **What is usable now** is the per-family correction, and the two go opposite
 ways: a simplified **GD-TP** peak runs about **2% low**, a simplified
@@ -1389,6 +1394,90 @@ measured 2.185435%, a difference of 4.7 × 10⁻⁵ points, `E` low by 0.386 GPa
 number quietly, so it was ruled out rather than assumed.
 
 Full record: `docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt`.
+
+### The P_c1 × P_l1 grid — the stiffened span goes, the load path survives
+
+**The discriminator.** Both surviving candidates are about where roller load
+enters the pipe, so both show up as a dependence on how far the base reaches
+beyond the connectors. They differ at one place: **when `P_c1 = P_l1` there is
+no base beyond the connectors**, so the stiffened-span candidate predicts the
+bias **goes away** on that line, while the load-path candidate — the
+stand-in's clamped shroud transferring continuously against two discrete
+connectors — predicts it **survives**.
+
+Three lines crossing at the published Case 2, with `P_l2 = 2.5 D`,
+`P_v = 2 D`, `kB = 3.1` and F2 held throughout. `kB` is a *ratio*, so the
+measured EI is not constant along any line and each row takes its own
+measured value. All eighteen passages sweep 100% of their travel; rig
+linearity +0.009% to +0.089%, boundary −0.000% throughout.
+
+| line | `P_c1` | `P_l1` | c/l | EI/EI<sub>p</sub> | real X_c | real X_i | real X_e | real peak | sim peak | **v peak** |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ratio | 5.0 | 10.0 | 0.50 | 5.015 | 1.228% | 0.1270% | 1.211% | 1.228% X_c | 1.3571% | **110.5%** |
+| ratio | 7.5 | 10.0 | 0.75 | 6.127 | 1.676% | 0.1174% | 1.080% | 1.676% X_c | 1.7609% | **105.1%** |
+| **cross** | **10.0** | **10.0** | **1.00** | **7.870** | **2.053%** | 0.1167% | 0.828% | 2.053% X_c | **2.1854%** | **106.4%** |
+| base | 10.0 | 12.5 | 0.80 | 6.880 | 1.801% | 0.1194% | 1.131% | 1.801% X_c | 1.8844% | **104.6%** |
+| base | 10.0 | 15.0 | 0.67 | 6.289 | 1.447% | 0.1214% | 1.321% | 1.447% X_c | 1.5680% | **108.4%** |
+| base | 10.0 | 20.0 | 0.50 | 5.616 | 1.173% | 0.1212% | **1.203%** | **1.203% X_e** | 1.2076% | **100.4%** |
+| match | 5.0 | 5.0 | 1.00 | 5.855 | 1.736% | 0.1276% | 0.736% | 1.736% X_c | 1.7994% | **103.7%** |
+| match | 16.0 | 16.0 | 1.00 | 9.586 | 2.317% | 0.1361% | 0.908% | 2.317% X_c | 2.4658% | **106.4%** |
+| match | 20.0 | 20.0 | 1.00 | 9.269 | 2.792% | 0.1563% | 0.894% | 2.792% X_c | 2.8613% | **102.5%** |
+
+| set | mean | band | spread |
+|---|---|---|---|
+| all nine, against the real peak | **+5.3%** | +0.4 to +10.5 | 10.1 points |
+| all nine, against X_c | +5.6% | +2.5 to +10.5 | 8.0 points |
+| the matched line, c/l = 1.00 | **+4.8%** | +2.5 to +6.4 | 4.0 points |
+
+**The bias survives on the matched line.** Four lengths at c/l = 1.00 — 5, 10,
+16, 20 D — give **+3.7, +6.4, +6.4 and +2.5%**, and not one point is near
+zero. Where P_c1 = P_l1 there is no base outboard of the connectors for the
+reduction to have mis-stiffened, and the reduction is still high by about 5%.
+**The stiffened span is eliminated as the sole cause** — not as a contributor
+to the scatter, but it cannot produce the offset, because the offset is there
+when the thing it blames is absent by construction.
+
+**And the bias does not track c/l either.** Ratio line, c/l 1.00 → 0.75 →
+0.50: +6.4, +5.1, +10.5. Base line, 1.00 → 0.80 → 0.67 → 0.50: +6.4, +4.6,
++8.4, +0.4. Neither monotone, and the two disagree about which end is worse.
+The overhang is not an ordering variable for this error — a second,
+independent strike against the same explanation.
+
+**The real peak migrates, once.** At (10 D, 20 D) the full model's peak
+**leaves the connector**: X_e 1.203% against X_c 1.173%, a 2.5% margin. It is
+the first point in the EA-SB set where X_c is not the peak, and it moves the
+quoted figure from +2.9% against X_c to **+0.4%** against the real peak. The
+methodology point is the one that matters: *peak against peak* has to mean the
+maximum over regions on the real side, and until this grid the two were the
+same number everywhere, so nothing distinguished them. Both columns are
+carried above rather than one being chosen silently.
+
+**Secondary: the measured stiffness is not ordered by `kB`.** It is held at
+3.1 everywhere and the rig reads EI/EI<sub>p</sub> from 5.015 to 9.586 —
+nearly a factor of two. Rising with `P_c1` at fixed `P_l1`, falling with
+`P_l1` at fixed `P_c1`, and non-monotone on the matched line (it turns over
+between 16 and 20 D). Same character as `P_v`'s non-monotonicity and the same
+cause: `kB` specifies a ratio per member, and the frame's geometry decides
+what that is worth in bending across the span. **X_i rises with the matched
+length** (0.1276 → 0.1167 → 0.1361 → 0.1563%): the shielded interior is nearly
+indifferent to depth but not to length.
+
+**The 15 D hole.** `P_c1 = P_l1 = 15 D` is refused by the mesher —
+`AssemblyError`, frame nodes of degree > 2 — on an exact coincidence in the
+mirrored `BaseStructure`: the outer connector slot sits at
+`P_c1/2 + P_c2 = (2/3)·P_c1` (because `P_c2 = P_c1/6`) and the frame's top
+corner at `P_l1/2 + P_l2`. Those are the same point when
+`(2/3)·P_c1 = P_l1/2 + P_l2`, which on the matched line at `P_l2 = 2.5 D` is
+`P = 6·P_l2 = 15 D` exactly. Two frame nodes land on one position, the closed
+outline acquires a node where three members meet, and `assemble._chains`
+cannot order it. **The refusal is correct** and it is a coincidence of this
+grid, not of the matched line: (10 D, 15 D) is Case 3's own layout and runs
+fine, its outer slot being at 6.667 D against a corner at 10 D. The band has
+width, since nodes merge within `parts.MERGE_TOL` = 0.01 m: refused at 14.9,
+15.0 and 15.1 D, clean at 14.8 and 15.2 D, so **P ∈ (14.852, 15.148) D**,
+width 0.295 D. 16 D was used instead; nothing was nudged.
+
+Full record: `docs/simple/RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt`.
 
 ### Limits of this section
 
@@ -1623,6 +1712,7 @@ sourcing a parameter rather than about validating one.
 
 | Version | Date | What |
 |---|---|---|
+| **3.10** | 9 Oct 2026 | **`P_c1` × `P_l1` swept on EA-SB F2 Case 2 — the stiffened span is eliminated as a sole cause.** Three lines, nine points. **The bias survives on the matched line** (c/l = 1.00 at 5, 10, 16, 20 D: +3.7, +6.4, +6.4, +2.5%) where there is no base beyond the connectors at all, and it **does not order by c/l** on either line. Of the three candidates stated for this family, only **the load path** is left standing — recorded as the last candidate, not as a cause. Also: the real peak **migrates out of X_c into X_e** at (10 D, 20 D), the first time in the EA-SB set, which pins down what *peak against peak* must mean; the measured EI spans a factor of two at fixed `kB`; and `P_c1 = P_l1 = 15 D` is correctly refused by the mesher on an exact frame-node coincidence |
 | **3.9** | 9 Oct 2026 | **`P_v` swept on EA-SB F2 Case 2 — the lift is eliminated as the mechanism.** Offset depth 1 D to 4 D, a **sevenfold** change in lift, with the rest of Case 2 held exactly. The quantity predicted moves by a factor of **2.60**; the bias stays **+5.8 to +6.4%**, a band of **0.6 points**. That rules out anything scaling with depth, lift, taper severity or lifted footprint, and leaves the two load-path candidates untouched — neither predicts a `P_v` dependence, so a flat bias is consistent with them and is not evidence for them. Side findings: frame stiffness is **not monotonic** in `P_v` (peaks at 2.5 D), and X_i moves +10% while X_c moves +160% |
 | **3.8** | 8 Oct 2026 | **EA-SB F2 reduced and run — the first genuinely combined case** (measured stiffness AND a measured lift, with `body_covers_shroud` False for the first time on real geometry). Peak **+10.2 / +6.5 / +8.4%**. **The shroud hypothesis from v3.7 is refuted**: EA-SB has a shroud and biases the opposite way from GD-TP. Fifteen cases, three families, three signatures; the usable output is a per-family correction, not a single one |
 | **3.7** | 8 Oct 2026 | **EA-ST F2 reduced and run — a second family, and a different reduction.** Stiffness MEASURED with a pure-bending rig (`EI_eq = M·L/Δθ`, closed form) because an EA structure has no section to read it off: 8.415× and 12.168× `EI_pipe`. Peak **+3.8%** and **−0.8%**, peak location reproduced. Body-only GD-Simple added (a top structure lifts nothing). Across twelve cases, **accuracy does not degrade with stiffness ratio** over a factor of seven, and the −2% bias is shown to be a **GD-TP family property, not the method's** |

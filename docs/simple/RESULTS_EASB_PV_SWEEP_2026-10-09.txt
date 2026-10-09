@@ -132,3 +132,10 @@ build: rounded inputs 2.185482%, measured floats 2.185435%, a difference of
 by 2.5e-4 and 4.7e-4 D. `sweep.repose` landed one commit before this sweep
 and a refactor of a re-pose can move a number quietly, so it was ruled out
 rather than assumed.
+
+ADDED LATER THE SAME DAY. The `P_c1` x `P_l1` grid called for above has been
+run: `RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt`. It eliminates the STIFFENED
+SPAN as a sole cause -- the bias survives on the matched line, where there is
+no base beyond the connectors -- and leaves the LOAD PATH as the only
+candidate still standing, which is a statement about the list and not about
+the mechanism.

@@ -1,0 +1,172 @@
+P_c1 x P_l1 on EA-SB F2 Case 2 -- the sweep that separates the two candidates
+=============================================================================
+
+NOT VALIDATION. Paper 2 publishes (P_c1, P_l1) = (10 D, 10 D) for Case 2 and
+(10 D, 15 D) for Case 3. Every other point is a PREDICTION on both sides, and
+the comparison being made is internal: the simplified model against the full
+model of the same layout.
+
+WHY THIS GRID SEPARATES THEM. After L113 was withdrawn and L118 eliminated
+the lift, two candidates were left for the EA-SB family's high bias. Both are
+about where roller load enters the pipe, so both would show as a dependence
+on how far the base reaches beyond the connectors. They differ at ONE place:
+
+  THE STIFFENED SPAN candidate: the reduction is wrong because it stiffens
+  BETWEEN THE CONNECTORS ONLY, while a real base bears along its whole
+  length. At P_c1 = P_l1 there IS no base beyond the connectors, so this
+  candidate predicts the bias GOES AWAY on the matched line.
+
+  THE LOAD PATH candidate: the reduction is wrong because the stand-in's
+  shroud is clamped to the pipe and transfers roller load CONTINUOUSLY, while
+  the real frame reaches the pipe at two points. That difference is in full
+  force at P_c1 = P_l1 as well, so this candidate predicts the bias SURVIVES
+  on the matched line.
+
+THREE LINES crossing at the published Case 2. P_l2 = 2.5 D, P_v = 2 D,
+kB = 3.1 and the F2 connection system are held throughout.
+
+  ratio line    P_l1 = 10 D fixed, P_c1 = 5, 7.5, 10        c/l 0.50 .. 1.00
+  base line     P_c1 = 10 D fixed, P_l1 = 10, 12.5, 15, 20  c/l 1.00 .. 0.50
+  matched line  P_c1 = P_l1 = 5, 10, 16, 20                 c/l 1.00
+
+kB is a RATIO, not a stiffness, so the measured EI is not constant along any
+line. The simplified model takes the MEASURED value at every point, so each
+row remains its own matched pair.
+
+15 D IS MISSING FROM THE MATCHED LINE and the reason is geometric, not a
+choice -- see THE 15 D HOLE at the end. 16 D stands in for it.
+
+THE RESULTS
+-----------
+R = 85 m, 9 m spacing, 100 MT, step 1 x OD, mesh ruled 2 x OD. ALL EIGHTEEN
+PASSAGES SWEEP 100% OF THEIR TRAVEL. Rig checks clean on every row:
+linearity +0.009% to +0.089%, boundary -0.000% throughout.
+
+ line   P_c1  P_l1   c/l  EI/EIp   E_eq | real X_c  real X_i  real X_e | real pk  where | sim pk  | v X_c  v peak
+ratio    5.0  10.0  0.50   5.015  1053G |   1.228%   0.1270%    1.211% |  1.228%   X_c  | 1.3571% | 110.5%  110.5%
+ratio    7.5  10.0  0.75   6.127  1287G |   1.676%   0.1174%    1.080% |  1.676%   X_c  | 1.7609% | 105.1%  105.1%
+cross   10.0  10.0  1.00   7.870  1653G |   2.053%   0.1167%    0.828% |  2.053%   X_c  | 2.1854% | 106.4%  106.4%
+ base   10.0  12.5  0.80   6.880  1445G |   1.801%   0.1194%    1.131% |  1.801%   X_c  | 1.8844% | 104.6%  104.6%
+ base   10.0  15.0  0.67   6.289  1321G |   1.447%   0.1214%    1.321% |  1.447%   X_c  | 1.5680% | 108.4%  108.4%
+ base   10.0  20.0  0.50   5.616  1179G |   1.173%   0.1212%    1.203% |  1.203%   X_e  | 1.2076% | 102.9%  100.4%
+match    5.0   5.0  1.00   5.855  1230G |   1.736%   0.1276%    0.736% |  1.736%   X_c  | 1.7994% | 103.7%  103.7%
+match   16.0  16.0  1.00   9.586  2013G |   2.317%   0.1361%    0.908% |  2.317%   X_c  | 2.4658% | 106.4%  106.4%
+match   20.0  20.0  1.00   9.269  1946G |   2.792%   0.1563%    0.894% |  2.792%   X_c  | 2.8613% | 102.5%  102.5%
+
+`sim pk` is in Xe in all nine -- the simplified model has no connector, so it
+has no X_c to put a peak in. `v peak` is against the real model's ACTUAL peak
+and is the number to read; `v X_c` is kept beside it because X_c has been the
+real peak in every EA-SB case until this grid, and at one point it is not.
+
+                                    mean          band       spread
+  all nine, against the real peak  +5.3%   +0.4 .. +10.5   10.1 points
+  all nine, against X_c            +5.6%   +2.5 .. +10.5    8.0 points
+  the matched line (c/l = 1.00)    +4.8%   +2.5 ..  +6.4    4.0 points
+
+FINDING 1: THE BIAS SURVIVES ON THE MATCHED LINE.
+--------------------------------------------------
+Four lengths at c/l = 1.00 -- 5, 10, 16 and 20 D -- give +3.7, +6.4, +6.4 and
++2.5%. Mean +4.8%, and NOT ONE POINT IS NEAR ZERO. When P_c1 = P_l1 there is
+no base outboard of the connectors for the reduction to have mis-stiffened,
+and the reduction is still high by about 5%.
+
+THE STIFFENED SPAN IS ELIMINATED AS THE SOLE CAUSE. It is not eliminated as a
+contributor -- it could still be feeding the scatter -- but it cannot be what
+produces the offset, because the offset is there when the thing it blames is
+absent by construction.
+
+FINDING 2: THE BIAS DOES NOT TRACK c/l EITHER.
+-----------------------------------------------
+If the overhang of base beyond the connectors were the ordering variable, the
+bias would rise as c/l falls. It does not, on either line:
+
+  ratio line  c/l  1.00 -> 0.75 -> 0.50    +6.4  +5.1  +10.5
+  base line   c/l  1.00 -> 0.80 -> 0.67 -> 0.50    +6.4  +4.6  +8.4  +0.4
+
+Neither is monotone, and the two disagree about which end is worse. The
+overhang is not an ordering variable for this error. Together with Finding 1
+that is the second, independent strike against the stiffened-span
+explanation.
+
+WHAT IS LEFT, AND WHAT IT IS WORTH
+-----------------------------------
+Of the three candidates stated since this family was first reduced -- the
+shroud (L113, refuted by L114), the lift (L118, eliminated), the stiffened
+span (eliminated here as a sole cause) -- the LOAD PATH is the only one still
+standing. It is also the only one that predicts what is observed: a bias
+present at every point of the grid, including where P_c1 = P_l1, because the
+stand-in transfers roller load continuously along 8.7 to 23.7 D of clamped
+shroud at every one of those points while the real frame reaches the pipe at
+two nodes.
+
+THAT IS NOT PROOF AND IS NOT WRITTEN DOWN AS ONE. Being the last candidate
+standing is a statement about the list, not about the mechanism. Testing it
+needs the transfer itself changed -- a stand-in that ties the pipe at two
+points instead of bearing along a shroud -- which is a different reduction,
+not a different layout, and is not in this program.
+
+The honest summary of the grid is: a residual of about +5% that does not
+order by any of the geometric variables swept, with roughly +/-4 points of
+scatter around it over nine points and no replication.
+
+FINDING 3: THE REAL PEAK MIGRATES, ONCE.
+-----------------------------------------
+At (10 D, 20 D) the full model's peak LEAVES THE CONNECTOR: X_e 1.203%
+against X_c 1.173%, a 2.5% margin. It is the first point in the EA-SB set
+where X_c is not the peak, and it moves the quoted figure from +2.9% (against
+X_c) to +0.4% (against the real peak).
+
+The methodology point is the one that matters: "peak against peak" has to
+mean the MAXIMUM OVER REGIONS on the real side, not X_c, and until this grid
+the two were the same number everywhere so nothing distinguished them. Both
+columns are printed above rather than one being chosen silently.
+
+SECONDARY READINGS
+------------------
+THE MEASURED STIFFNESS IS NOT ORDERED BY kB. kB is held at 3.1 everywhere and
+the rig reads EI/EI_pipe from 5.015 to 9.586 -- nearly a factor of two. It
+rises with P_c1 at fixed P_l1 (5.015 -> 6.127 -> 7.870) and falls with P_l1 at
+fixed P_c1 (7.870 -> 6.880 -> 6.289 -> 5.616), and on the matched line it is
+non-monotone (5.855, 7.870, 9.586, 9.269 -- it turns over between 16 and
+20 D). Same character as the P_v non-monotonicity in L118, from the same
+cause: kB specifies a ratio per member and the frame's geometry decides what
+that is worth in bending across the span.
+
+X_i RISES WITH THE MATCHED LENGTH: 0.1276% at 5 D, 0.1167% at 10 D, 0.1361%
+at 16 D, 0.1563% at 20 D. The shielded interior is nearly indifferent to
+depth (L118) but not to length.
+
+REAL X_c FALLS AS THE BASE LENGTHENS at fixed connector span -- 2.053% ->
+1.801% -> 1.447% -> 1.173% over P_l1 10 to 20 D -- which tracks the measured
+EI falling over the same line. That is a full-model trend, not a reduction
+artifact, and it is why the base line's absolute strains are the lowest in the
+grid.
+
+THE 15 D HOLE
+-------------
+P_c1 = P_l1 = 15 D is REFUSED by the mesher -- `AssemblyError`, frame nodes of
+degree > 2 -- and the reason is an exact geometric coincidence in the mirrored
+`BaseStructure`:
+
+  the outer connector slot sits at   P_c1/2 + P_c2  =  (2/3) P_c1   (P_c2 = P_c1/6)
+  the top corner of the frame at     P_l1/2 + P_l2
+
+These are the same point when (2/3) P_c1 = P_l1/2 + P_l2, which at
+P_c1 = P_l1 and P_l2 = 2.5 D is P = 6 * P_l2 = 15 D EXACTLY. Two distinct
+frame nodes then land on one position, the closed outline acquires a node
+where three members meet, and `assemble._chains` cannot order the chain. The
+refusal is CORRECT -- the topology really is ambiguous -- and it is a
+coincidence of this grid, not a property of the matched line: (10 D, 15 D) is
+Case 3's own layout and builds and runs fine, because its outer slot is at
+6.667 D and its corner at 10 D.
+
+The refused band has WIDTH, because nodes merge within `parts.MERGE_TOL` =
+0.01 m rather than only when exactly coincident:
+
+  P_c1 = P_l1      14.8 D    14.9 D    15.0 D    15.1 D    15.2 D
+  slot - corner   -13.6 mm   -6.8 mm    0.0 mm   +6.8 mm  +13.6 mm
+  verdict            ok      REFUSED   REFUSED   REFUSED     ok
+
+|slot - corner| = |P_c1/6 - P_l2|, so the band is P in (14.852, 15.148) D,
+width 0.295 D. Nothing was nudged into it or out of it: 16 D was used instead
+and the hole is recorded.
