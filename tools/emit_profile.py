@@ -152,18 +152,15 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     # The SAME mesh the sweep solved on. Building the shared model at a
     # different density than sweep.run used would make every element index
     # in the sections table name a different element.
-    m = build_model(sc, ils, s_centre=s_centre,
-                    extra_stations=sweep._required_stations(sc), **mesh_kw)
+    m = sweep.passage_model(sc, ils, s_centre=s_centre, **mesh_kw)
     built = {}
 
     def model_of(pos):
         if pos.shift not in built:
-            p = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
-                              tension=tension_mt * TON,
-                              material=material('j2'),
-                              **sweep.with_buffer(
-                                  sc, problem_kw, assembly=ils.assembly,
-                                  ils=ils))
+            p = sweep.repose(m, sc, shift=pos.shift, s_centre=s_centre,
+                             problem_kw=problem_kw, ils=ils,
+                             tension=tension_mt * TON,
+                             material=material('j2'))
             ms, _mdl, _ix = mesh_of_problem(p)
             built[pos.shift] = (m, ms, pos.result.U, p)
         return built[pos.shift]

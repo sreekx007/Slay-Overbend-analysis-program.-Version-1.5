@@ -222,3 +222,53 @@ def test_the_buffer_never_yields():
 def test_mode_must_be_a_or_b(plain):
     with pytest.raises(ValueError, match="mode must be"):
         sweep.run(plain, None, L_comp=1.0, mode='C')
+
+
+# ---------------------------------------------------------------------------
+# passage_model / repose -- the re-pose, which was four copies in tools/
+# ---------------------------------------------------------------------------
+
+def test_passage_model_meshes_as_the_sweep_does():
+    """The re-pose must mesh IDENTICALLY to the solve or every element index
+    names a different element, and the sections table then carries strains
+    against the wrong ones -- silently and plausibly."""
+    from slay.model.assemble import build_model
+    sc = sweep.scene_for(R=85.0, spacing=9.0, L_comp=0.0)
+    mine = sweep.passage_model(sc, None, s_centre=0.0)
+    theirs = build_model(sc, None, s_centre=0.0,
+                         extra_stations=sweep._required_stations(sc))
+    assert [n.index for n in mine.nodes] == [n.index for n in theirs.nodes]
+    assert [(n.s, n.y) for n in mine.nodes] == [(n.s, n.y) for n in theirs.nodes]
+    assert len(mine.elements) == len(theirs.elements)
+
+
+def test_repose_merges_the_buffer_rather_than_replacing_it():
+    """THE L109 SITE, and the reason it took four changes to fix: every tool
+    that re-posed a position called `with_buffer` by hand. One site now."""
+    sc = sweep.scene_for(R=85.0, spacing=9.0, L_comp=0.0)
+    m = sweep.passage_model(sc, None, s_centre=0.0)
+    lo, hi = sweep.buffer_span(sc)
+    mine = (lo - 20.0, lo - 10.0)          # a span of the caller's own
+    p = sweep.repose(m, sc, shift=0.0, s_centre=0.0,
+                     problem_kw=dict(elastic_spans=(mine,)))
+    assert mine in p.elastic_spans, 'the caller span was dropped'
+    assert (lo, hi) in p.elastic_spans, 'the BUFFER span was dropped'
+
+
+def test_repose_reproduces_a_hand_posed_problem_exactly():
+    """What the four tools were doing by hand, held against the helper."""
+    from slay.physics.problem import build_problem
+    sc = sweep.scene_for(R=85.0, spacing=9.0, L_comp=0.0)
+    m = sweep.passage_model(sc, None, s_centre=0.0)
+    a = sweep.repose(m, sc, shift=0.5, s_centre=0.0, tension=1.0e6)
+    b = build_problem(m, sc, shift=0.5, s_centre=0.0, tension=1.0e6,
+                      **sweep.with_buffer(sc))
+    assert a.to_json() == b.to_json()
+
+
+def test_repose_carries_the_assembly_and_the_ils_together():
+    """They always travel together into `build_problem`; one without the
+    other poses a problem that cannot see its own component."""
+    import inspect
+    src = inspect.getsource(sweep.repose)
+    assert 'assembly=ils.assembly' in src and 'ils=ils' in src

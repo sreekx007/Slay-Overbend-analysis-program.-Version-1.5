@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 115
+# entries: 116
 
 - id: L001
   area: kernel
@@ -3119,4 +3119,56 @@
     moved and still assert every number they did before.
   detect: test_the_module_reports_nothing, test_it_uses_the_LIBRARY_all_bidirectional, test_steps_three_and_four_differ_ONLY_in_the_material, test_it_reproduces_the_reference_program
   refs: [rebuild/slay/study/staged.py, tools/stage_run.py, rebuild/tests/test_staged.py, rebuild/tests/test_stage_run.py, rebuild/slay/_layers.py]
+  date: 2026-10-09
+
+- id: L116
+  area: process
+  class: ruling
+  symptom: >-
+    Four tools -- `slide`, `emit_profile`, `plot_stinger` and `study_simple`
+    -- each re-posed a solved sweep position by hand, with the same two
+    calls: `build_model(..., extra_stations=sweep._required_stations(scene))`
+    and `build_problem(..., **sweep.with_buffer(...))`. Six of those
+    imported a PRIVATE function across a layer boundary into unpoliced code.
+  cause: >-
+    The re-pose is a workflow step and was never given a name, so each
+    caller rebuilt it. It is the same class as L115's staged sequence: a
+    `study`-layer operation living in `tools/`.
+  cause_detail: >-
+    THE COST IS NOT HYPOTHETICAL AND IS ALREADY IN THIS REGISTER. L109 --
+    the buffer's elastic span being REPLACED rather than merged, which would
+    have let feedstock yield and carried a plastic hinge forward through
+    every later position -- took a FOUR-SITE fix, and the four sites are
+    exactly these four tools. One function would have made it one site. The
+    re-pose also has a second way to go wrong that nothing would have
+    caught: mesh the re-pose at a different density than the sweep solved
+    on and every element index names a different element, so the sections
+    table carries strains against the wrong ones, silently and plausibly.
+  rule: >-
+    `sweep.passage_model(scene, ils, s_centre, **mesh_kw)` builds the mesh
+    the sweep solved on; `sweep.repose(model, scene, shift, s_centre,
+    problem_kw, ils, **kw)` poses one position on it with the buffer merged.
+    Both in `study`, where the sweep they must agree with already lives. The
+    private crossing is gone: `_required_stations` is now called only from
+    inside its own module.
+  rule_detail: >-
+    THE EXTRACTION IS NARROWER THAN THE REVIEW THAT PROPOSED IT, which is
+    worth recording because the first shape would have been wrong. The
+    review described the repeated idiom as the whole chain -- scene_for,
+    start_centre, run, measure, envelope, then the re-pose -- and reading
+    the four call sites showed only the RE-POSE is genuinely common. The
+    outer chain differs by caller for real reasons: `slide` carries modes
+    and clearances, `emit_profile` caches per shift, `study_simple` takes
+    mesh and modulus flags. Forcing those into one function would have
+    invented a shape none of them has. Two small functions, not one big one.
+  rule_detail_2: >-
+    BIT-IDENTICAL, PROVEN BEFORE AND AFTER on a 2.5 D GD-TP at R = 85: all
+    four profile-artifact sha256 hashes unchanged (geometry, sections,
+    stations, members), the envelope unchanged to fifteen decimals, and
+    `slide.passage`'s first Problem unchanged by full `to_json` digest. A
+    refactor of a re-pose is exactly the kind that can move a number without
+    failing anything, so the digest was the gate rather than the test suite
+    alone.
+  detect: test_passage_model_meshes_as_the_sweep_does, test_repose_merges_the_buffer_rather_than_replacing_it, test_repose_reproduces_a_hand_posed_problem_exactly
+  refs: [rebuild/slay/study/sweep.py, tools/slide.py, tools/emit_profile.py, tools/plot_stinger.py, tools/study_simple.py, rebuild/tests/test_sweep.py]
   date: 2026-10-09

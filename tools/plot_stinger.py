@@ -189,17 +189,14 @@ def passage_cases(arch_id='ILS-TP', R=85.0, spacing=9.0,
                           tension=tension_mt * TON, material=material('j2'))
     recs = rp.measure(positions, sc, L_comp=L)
     env = rp.envelope(recs)
-    m = build_model(sc, ils, s_centre=s_centre,
-                    extra_stations=sweep._required_stations(sc))
+    m = sweep.passage_model(sc, ils, s_centre=s_centre)
     out = []
     for pos in positions:
         if not pos.converged:
             out.append(None)
             continue
-        pr = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
-                           tension=tension_mt * TON, material=material('j2'),
-                           **sweep.with_buffer(sc, assembly=ils.assembly,
-                                               ils=ils))
+        pr = sweep.repose(m, sc, shift=pos.shift, s_centre=s_centre, ils=ils,
+                          tension=tension_mt * TON, material=material('j2'))
         ms, _mdl, _ix = mesh_of_problem(pr)
         out.append(dict(problem=pr, ms=ms, position=pos))
     return dict(scene=sc, model=m, steps=out, records=recs, envelope=env,
@@ -239,12 +236,9 @@ def component_case(arch_id='ILS-TP', R=85.0, spacing=9.0,
         pos = min(ok, key=lambda p_: abs(p_.shift - shift))
         note = f'nearest solved position to shift {shift:.3f} m'
 
-    m = build_model(sc, ils, s_centre=s_centre,
-                    extra_stations=sweep._required_stations(sc))
-    p = build_problem(m, sc, shift=pos.shift, s_centre=s_centre,
-                      tension=tension_mt * TON, material=material('j2'),
-                      **sweep.with_buffer(sc, assembly=ils.assembly,
-                                          ils=ils))
+    m = sweep.passage_model(sc, ils, s_centre=s_centre)
+    p = sweep.repose(m, sc, shift=pos.shift, s_centre=s_centre, ils=ils,
+                     tension=tension_mt * TON, material=material('j2'))
     ms, _mdl, _ix = mesh_of_problem(p)
     slots = ctc.slots_from_targets(p.contacts, ms)
     return dict(scene=sc, model=m, problem=p, result=pos.result, ms=ms,

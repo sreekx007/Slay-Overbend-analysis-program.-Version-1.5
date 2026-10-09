@@ -108,14 +108,10 @@ def _sweep(sm, R, spacing, tension_mt, step_OD, mesh_OD=None):
                           **pkw, **mkw)
     recs = rp.measure(positions, scene, L_comp=L)
     env = rp.envelope(recs)
-    model = build_model(scene, sm.ils, s_centre=s_centre,
-                        extra_stations=sweep._required_stations(scene),
-                        **mkw)
-    p0 = build_problem(
-        model, scene, shift=positions[env.index].shift, s_centre=s_centre,
-        tension=tension_mt * TON, material=material('j2'),
-        **sweep.with_buffer(scene, pkw, assembly=sm.ils.assembly,
-                            ils=sm.ils))
+    model = sweep.passage_model(scene, sm.ils, s_centre=s_centre, **mkw)
+    p0 = sweep.repose(model, scene, shift=positions[env.index].shift,
+                      s_centre=s_centre, problem_kw=pkw, ils=sm.ils,
+                      tension=tension_mt * TON, material=material('j2'))
     geom = rg.simple_geometry(sm.ils, s_centre)
     if geom is None:
         raise SystemExit('simple_geometry did not recognise this assembly')
@@ -150,13 +146,10 @@ def run_case(E_GPa, L_body_D, V_D, L1_D, L2_D, R, spacing, tension_mt,
     recs = rp.measure(positions, scene, L_comp=L)
     env = rp.envelope(recs)
 
-    model = build_model(scene, sm.ils, s_centre=s_centre,
-                        extra_stations=sweep._required_stations(scene))
-    p0 = build_problem(
-        model, scene, shift=positions[env.index].shift, s_centre=s_centre,
-        tension=tension_mt * TON, material=material('j2'),
-        **sweep.with_buffer(scene, pkw, assembly=sm.ils.assembly,
-                            ils=sm.ils))
+    model = sweep.passage_model(scene, sm.ils, s_centre=s_centre)
+    p0 = sweep.repose(model, scene, shift=positions[env.index].shift,
+                      s_centre=s_centre, problem_kw=pkw, ils=sm.ils,
+                      tension=tension_mt * TON, material=material('j2'))
 
     geom = rg.simple_geometry(sm.ils, s_centre)
     if geom is None:

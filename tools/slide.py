@@ -156,26 +156,20 @@ def _problem_at(scene, ils, pos, L_comp, **kw):
     emit = kw.pop('emit_unenforced_conn_types', frozenset())
     c = sweep.start_centre(scene, L_comp, cb, sweep.STATION) \
         if L_comp > 0 else 0.0
-    model = build_model(scene, ils, s_centre=c,
-                        extra_stations=sweep._required_stations(scene),
-                        emit_unenforced_conn_types=emit)
-    extra = {}
-    if ils is not None:
-        extra = dict(assembly=ils.assembly, ils=ils)
-    # THE SAME MERGE THE SOLVE USED. `sweep.with_buffer` adds the buffer's
-    # support and elastic span to whatever the caller asked for, instead of
-    # replacing it (L109) -- and this re-pose has to agree with the solved
-    # problem or `differs_only_in_contact` will say they are not the same
-    # problem, correctly.
-    extra = sweep.with_buffer(scene, extra,
-                              **{k: kw.pop(k) for k in
-                                 ('vertical_at', 'elastic_spans')
-                                 if k in kw})
+    # THE MESH AND THE BUFFER MERGE ARE BOTH `sweep`'s, not this file's --
+    # see `passage_model` and `repose`. This was four copies of the same two
+    # calls, which is why L109 took four sites to fix.
+    #
     # `OD` is NOT taken separately here: it already travels in `kw` when the
     # case is off the default pipe. Passing it both ways is a TypeError that
     # only fires on a non-default diameter -- invisible on the baseline.
-    return build_problem(model, scene, shift=pos.shift, s_centre=c,
-                         **extra, **kw)
+    return sweep.repose(
+        sweep.passage_model(scene, ils, s_centre=c,
+                            emit_unenforced_conn_types=emit),
+        scene, shift=pos.shift, s_centre=c, ils=ils,
+        problem_kw={k: kw.pop(k) for k in ('vertical_at', 'elastic_spans')
+                    if k in kw},
+        **kw)
 
 
 def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,

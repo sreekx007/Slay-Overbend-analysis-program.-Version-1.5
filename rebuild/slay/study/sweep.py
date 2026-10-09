@@ -340,6 +340,46 @@ def buffer_span(scene) -> tuple:
     return (min(scene.extent), min(st.s_arc for st in scene.stations))
 
 
+def passage_model(scene, ils=None, s_centre: float = 0.0, **mesh_kw):
+    """THE SAME MESH THE SWEEP SOLVED ON, built once.
+
+    `sweep.run` meshes with `_required_stations(scene)`, and anything that
+    re-poses one of its positions has to mesh identically or every element
+    index names a different element: the sections table would then carry
+    strains against the wrong elements, silently and plausibly.
+
+    This existed four times over in `tools/` -- `slide`, `emit_profile`,
+    `plot_stinger` and `study_simple` each calling `build_model` with
+    `extra_stations=sweep._required_stations(scene)` -- which is also why a
+    PRIVATE function was being imported across a layer boundary six times.
+    """
+    return build_model(scene, ils, s_centre=s_centre,
+                       extra_stations=_required_stations(scene), **mesh_kw)
+
+
+def repose(model, scene, shift: float, s_centre: float = 0.0,
+           problem_kw=None, ils=None, **kw):
+    """Re-pose ONE solved position, as the sweep posed it.
+
+    The re-pose must agree with the solve or `differs_only_in_contact` will
+    say the two are not the same problem -- correctly, and annoyingly to
+    debug. Two things make them agree and both were being repeated by hand:
+    the model (see `passage_model`) and the buffer merge.
+
+    THE BUFFER MERGE IS THE L109 SITE. `with_buffer` ADDS the feedstock
+    buffer's support and elastic span to whatever the caller asked for; the
+    four copies of this call are why fixing L109 was a four-site change.
+    One site now.
+
+    `ils` is a convenience: an assembly and an ILS always travel together
+    into `build_problem`, and passing one without the other poses a problem
+    that cannot see its own component.
+    """
+    extra = {} if ils is None else dict(assembly=ils.assembly, ils=ils)
+    return build_problem(model, scene, shift=shift, s_centre=s_centre,
+                         **with_buffer(scene, problem_kw, **extra), **kw)
+
+
 def with_buffer(scene, problem_kw=None, **more) -> dict:
     """`problem_kw` with the buffer's support and elastic span ADDED.
 
