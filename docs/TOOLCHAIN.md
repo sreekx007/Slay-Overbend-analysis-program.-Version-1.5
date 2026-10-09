@@ -44,6 +44,29 @@ OUT of the mirror and **are** ours.
 `ils_plotter.py` and `component_plotter.py` are **not** mirrored — they live
 only in the reference clone. Plotting an ILS needs that clone on `sys.path`.
 
+`fixtures/standard_ils_layouts.json` is the third mirrored artifact: the
+seven published archetype definitions, hashed alongside the two modules.
+
+### Building an archetype — `slay/define/archetypes.py`
+
+The seven published layouts are turned into an `ILS` by
+**`slay.define.archetypes.build_component_ils`**, which reads the mirrored
+fixture per call (no cache — a cache would hold a stale copy across a
+re-sync, which is exactly the drift G7 exists to catch) and applies the
+optional overrides in the order `OD`, `t_wall`, `L_OD`, `t_ratio`, because
+the last two are *relative* and must see the pipeline they scale against.
+
+A relative dimension goes to the component that **has** the attribute, not
+to `components[0]`: `ILS-SHTP` is a shroud with a thick body inside it, and
+`L_OD` means the body. A dimension no component of the archetype carries —
+`L_OD` on a bare `ILS-SH` — is **refused by name** rather than applied to
+the wrong body silently.
+
+This lived in `tools/plot_stinger.py` until 2026-10-09, where ten callers
+imported a 1349-line figure module to reach four names and paid for numpy
+and matplotlib to do it (L117). It is library code: `plot_stinger` imports
+it back, so the figure tool is unchanged.
+
 ---
 
 ## 2. The design workflow, end to end
@@ -117,7 +140,7 @@ rig is a bare beam by design. Building that view is an open gap.
 | `draw_layout.py` | the Scene to scale as SVG — roller stations, arc, deck. Deliberately draws **no pipe** (tracker item 27). |
 | `emit_profile.py` | **generator.** Solves a passage and writes it down as a profile artifact (three CSVs + sidecars). Draws nothing. |
 | `plot_from_schema.py` | **reader.** Draws case rows, or `--profile <stem>` for the five-panel stinger figure. Imports nothing from `slay`. |
-| `plot_stinger.py` | the older combined tool: solves *and* draws. Superseded for figures by the pair above (G13); kept for its solve helpers, which `emit_profile.py` uses. |
+| `plot_stinger.py` | the older combined tool: solves *and* draws. Superseded for figures by the pair above (G13); kept for its solve helpers, which `emit_profile.py` uses. It no longer owns `build_component_ils` — see below. |
 
 **Generating and drawing are separate programs (G13).** A figure that
 re-runs the analysis cannot be checked against the run it claims to show,

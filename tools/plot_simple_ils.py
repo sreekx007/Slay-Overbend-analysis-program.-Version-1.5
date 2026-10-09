@@ -38,7 +38,8 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-import plot_stinger as gen                                  # noqa: E402
+from slay.define.archetypes import (FIXTURE,            # noqa: E402
+                                    build_component_ils)
 from slay.define.simple import build                        # noqa: E402
 
 D = 0.4064
@@ -77,7 +78,7 @@ def draw(rec, out_dir):
     s_, e_, src = rec['simple'], rec['equivalent'], rec['source']
     sm = build(E=s_['E'], L_body=s_['L_body'], V=s_['V'],
                L1=s_['L1'], L2=s_['L2'], centre_x=s_['centre_x'])
-    orig = gen.build_component_ils('ILS-TP', L_OD=src['L_OD'],
+    orig = build_component_ils('ILS-TP', L_OD=src['L_OD'],
                                    t_ratio=src['t_mm'] / 21.0)
 
     OD_p = src['OD_pipe']

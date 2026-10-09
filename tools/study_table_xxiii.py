@@ -43,7 +43,8 @@ for _p in (REPO / 'rebuild', REPO, REPO / 'tools'):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-import plot_stinger as gen                                 # noqa: E402
+from slay.define.archetypes import (FIXTURE,            # noqa: E402
+                                    build_component_ils)
 import slide                                               # noqa: E402
 from slay.report import passage as rp                      # noqa: E402
 from slay.study import sweep                               # noqa: E402
@@ -79,7 +80,7 @@ def _component_elements(problems):
 
 
 def run_case(c, spacing, step_OD):
-    ils = gen.build_component_ils('ILS-TP', L_OD=c['L_OD'],
+    ils = build_component_ils('ILS-TP', L_OD=c['L_OD'],
                                   t_ratio=c['t_mm'] / 1000.0 / T_PIPE)
     with warnings.catch_warnings():
         warnings.simplefilter('ignore')

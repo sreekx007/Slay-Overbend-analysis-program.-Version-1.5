@@ -21,7 +21,8 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
         sys.path.insert(0, str(p))
 
 import config                                               # noqa: E402
-import plot_stinger as gen                                  # noqa: E402
+from slay.define.archetypes import (FIXTURE,            # noqa: E402
+                                    build_component_ils)
 from slay.define import simplify as sx                      # noqa: E402
 
 D = 0.4064
@@ -29,7 +30,7 @@ OD_P, T_P = 0.4064, 0.021
 
 
 def tp(L_OD=20.0, t_mm=53):
-    return gen.build_component_ils('ILS-TP', L_OD=L_OD, t_ratio=t_mm / 21.0)
+    return build_component_ils('ILS-TP', L_OD=L_OD, t_ratio=t_mm / 21.0)
 
 
 # ---------------------------------------------------------------------------
@@ -96,13 +97,13 @@ def test_the_axial_error_grows_with_the_wall():
 
 def test_a_tapered_body_is_refused_not_averaged():
     with pytest.raises(sx.ReductionError, match='tapered|constant section'):
-        sx.equivalent(gen.build_component_ils('ILS-TT'))
+        sx.equivalent(build_component_ils('ILS-TT'))
 
 
 def test_a_layout_with_nothing_to_reduce_is_refused():
     """A bare shroud owns contact but no section: there is no stiffness."""
     with pytest.raises(sx.ReductionError, match='owns a section'):
-        sx.equivalent(gen.build_component_ils('ILS-SH'))
+        sx.equivalent(build_component_ils('ILS-SH'))
 
 
 def test_a_body_that_owns_no_contact_is_refused():
@@ -110,7 +111,7 @@ def test_a_body_that_owns_no_contact_is_refused():
     depth is therefore not the thing a roller would touch, and reducing it
     as though it were would put the stand-in at the wrong elevation."""
     with pytest.raises(sx.ReductionError, match='owns no contact'):
-        sx.equivalent(gen.build_component_ils('ILS-SHTP'))
+        sx.equivalent(build_component_ils('ILS-SHTP'))
 
 
 def test_a_zero_taper_is_refused_with_the_reason():
@@ -163,3 +164,49 @@ def test_the_reduction_checks_itself_against_what_it_built():
     sm = build(**{**good, 'V': good['V'] + 0.05})
     got = sx.equivalent_of_simple(sm)
     assert abs(got['depth'] - eq.depth) > sx.FLAT_TOL
+
+
+# ---------------------------------------------------------------------------
+# the archetype builder, now in `define` rather than in a figure module
+# ---------------------------------------------------------------------------
+
+def test_every_published_archetype_builds():
+    from slay.define.archetypes import definitions
+    for arch in definitions():
+        ils = build_component_ils(arch)
+        assert ils.extent[1] > ils.extent[0], arch
+        assert ils.assembly.pipe.OD_pipe > 0, arch
+
+
+def test_a_dimension_goes_to_the_component_that_HAS_it():
+    """ILS-SHTP is a shroud with a thick body inside it, and the shroud is
+    components[0]. `L_comp` must reach the BODY, not the first component."""
+    ils = build_component_ils('ILS-SHTP', L_OD=5.0)
+    body = [c for c in ils.assembly.components if c.code == 'GD-TP'][0]
+    assert body.L_comp == pytest.approx(5.0 * ils.assembly.pipe.OD_pipe)
+
+
+def test_a_dimension_no_component_carries_is_refused():
+    """A bare shroud has no `L_comp`. Silently re-dimensioning the wrong
+    body is the failure this refusal exists to prevent."""
+    with pytest.raises(ValueError, match='no component of this archetype'):
+        build_component_ils('ILS-SH', L_OD=1.0)
+
+
+def test_relative_dimensions_follow_the_pipe_they_are_given():
+    """`L_OD` and `t_ratio` are RELATIVE, so changing the pipeline changes
+    what they mean -- which is why they are applied after OD and t_wall."""
+    a = build_component_ils('ILS-TP', L_OD=10.0)
+    b = build_component_ils('ILS-TP', OD=0.3239, t_wall=0.0127, L_OD=10.0)
+    ca = [c for c in a.assembly.components if c.code == 'GD-TP'][0]
+    cb = [c for c in b.assembly.components if c.code == 'GD-TP'][0]
+    assert ca.L_comp == pytest.approx(10.0 * 0.4064)
+    assert cb.L_comp == pytest.approx(10.0 * 0.3239)
+
+
+def test_the_fixture_is_read_per_call_not_cached():
+    """Mirrored data (G7). A cache would hold a stale copy across a re-sync,
+    which is the silent drift the guardrail exists to prevent."""
+    from slay.define import archetypes
+    assert archetypes.definitions() is not archetypes.definitions()
+    assert archetypes.definitions() == archetypes.definitions()

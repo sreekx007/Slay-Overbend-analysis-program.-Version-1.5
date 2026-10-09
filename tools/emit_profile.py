@@ -43,6 +43,8 @@ from slay.report import regions as rg               # noqa: E402
 from slay.study import sweep                        # noqa: E402
 
 import plot_stinger as gen                          # noqa: E402
+from slay.define.archetypes import (FIXTURE,        # noqa: E402,F401
+                                    build_component_ils)
 
 TON = gen.TON
 
@@ -54,7 +56,7 @@ def _ea_ils(arch_id, P_c1, kT, L_top, system=None, extra=None):
 
     import ils_builder
     spec = copy.deepcopy({a['id']: a for a in json.loads(
-        gen.FIXTURE.read_text())['archetypes']}[arch_id]['definition'])
+        FIXTURE.read_text())['archetypes']}[arch_id]['definition'])
     if system is not None:
         # WHICH SLOTS ARE POPULATED, not how they behave: F1 is a single F
         # at the centre slot, F2 a pair at the inner slots. Declaring the
@@ -119,7 +121,7 @@ def emit(arch_id='ILS-TP', R=85.0, spacing=9.0, tension_mt=120.0,
     extra = {k: v for k, v in (extra or {}).items() if v is not None} or None
     ils = _ea_ils(arch_id, P_c1, kT, L_top, system, extra) if any(
         v is not None for v in (P_c1, kT, L_top, system, extra)) \
-        else gen.build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
+        else build_component_ils(arch_id, L_OD=L_OD, t_ratio=t_ratio)
     OD = ils.assembly.pipe.OD_pipe
     t_wall = ils.assembly.pipe.t_pipe
     L = ils.extent[1] - ils.extent[0]
@@ -265,7 +267,7 @@ def main() -> int:
     print(f'\n=== {aid} -> profile artifact ===')
     for t, s in res['summary'].items():
         print(f'  {t:9s} {s["rows"]:6d} rows x {s["columns"]:2d} cols  '
-              f'{gen._rel(Path(s["path"]))}')
+              f'{gen.rel(Path(s["path"]))}')
     print(f'  envelope: step {env.index}, shift {env.shift:.3f} m, '
           f'peak {100 * env.peak_strain:.4f}%')
 
@@ -302,7 +304,7 @@ def main() -> int:
                   f'this mesh -- those ratios are reporting a mesh, not a '
                   f'strain field. Refine with --mesh.')
     print(f'\n  plot it with:\n    python3 tools/plot_from_schema.py '
-          f'--profile {gen._rel(Path(res["stem"]))}')
+          f'--profile {gen.rel(Path(res["stem"]))}')
     return 0
 
 

@@ -44,7 +44,8 @@ for _p in (REPO / 'rebuild', REPO, REPO / 'tools'):
         sys.path.insert(0, str(_p))
 
 import ils_builder                                         # noqa: E402
-import plot_stinger as gen                                 # noqa: E402
+from slay.define.archetypes import (FIXTURE,            # noqa: E402
+                                    build_component_ils)
 import slide                                               # noqa: E402
 from slay.report import passage as rp                      # noqa: E402
 
@@ -67,7 +68,7 @@ def two_body_ils(gap_D, L_OD=2.5, t_mm=T_COMP_MM):
     sweep's `s_centre` means the same thing.
     """
     spec = copy.deepcopy({a['id']: a for a in json.loads(
-        gen.FIXTURE.read_text())['archetypes']}['ILS-TP']['definition'])
+        FIXTURE.read_text())['archetypes']}['ILS-TP']['definition'])
     a = spec['components'][0]
     a['L_comp'] = L_OD * D
     a['t_comp'] = t_mm / 1000.0

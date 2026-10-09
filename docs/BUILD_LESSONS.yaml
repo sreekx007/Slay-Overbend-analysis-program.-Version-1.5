@@ -3172,3 +3172,64 @@
   detect: test_passage_model_meshes_as_the_sweep_does, test_repose_merges_the_buffer_rather_than_replacing_it, test_repose_reproduces_a_hand_posed_problem_exactly
   refs: [rebuild/slay/study/sweep.py, tools/slide.py, tools/emit_profile.py, tools/plot_stinger.py, tools/study_simple.py, rebuild/tests/test_sweep.py]
   date: 2026-10-09
+
+- id: L117
+  area: process
+  class: ruling
+  symptom: >-
+    `tools/plot_stinger.py` is 1349 lines, imports numpy and matplotlib at
+    module scope, and is documented in TOOLCHAIN as SUPERSEDED for figures
+    (G13). Ten other modules imported it anyway -- five tools and five
+    tests -- and between them used four of its twenty-four definitions:
+    `build_component_ils` (x17 call sites), `FIXTURE` (x2), `_rel` (x2) and
+    `TON` (x1). Two of those four were private.
+  cause: >-
+    `build_component_ils` was written where it was first needed. It reads
+    the mirrored archetype fixture and hands the definition to the mirrored
+    `ils_builder` -- that is `define`-layer work, with no drawing in it --
+    but it was never moved out of the figure tool it was born in.
+  cause_detail: >-
+    THE LAYER LINTER COULD NOT SEE THIS. `tools/` is not policed by
+    `check_layers.py`, so a `define`-layer function sitting in a tool is
+    invisible to the gate that exists to catch exactly this. The private
+    crossings are the symptom that gives it away: `_rel` was being called
+    from two other tools, which means the module had no enforced surface at
+    all, only a convention nobody was checking. The second cost is paid on
+    every import: a test that wants one archetype built loads numpy and
+    matplotlib to get it.
+  rule: >-
+    `slay/define/archetypes.py` owns `FIXTURE`, `definitions()` and
+    `build_component_ils`. The ten callers import the library. `plot_stinger`
+    imports both names back (`FIXTURE = archetypes.FIXTURE`), so the figure
+    tool's own surface is unchanged and nothing that pointed at it broke.
+    `_rel` was the other half of the problem and is now public `rel`,
+    because it is presentation -- it belongs to the plotter, it just has to
+    say so.
+  rule_detail: >-
+    `definitions()` RE-READS THE FIXTURE ON EVERY CALL and is deliberately
+    not cached. The fixture is mirrored data hashed under G7; a module-level
+    cache would hold a stale copy across a re-sync, which is precisely the
+    silent drift the guardrail exists to catch. The cost is one small JSON
+    read per build and it is worth paying.
+  rule_detail_2: >-
+    BIT-IDENTICAL, PROVEN BEFORE AND AFTER by eleven fingerprints captured
+    from the old call path and replayed through the new one: all seven
+    published archetypes, three dimensioned variants (`OD`/`t_wall`,
+    `L_OD`, `t_ratio`), and the refusal path -- the `ValueError` text for
+    `L_OD` on a bare `ILS-SH`, compared as a string. The refusal is in the
+    fingerprint set on purpose: a relative dimension applied to
+    `components[0]` instead of to the component that HAS the attribute
+    would re-dimension the wrong body and still build, so the error message
+    is as much a result as the geometry is.
+  rule_detail_3: >-
+    ONE SELF-INFLICTED BREAK, WORTH RECORDING. The migration was done with
+    a regex over the ten callers, and in `test_simple_component.py` the
+    import being replaced was FUNCTION-LOCAL, not top-level. Substituting a
+    module-level import block at that indentation produced an
+    `IndentationError` at line 364 -- caught by the suite, not by the
+    fingerprints, because the file never imported. A mechanical edit across
+    ten files needs the suite run as the gate, not just the equivalence
+    check the refactor was designed around.
+  detect: test_every_published_archetype_builds, test_a_dimension_goes_to_the_component_that_HAS_it, test_a_dimension_no_component_carries_is_refused, test_the_fixture_is_read_per_call_not_cached
+  refs: [rebuild/slay/define/archetypes.py, tools/plot_stinger.py, tools/emit_profile.py, tools/simplify_ils.py, rebuild/tests/test_simplify.py, docs/TOOLCHAIN.md]
+  date: 2026-10-09

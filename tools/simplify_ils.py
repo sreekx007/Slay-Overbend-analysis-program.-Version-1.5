@@ -40,7 +40,8 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-import plot_stinger as gen                                  # noqa: E402
+from slay.define.archetypes import (FIXTURE,            # noqa: E402
+                                    build_component_ils)
 from slay.define import simplify as sx                      # noqa: E402
 
 D = 0.4064
@@ -89,7 +90,7 @@ CASES = {
 def reduce_case(name, L2_D, match):
     """One case: build the real GD-TP, reduce it, build the stand-in."""
     table, R, tension, L_OD, t_mm, eps_paper, eps_ours, bm_ours = CASES[name]
-    ils = gen.build_component_ils('ILS-TP', L_OD=L_OD, t_ratio=t_mm / 21.0)
+    ils = build_component_ils('ILS-TP', L_OD=L_OD, t_ratio=t_mm / 21.0)
     sm, eq = sx.simplify(ils, L2=L2_D * D if L2_D else sx.TAPER_MIN,
                          match=match)
     return dict(
@@ -133,7 +134,7 @@ def main() -> int:
     arch = arg('--archetype', str, '')
 
     if arch:
-        ils = gen.build_component_ils(
+        ils = build_component_ils(
             arch, L_OD=arg('--L-OD', float, None),
             t_ratio=(arg('--t-mm', float, 0.0) / 21.0) or None)
         sm, eq = sx.simplify(ils, L2=L2_D * D if L2_D else sx.TAPER_MIN,

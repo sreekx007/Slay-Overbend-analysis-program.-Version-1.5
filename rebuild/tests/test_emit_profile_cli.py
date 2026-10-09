@@ -27,6 +27,8 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
         sys.path.insert(0, str(p))
 
 emit_profile = pytest.importorskip('emit_profile')
+from slay.define.archetypes import (            # noqa: E402
+    build_component_ils)
 
 
 # ---------------------------------------------------------------------------
@@ -97,11 +99,10 @@ def test_t_ratio_reaches_the_built_component(t_ratio, t_mm):
     Built through the SAME call `emit` makes, with an all-None `extra` as
     the CLI supplies it -- so this fails if the branch test regresses.
     """
-    import plot_stinger as gen
     extra = {k: None for k in emit_profile.EA_DIMS}
     extra = {k: v for k, v in extra.items() if v is not None} or None
     assert extra is None, 'an all-None extra must collapse to None'
-    ils = gen.build_component_ils('ILS-TP', t_ratio=t_ratio)
+    ils = build_component_ils('ILS-TP', t_ratio=t_ratio)
     body = ils.assembly.components[0]
     got = getattr(body, 't_comp', None) or getattr(body, 't', None)
     assert got == pytest.approx(t_mm / 1000.0, abs=6e-4), (
@@ -112,10 +113,9 @@ def test_t_ratio_reaches_the_built_component(t_ratio, t_mm):
 def test_three_wall_thicknesses_build_three_different_stiffnesses():
     """The invariant whose violation exposed L094: identical strain from
     three thicknesses is impossible, so the sections must differ first."""
-    import plot_stinger as gen
     ods = set()
     for tr in (1.523809524, 2.0, 2.523809524):
-        ils = gen.build_component_ils('ILS-TP', t_ratio=tr)
+        ils = build_component_ils('ILS-TP', t_ratio=tr)
         b = ils.assembly.components[0]
         ods.add(round(getattr(b, 'OD_comp', None)
                       or getattr(b, 'OD', 0.0), 6))

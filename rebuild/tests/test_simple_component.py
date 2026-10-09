@@ -29,6 +29,8 @@ for p in (REPO / 'rebuild', REPO, REPO / 'tools'):
 import config                                               # noqa: E402
 import ils_builder                                          # noqa: E402
 from slay.data.materials import material                    # noqa: E402
+from slay.define.archetypes import (                        # noqa: E402
+    build_component_ils)
 from slay.define import simple as sp                        # noqa: E402
 from slay.model import assemble                             # noqa: E402
 from slay.physics.problem import build_problem              # noqa: E402
@@ -359,8 +361,7 @@ def test_a_top_structure_changes_nothing_a_roller_touches():
     """The measurement the body-only variant exists for. If this ever comes
     back with a lift, EA-ST needs a shroud after all and the reduction is
     wrong, not the test."""
-    import plot_stinger as gen
-    ils = gen.build_component_ils('ILS-EAST')
+    ils = build_component_ils('ILS-EAST')
     half = ils.assembly.pipe.OD_pipe / 2.0
     for x in (-5.0, -2.0, 0.0, 2.0, 5.0):
         c = ils.assembly.contact_at(x)

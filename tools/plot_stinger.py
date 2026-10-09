@@ -57,6 +57,8 @@ sys.path.insert(0, str(REPO / 'rebuild'))
 sys.path.insert(0, str(REPO))
 
 from slay.data.materials import material                   # noqa: E402
+from slay.define import archetypes                         # noqa: E402
+from slay.define.archetypes import build_component_ils     # noqa: E402,F401
 from slay.model.assemble import build_model                # noqa: E402
 from slay.physics.problem import build_problem             # noqa: E402
 from slay.scene.path import LayPath                        # noqa: E402
@@ -76,13 +78,16 @@ UPLIFT_ARROW = 1.6                  # m, the 'may lift off' arrow's length
 # threshold. See section 5 of `docs/modules/T5_solve_spec.md`.
 TENSION_MT = 120.0
 
-FIXTURE = REPO / 'rebuild' / 'fixtures' / 'standard_ils_layouts.json'
+# RE-EXPORTED, not redefined. Both moved to `slay.define.archetypes`
+# on 9 Oct 2026; the names stay here so the ten callers that had them
+# from this module keep working while they migrate.
+FIXTURE = archetypes.FIXTURE
 OFFSET_COL = '#6b4ea8'
 JUNC_COL = '#c1121f'
 COMP_FILL = '#f2e3c4'
 
 
-def _rel(path):
+def rel(path):   # public: `emit_profile` displays paths too
     """Path relative to the repo when it is inside it, else as given.
 
     `relative_to` RAISES on a path outside the repo or on a relative one, so
@@ -121,51 +126,6 @@ def case(R=85.0, one_sided=None, gravity=True, tension_mt=0.0, elastic=16.0):
     return sc, m, p, r, ms, slots
 
 
-def build_component_ils(arch_id='ILS-TP', OD=None, t_wall=None,
-                        L_OD=None, t_ratio=None):
-    """The archetype, optionally re-dimensioned.
-
-    Edits the archetype's own definition rather than constructing geometry
-    here, so `ils_builder` stays the single author of what a component IS
-    (G7) and the constant-bore outward growth comes with it.
-    """
-    import copy
-    import json
-
-    import ils_builder
-    spec = copy.deepcopy({a['id']: a for a in json.loads(
-        FIXTURE.read_text())['archetypes']}[arch_id]['definition'])
-    if OD is not None:
-        spec['pipeline']['OD_pipe'] = OD
-    if t_wall is not None:
-        spec['pipeline']['t_pipe'] = t_wall
-    od = spec['pipeline']['OD_pipe']
-    tw = spec['pipeline']['t_pipe']
-    # APPLY A DIMENSION TO THE COMPONENT THAT HAS IT, not to the first one.
-    # `ILS-SHTP` is a shroud (GD-SH: V, L1, L2) with a thick body inside it
-    # (GD-TP: t_comp, L_comp), and the shroud is components[0]. Writing
-    # L_comp onto it raised `OffsetShroud.__init__() got an unexpected
-    # keyword argument 'L_comp'` -- which at least failed loudly; on a
-    # component that happened to accept the key it would have re-dimensioned
-    # the wrong body silently (6 Oct 2026).
-    def _set(key, value):
-        if value is None or not spec.get('components'):
-            return
-        owners = [c for c in spec['components'] if key in c]
-        if not owners:
-            raise ValueError(
-                f'no component of this archetype carries {key!r} -- '
-                f'components are '
-                f'{[c.get("code") for c in spec["components"]]}')
-        if len(owners) > 1:
-            raise ValueError(
-                f'{len(owners)} components carry {key!r}; which one is meant '
-                f'is not something this flag can express')
-        owners[0][key] = value
-
-    _set('L_comp', None if L_OD is None else L_OD * od)
-    _set('t_comp', None if t_ratio is None else t_ratio * tw)
-    return ils_builder.build_ils(spec)
 
 
 def passage_cases(arch_id='ILS-TP', R=85.0, spacing=9.0,
@@ -676,7 +636,7 @@ def plot(cases, out):
                  'uplift.', fontsize=11)
     fig.tight_layout()
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {_rel(out)}')
+    print(f'\nwrote {rel(out)}')
 
 
 def ils_of(c):
@@ -1049,7 +1009,7 @@ def plot_component(c, out):
         'the deformed pipe.\n' + tail, fontsize=11)
     fig.subplots_adjust(left=0.07, right=0.985, top=0.925, bottom=0.055)
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {_rel(out)}')
+    print(f'\nwrote {rel(out)}')
 
 
 def plot_passage(c, out):
@@ -1253,7 +1213,7 @@ def plot_passage(c, out):
         'is discontinuous there.', fontsize=11)
     fig.subplots_adjust(left=0.065, right=0.895, top=0.925, bottom=0.05)
     fig.savefig(out, dpi=140)
-    print(f'\nwrote {_rel(out)}')
+    print(f'\nwrote {rel(out)}')
 
 
 def report_component(c):
