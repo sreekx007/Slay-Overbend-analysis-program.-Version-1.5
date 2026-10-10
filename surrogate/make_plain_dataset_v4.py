@@ -350,6 +350,41 @@ def git_sha() -> str:
         return ''
 
 
+def shard_of(spec):
+    """`'I/N'` -> `(I, N)`, or None.
+
+    A SHARD CANNOT CHANGE A RESULT, which is the only reason this is safe to
+    add to a run already in progress. Every case is one independent passage:
+    it builds its own scene, its own mesh and its own state, and carries
+    nothing to the next case. Mode A carries state between POSITIONS of one
+    passage, never between cases. So the partition is arbitrary and
+    `index % n` is chosen because the expensive cases cluster in consecutive
+    indices -- one section's four tensions in a row -- and striding spreads
+    them across workers instead of loading one.
+    """
+    if spec is None:
+        return None
+    i, n = (int(x) for x in str(spec).split('/'))
+    if not (0 <= i < n) or n < 1:
+        raise SystemExit(f'--shard {spec}: need 0 <= I < N and N >= 1')
+    return i, n
+
+
+def _done_elsewhere(mine: Path) -> set:
+    """`case_id`s already written by the OTHER shards, or by a sequential run.
+
+    Read so a worker never redoes a case another one has finished -- which
+    matters when sharding is switched on partway through, as it was here with
+    48 rows already in `plain_runs_v4.jsonl`.
+    """
+    out = set()
+    for p in sorted(HERE.glob('plain_runs_v4*.jsonl')):
+        if p == mine:
+            continue
+        out |= done_ids(p)
+    return out
+
+
 def done_ids(path: Path) -> set:
     if not path.exists():
         return set()
@@ -390,13 +425,26 @@ def main() -> int:
                     help='block A only -- the gate')
     ap.add_argument('--budget', type=float, default=None,
                     help='seconds; stop cleanly when exceeded')
-    ap.add_argument('--out', type=Path, default=OUT)
+    ap.add_argument('--out', type=Path, default=None)
+    ap.add_argument('--shard', default=None, metavar='I/N',
+                    help='run only cases where index %% N == I, writing to '
+                         'plain_runs_v4.shardI.jsonl. The cases are '
+                         'independent, so this changes nothing but the wall '
+                         'clock -- see `shard_of`.')
     a = ap.parse_args()
 
     cases = case_list()
     if a.anchors_only:
         cases = [c for c in cases if c['block'].startswith('A')]
-    already = done_ids(a.out)
+    shard = shard_of(a.shard)
+    out = a.out
+    if shard is not None:
+        i, n = shard
+        cases = [c for k, c in enumerate(cases) if k % n == i]
+        out = out or HERE / f'plain_runs_v4.shard{i}.jsonl'
+    out = out or OUT
+    a.out = out
+    already = done_ids(a.out) | _done_elsewhere(a.out)
     todo = [c for c in cases if c['case_id'] not in already]
     sha = git_sha()
     started = time.time()
