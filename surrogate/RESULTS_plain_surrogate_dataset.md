@@ -424,7 +424,20 @@ rejection — which is a different design, and this one is recorded as it ran.
 
 ## 10. Columns, for the CSV step
 
-68 fields per row in `plain_runs.jsonl`.
+**This section is the contract the CSV is generated from.**
+`make_csv.py` parses the two tables below and emits exactly what they say; it
+carries no column list of its own, because two lists drift and then this
+document becomes a story about a table nobody produced from it. It refuses
+rather than guesses: a name here that no row carries, a key in
+`plain_runs.jsonl` that is not named here, or a computed column it does not
+implement, each stops the CSV from being written.
+
+The group table lists **69** names. `plain_runs.jsonl` carries **68** of
+them: `traceback` is written only when a case raises an exception, and no
+case did, so it is emitted as an empty column rather than dropped — a reader
+diffing the document against the file has to find every name. With the three
+computed columns appended, `plain_dataset.csv` is **525 rows × 72
+columns**.
 
 | group | fields |
 |---|---|
@@ -445,6 +458,30 @@ already present, all because this document found a reason for them:
 | `sigma_axial` | `tension_mt × 9806.65 / A` | section 8: the tension axis changes regime at small diameter |
 | `axial_over_yield` | `sigma_axial / 360e6` | 6 rows above 1.0, 11 more above 0.8 |
 | `tip_exceeds_peak` | `max(eps_SR5..SR7) > peak_strain` | section 8: true in 98% of rows, and the columns are on a different zone rule |
+
+They are **appended** after everything the run wrote, in the run's own order,
+so the CSV header diffs cleanly against the raw file. Two notes on reading
+them:
+
+`sigma_axial` and `axial_over_yield` are arithmetic on inputs alone, so they
+are computed for **all 525 rows including the seven failures** — which is why
+counting `axial_over_yield > 1` in the CSV gives **10** where section 8 says
+6. Six of those are among the 518 cases with a result; the other four are
+failures, and section 7 lists them at 1.03 to 1.69 × yield. Both numbers are
+right and they are counting different populations.
+
+`tip_exceeds_peak` is empty for the seven failures, because there is no
+scored peak to exceed.
+
+### The one unit trap
+
+**`peak_strain`, `start_strain`, `eps_*_env` and `eps_pure_bend` are
+FRACTIONS. `ref_strain_pct` is a PERCENT**, because it is transcribed from
+the papers' own tables, which print percent. Subtracting one from the other
+gives nonsense that looks plausible — 0.4070 against 0.4070% is a factor of
+100 — and this is the third time that family of slip has appeared in this
+project. Both are flagged in `plain_dataset.csv.schema.json` with the word
+FRACTION or PERCENT in the `quantity` field.
 
 `start_strain` is worth one note of its own. **In 331 of 518 rows it equals
 `peak_strain` exactly**, mean gain over the passage +0.26%, median 0.00%, max
@@ -482,4 +519,5 @@ ledger about why the gap is as large as it is.
 
 | | |
 |---|---|
+| 10 Oct 2026 | `plain_dataset.csv` generated from section 10 of this document: 525 rows × 72 columns, with `plain_dataset.csv.schema.json` beside it. Round trip verified exact over all 525 rows and all 68 run-written columns, computed columns recomputed independently and exact, and all six of the generator's refusal paths exercised. |
 | 10 Oct 2026 | 525 cases run, 1.41 h. Block A green 9/9 to four decimals. Zero partial passages. Seven failures, all in one corner, all recorded. Three columns identified for the CSV step. One lead raised for ledger §8 — the excess over pure bending is ordered by roller spacing, ρ = +0.731 over 76 zero-tension cases, and at 6 m spacing it lands on Paper 1's own figure. |

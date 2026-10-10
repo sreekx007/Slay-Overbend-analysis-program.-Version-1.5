@@ -277,6 +277,17 @@ afterwards.
 | `surrogate/RESULTS_plain_surrogate_dataset.md` | what the run produced, and the source the CSV is generated from |
 | `surrogate/make_plain_dataset.py` | the runner; appends one JSON object per case |
 | `surrogate/plain_runs.jsonl` | the checkpoint, 68 fields per row |
+| `surrogate/make_csv.py` | the tabulator; **parses the results document's own column section** and emits the CSV from it |
+| `surrogate/plain_dataset.csv` | 525 rows x 72 columns |
+| `surrogate/plain_dataset.csv.schema.json` | one description per column: unit, quantity, role, and whether the run wrote it or the CSV step computed it |
+
+**The CSV is generated from the document, not beside it.** `make_csv.py`
+carries no column list of its own: it reads section 10 of
+`RESULTS_plain_surrogate_dataset.md` and refuses to write anything if the
+document and the data disagree in either direction -- a name the document
+lists that no row carries, a key the run wrote that the document does not
+name, or a computed column the script does not implement. Two lists drift;
+one list and a parser cannot.
 
 **The step rule is the opposite of the one a component case gets, and that is
 deliberate.** A component passage refines the step because the envelope sits

@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 121
+# entries: 122
 
 - id: L001
   area: kernel
@@ -3524,4 +3524,67 @@
     `refs`.
   detect: test_the_header_count_matches, test_every_named_test_still_exists
   refs: [docs/BUILD_LESSONS.yaml, rebuild/tests/test_build_lessons.py, rebuild/tests/test_trial_log.py]
+  date: 2026-10-10
+
+- id: L122
+  area: process
+  class: ruling
+  symptom: >-
+    A dataset is three artifacts -- the raw run, the write-up and the table a
+    consumer actually loads -- and nothing kept them agreeing. The 30
+    September matrix emitted its CSV from the runner and its report
+    alongside, so the report was a commentary on a table it had no hand in
+    producing; when the program moved under both, neither noticed.
+  cause: >-
+    TWO COLUMN LISTS DRIFT. A runner that writes the CSV owns one list and
+    the document owns another, and the only thing tying them together is
+    that the same person wrote both on the same day. That is the same
+    structure as the register header that said 116 against 120 entries
+    (L121) and as every other hand-kept count in this project that has
+    drifted.
+  rule: >-
+    THE DOCUMENT IS THE CONTRACT AND THE TABLE IS GENERATED FROM IT.
+    `surrogate/make_csv.py` parses section 10 of
+    `RESULTS_plain_surrogate_dataset.md` -- the group table and the
+    computed-column table -- and carries no column list of its own. The
+    runner writes JSONL only. One list, and a parser instead of a
+    convention.
+  rule_detail: >-
+    IT REFUSES IN BOTH DIRECTIONS, which is what makes the contract real
+    rather than decorative. A name the document lists that no row carries is
+    an error. A key the run wrote that the document does not name is an
+    error, because a column must not be dropped silently. A computed column
+    the document asks for that the script does not implement is an error,
+    and so is the reverse. A group label stating a field count that
+    disagrees with the names it lists is an error -- the same check that
+    catches a register header drifting from its own register. And a missing
+    section heading refuses in the script's own words rather than as a bare
+    `ValueError: substring not found`, because the address of the contract is
+    the one thing that cannot be worked around.
+  rule_detail_2: >-
+    VERIFIED, NOT ASSUMED (G8). Round trip exact over all 525 rows and all
+    68 run-written columns, compared value by value against the JSONL with
+    None mapping to an empty cell and floats compared as floats. The three
+    computed columns recomputed independently from the raw file and exact.
+    All six refusal paths exercised against deliberately corrupted copies of
+    the document and the data, in a temporary directory, never against the
+    real files. Three implementation defects were caught by that pass and
+    not by the script running: the computed columns were parsed and then
+    never appended to the column order, so the first CSV had 69 columns and
+    none of the three; their `present` flag was read before they were
+    filled, so the summary reported them as "never written by the run",
+    which is true of the run and false of the file; and the missing-section
+    path raised the bare `ValueError`. A generator that prints a plausible
+    summary is not evidence that it wrote the right file.
+  rule_detail_3: >-
+    THE UNIT TRAP IS NAMED IN THE SIDECAR, because it is the third
+    appearance of the same family of slip in this project. `peak_strain`,
+    `start_strain`, `eps_*_env` and `eps_pure_bend` are FRACTIONS;
+    `ref_strain_pct` is a PERCENT, since it is transcribed from the papers'
+    tables, which print percent. 0.4070 against 0.4070% is a factor of 100
+    and both read as plausible. `plain_dataset.csv.schema.json` carries the
+    word FRACTION or PERCENT in the `quantity` field of every strain column
+    so a reader meets it before the arithmetic does.
+  detect: '-'
+  refs: [surrogate/make_csv.py, surrogate/RESULTS_plain_surrogate_dataset.md, surrogate/plain_dataset.csv.schema.json, docs/TOOLCHAIN.md]
   date: 2026-10-10
