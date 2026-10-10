@@ -301,3 +301,7 @@ library addition is `station_moments` in the `report` layer, with a test.
 | | |
 |---|---|
 | 10 Oct 2026 | Plan written against the user's axes. Case list generated to `CASES_plain_v3_proposed.txt` (F 1500, A 9, Z 75). Features settled. Targets settled as six — strain and moment at SR1/SR2/SR3 — and `station_moments` identified as missing from the library. Four decisions open. Nothing run. |
+
+> **Superseded by `PLAN_plain_surrogate_v4.md` (10 Oct 2026).** This was
+> the review draft; its targets, window rule and sweep travel were all
+> changed in review. Left unedited as the record of what was proposed.
