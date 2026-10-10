@@ -1,0 +1,19 @@
+# Python dependencies, pinned to what the 10 Oct 2026 runs were produced on.
+#
+# WHY THIS FILE EXISTS. A container restart that day left the repository
+# re-cloned and the interpreter bare: `import numpy` failed, and nothing in
+# the repo said what to install or at which versions. The dataset run had to
+# be halted while the versions were guessed, and then every finished row had
+# to be re-verified against the new interpreter before the run could continue
+# -- because a different numpy could have moved the numbers and no record
+# said which one produced them.
+#
+# VERIFIED ACROSS THAT RESTART: four finished cases, including two failures,
+# were re-run on numpy 2.4.6 / scipy 1.17.1 and reproduced every field of
+# their earlier rows exactly. The versions below are therefore known-good for
+# `surrogate/plain_runs_v4.jsonl`, not merely what happened to be installed.
+numpy==2.4.6
+scipy==1.17.1
+PyYAML
+pytest
+matplotlib
