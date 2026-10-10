@@ -176,7 +176,8 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
             tension_mt=TENSION_MT_DEF, step=None, OD=OD_DEF, t_wall=None,
             mode='A', elastic=False, clear_before=None, clear_after=None,
             contact_surface=None, ils=None, verbose=True,
-            emit_unenforced_conn_types=frozenset()):
+            emit_unenforced_conn_types=frozenset(),
+            n_sr=None, n_vr=None, spacing_vr=None):
     """Run one passage.
 
     Returns `(scene, L_comp, records, junction rows, problems, positions,
@@ -198,6 +199,14 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     `ils` overrides `arch_id` with an already-built assembly, which is how
     the dataset runner varies component length and wall: those are fields of
     an ILS definition, not of a fixture name.
+
+    `n_sr`, `n_vr` and `spacing_vr` are PASS-THROUGHS to `build_scene`, added
+    10 Oct 2026 for a study that varies the stinger pitch while holding the
+    vessel deck. `None` on all three reproduces the layout every validated
+    number was computed with, so they move nothing until asked. They are
+    here rather than being reached by calling `study.sweep` directly, because
+    this function is the entry point the published Sec. 1 tables use and a
+    dataset that bypassed it would stop being comparable to them.
     """
     # None means "whatever the library rules" -- this tool does not keep
     # its own copy of the contact-surface ruling (6 Oct).
@@ -224,10 +233,16 @@ def passage(arch_id='none', R=R_DEF, spacing=SPACING_DEF,
     # depends on the contact surface AND the diameter. This call used to pass
     # neither, which was harmless only while the default was 'centreline' and
     # the margin was zero.
+    # The pass-throughs are omitted when None rather than forwarded as None,
+    # so a scene built without them is byte-for-byte the call that was made
+    # before they existed.
+    scene_kw = {k: v for k, v in (('n_sr', n_sr), ('n_vr', n_vr),
+                                  ('spacing_vr', spacing_vr))
+                if v is not None}
     sc = sweep.scene_for(R=R, spacing=spacing, L_comp=L_comp,
                          clear_before=cb, clear_after=ca,
                          contact_surface=contact_surface,
-                         OD=None if OD == OD_DEF else OD)
+                         OD=None if OD == OD_DEF else OD, **scene_kw)
 
     kw = dict(tension=tension_mt * TON,
               material=None if elastic else material('j2'),

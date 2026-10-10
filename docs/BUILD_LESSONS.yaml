@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 122
+# entries: 125
 
 - id: L001
   area: kernel
@@ -3587,4 +3587,161 @@
     so a reader meets it before the arithmetic does.
   detect: '-'
   refs: [surrogate/make_csv.py, surrogate/RESULTS_plain_surrogate_dataset.md, surrogate/plain_dataset.csv.schema.json, docs/TOOLCHAIN.md]
+  date: 2026-10-10
+
+- id: L123
+  area: model
+  class: defect
+  symptom: >-
+    `scene.all_bidirectional` REBUILDS every station and promises in its own
+    docstring to be "GEOMETRICALLY IDENTICAL -- same path, same stations,
+    same extent and elastic zones -- so a model built from either meshes the
+    same way and a displacement field carries between them. Only
+    `one_sided` differs." It rebuilt them from `scene.spacing` alone. The
+    moment the vessel and stinger pitches became two numbers (10 Oct 2026),
+    that call re-spaced the VESSEL DECK at the STINGER pitch and the
+    docstring's promise became false.
+  cause: >-
+    A function that reconstructs an object from one of its fields is only as
+    correct as the field list it reads, and nothing ties the two together.
+    Splitting one parameter into two makes every such reconstruction stale
+    at once, and `all_bidirectional` was the only one -- found by grepping
+    `.spacing` rather than by the suite, which was green throughout.
+  cause_detail: >-
+    THE FAILURE WOULD HAVE BEEN SILENT AND IT LANDS IN THE WORST PLACE.
+    `all_bidirectional` is step 1 of the staged sequence and the first step
+    of `study.sweep.seed_state`: every roller held, which is what BUILDS the
+    arc geometry, and the geometry is what supplies the geometric stiffness
+    a lay tension is then reacted by. A seed solved on a differently-spaced
+    vessel still meshes, still converges, and hands a plausible
+    displacement field forward. Measured with the fix reverted: VR5 at
+    -20.0 m instead of -45.0, so 25 m of vessel deck vanishes and the feed
+    geometry changes at the same time as the thing under test.
+  rule: >-
+    `Scene` carries `spacing_vr` (None meaning "same as the stinger") and a
+    `vessel_spacing` property that resolves it. ANYTHING REBUILDING THE
+    STATIONS FROM A SCENE READS `vessel_spacing`, NOT `spacing`.
+    `roller_stations` and `build_scene` take `spacing_vr` beside `spacing`,
+    and omitting it reproduces the single-pitch layout exactly, which is
+    what every number in `docs/validation/` was computed with.
+  rule_detail: >-
+    THE TEST WAS PROVEN TO HAVE TEETH BEFORE IT WAS KEPT. With the fix
+    reverted, `test_all_bidirectional_keeps_the_vessel_pitch` fails at the
+    first station with `('VR5', -45.0) != ('VR5', -20.0)`. A compatibility
+    test that passes both with and without the change it guards is not a
+    test, and this one was checked against the defect rather than only
+    against the fix.
+  rule_detail_2: >-
+    BIT-IDENTICAL, PROVEN BEFORE AND AFTER across all five changes of that
+    day by a full-precision fingerprint of the nine published anchors --
+    peak strain, peak moment, envelope shift, all twelve station strains,
+    the zone bound, the completion flag, and every station's name, arc
+    position, one-sided flag and role -- plus a scene-only fingerprint at
+    five spacings. sha256 `bf6d69d984e6d37e` before the first change and
+    after the last. Full suite 804 green, `check_layers` clean.
+  detect: test_all_bidirectional_keeps_the_vessel_pitch, test_omitting_spacing_vr_reproduces_the_single_pitch_layout, test_vessel_spacing_resolves_to_the_stinger_pitch_when_unset
+  refs: [rebuild/slay/scene/scene.py, rebuild/slay/scene/rollers.py, rebuild/tests/test_station_targets.py]
+  date: 2026-10-10
+
+- id: L124
+  area: measure
+  class: finding
+  symptom: >-
+    The per-roller reaction was wanted as a dataset target and I reported it
+    unreachable -- "`position.result` carries `U`, `strains`, `moments`,
+    `active`, `released`; no contact reactions; extracting them is
+    solve-layer work". That was wrong by one layer: the quantity was already
+    being computed every contact pass and thrown away.
+  cause: >-
+    `solve.contact.update_active_set` computes `pen * r` per slot to decide
+    release, and `solve.newton._constraint_force` already documents that
+    product as "the physical reaction in kN -- well conditioned, where the
+    raw separation is not", because at convergence `r` is ~1e-9 m against a
+    penalty of ~1e15 N/m. The solver trusted the number for a decision and
+    never reported it. Reading the Result's field list said "absent"; reading
+    the code that fills it said "computed and discarded".
+  rule: >-
+    `slot_reactions(slots, active, U, pen, anchors, lam)` returns
+    `(name, force, active)` per slot, push positive, carried on
+    `Result.reactions` at the converged state with the last penalty the
+    Newton loop used. An INACTIVE slot reports 0.0 rather than its
+    arithmetic value: a released roller applies nothing, so `pen * r` for it
+    is the force it WOULD apply if it were holding, which is not a reaction.
+    `anchor_reactions` does the same for the FIXED station, which is not a
+    slot and is what closes the equilibrium check.
+  rule_detail: >-
+    A PENALTY-SCALED FORCE IS PLAUSIBLE LONG BEFORE IT IS RIGHT, so it is
+    gated on global vertical equilibrium -- slots plus anchor plus applied
+    load -- and the gate is a test, not a one-off. Measured residuals 0.11%
+    to 0.62% of the applied load across four cases spanning 0 to 240 MT and
+    16 in to 32 in, which is the penalty method's convergence tolerance.
+    Sign confirmed by measurement rather than by reading the normal: SR2
+    reads +91.9 / +255.0 / +349.0 kN at 0 / 120 / 240 MT, so a roller
+    carries more as tension rises.
+  rule_detail_2: >-
+    THE REACTION IS NOT A ROLLER LOAD AT THE TERMINAL STATION OR ITS
+    NEIGHBOUR, and that is recorded in the function's docstring because
+    nothing else would stop a reader using it. The terminal stinger station
+    bears the lay tension and is bidirectional because it stands for the
+    catenary continuation rather than a real roller (D6), so it reads a
+    large negative force while the roller inboard of it carries the opposing
+    couple: +1336 and -1159 kN measured on a 32 in pipe at 4 m spacing. The
+    same opposed pair appears at the vessel end around the FIXED anchor,
+    +243 and -263 kN. Those are boundary conditions reporting themselves.
+  rule_detail_3: >-
+    AND SR1 RELEASES. It sits at the tangency on the deck line and lifts off
+    in some layouts -- observed at R = 70 with no tension, and at 4 m
+    spacing on a 32 in pipe -- so `react_SR1 = 0.0` is a MEASURED ZERO
+    meaning "this roller is carrying nothing", not a missing value. The
+    `active` flag beside it is what distinguishes the two, and any dataset
+    carrying the reaction has to carry that flag with it.
+  detect: test_the_reactions_balance_the_applied_load, test_a_released_slot_reports_a_measured_zero, test_station_reactions_are_keyed_by_station
+  refs: [rebuild/slay/solve/contact.py, rebuild/slay/solve/passage.py, rebuild/slay/report/passage.py, rebuild/tests/test_station_targets.py]
+  date: 2026-10-10
+
+- id: L125
+  area: measure
+  class: ruling
+  symptom: >-
+    A request to "add axial strain to bending strain and record total
+    strain". Doing as asked would have double-counted the membrane term in
+    every row of a 1518-case dataset, and the result would have looked
+    entirely reasonable.
+  cause: >-
+    THE STRAIN THIS PROGRAM REPORTS HAS ALWAYS BEEN TOTAL.
+    `nlfea_v4.get_element_strains` computes the extreme fibre as
+    `eps_top = eps_axial + r_o * kappa` and `solve.passage._strains` carries
+    `eps_max = max(|eps_top|, |eps_bot|)` from that same dict. Nothing in
+    the field name `eps_max`, or in `strains`, says so.
+  cause_detail: >-
+    MEASURED RATHER THAN ARGUED FROM READING THE CODE. 406.4 x 21 mm at
+    R = 70 reads 0.3536% at 0 MT and 0.5280% at 100 MT, a jump of 0.1744
+    points, while the nominal membrane strain at 100 MT is
+    T*g/(A*E) = 0.0184%. So about 90% of what lay tension does to the
+    reported strain is GEOMETRIC -- pulling the pipe harder onto the rollers
+    -- and only a tenth of it is membrane. A dataset that added 0.0184% on
+    top would be fitting a number the solver never computed.
+  rule: >-
+    NOTHING IS ADDED. `Result.parts` carries `(element, s, eps_axial,
+    kappa)` beside `strains`, out of the SAME kernel call, so the
+    decomposition can be READ rather than reconstructed: `eps_total` is the
+    target, `eps_membrane` and `kappa` are that element's split, and
+    `eps_total - eps_membrane` is the bending part. A test asserts the
+    identity `eps_max == max|eps_axial +/- r_o*kappa|` element by element.
+  rule_detail: >-
+    THE NOMINAL AND THE MEASURED MEMBRANE STRAIN ARE DIFFERENT NUMBERS AND
+    ARE NAMED APART. `eps_axial_nominal = sigma_axial/E` is a FEATURE,
+    computable from the inputs before any solve. `eps_membrane_SRn` is
+    MEASURED and is larger: 0.0613% against a 0.0184% nominal at the worst
+    element of one 100 MT case, because the local axial strain includes the
+    stretch the deformed geometry imposes, not just tension over EA. Giving
+    both the name `eps_axial` would have invited exactly the confusion the
+    original request contained.
+  rule_detail_2: >-
+    SAME FAMILY AS THE TWO UNIT SLIPS ALREADY IN THIS REGISTER -- a quantity
+    whose definition is in the kernel and whose name does not carry it. The
+    general rule: before adding a term to a reported quantity, find where
+    that quantity is COMPUTED, not where it is stored.
+  detect: test_the_decomposition_reproduces_the_strain_it_came_from
+  refs: [nlfea_v4.py, rebuild/slay/solve/passage.py, surrogate/PLAN_plain_surrogate_v4.md, rebuild/tests/test_station_targets.py]
   date: 2026-10-10

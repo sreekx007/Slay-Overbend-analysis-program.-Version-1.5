@@ -102,6 +102,52 @@ def incremental_target(slot: ContactSlot, anchor: float, lam: float) -> float:
     return anchor + (slot.dn - anchor) * lam
 
 
+def slot_reactions(slots, active, U, pen, anchors, lam) -> tuple:
+    """`(name, force, active)` per slot. Force in N, PUSH POSITIVE.
+
+    THE SAME QUANTITY THE RELEASE TEST ALREADY USES. `update_active_set`
+    below drops a one-sided roller when `pen * r` falls below `-RELEASE_N`,
+    and `newton._constraint_force` calls that product "the physical reaction
+    in kN -- well conditioned, where the raw separation is not": at
+    convergence `r` is ~1e-9 m against a penalty of ~1e15 N/m, so the
+    product is physical and `r` on its own is numerical noise. This function
+    exists so the number can be REPORTED rather than only acted on.
+
+    Sign follows the slot's outward normal, which points away from the arc
+    centre, so a roller bearing on the pipe reads POSITIVE. A one-sided
+    roller cannot pull, which is exactly why a sufficiently negative reading
+    releases it; a bidirectional one (the terminal station, standing for the
+    catenary continuation) may legitimately read negative.
+
+    AN INACTIVE SLOT REPORTS 0.0, NOT ITS ARITHMETIC VALUE. A released
+    roller applies nothing to the pipe -- its constraint is not assembled at
+    all -- so `pen * r` for it is the force it WOULD apply if it were
+    holding, which is not a reaction and must not be read as one.
+    """
+    out = []
+    for i, slot in enumerate(slots):
+        if active[i]:
+            r = incremental_target(slot, anchors[i], lam) - slot.u_out(U)
+            f = pen * r
+        else:
+            f = 0.0
+        out.append((slot.name, float(f), bool(active[i])))
+    return tuple(out)
+
+
+def anchor_reactions(anchor_dofs, U, pen) -> tuple:
+    """`(dof, force)` for each restrained DOF of the FIXED station, in N.
+
+    Needed to CLOSE the equilibrium check and for no other reason. The fixed
+    station is penalised the same way a slot is (`passage`: `Kl[d,d] +=
+    p_val; R[d] += p_val * (0.0 - U[d])`), so its reaction has the same form
+    -- but it is not a contact slot, so a sum over slots alone does NOT
+    balance the applied load, and a check that ignored it would fail by
+    whatever the anchor is carrying and look like a defect in the reactions.
+    """
+    return tuple((int(d), float(pen * (0.0 - U[d]))) for d in anchor_dofs)
+
+
 def update_active_set(slots, active, released, U, pen, anchors, lam):
     """One active-set pass. Returns (new_active, changed).
 

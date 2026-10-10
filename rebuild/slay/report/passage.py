@@ -108,6 +108,11 @@ def station_strains(position, scene) -> dict:
     Keyed by station name and looked up in STATION coordinates, so the same
     key means the same place on the stinger at every position -- which is the
     only way a passage table reads.
+
+    LEFT EXACTLY AS IT WAS. Every published Sec. 1 number is measured with
+    this window, so it is not the place to improve the rule. `station_window`
+    below is the element-counted alternative, and it is a different function
+    precisely so this one cannot drift.
     """
     out, half = {}, scene.spacing / 2.0
     rows = _rows(position)
@@ -115,6 +120,92 @@ def station_strains(position, scene) -> dict:
         near = [e for (s_sta, _s_mat, e) in rows if abs(s_sta - st.s_arc) < half]
         if near:
             out[st.name] = max(near)
+    return out
+
+
+def station_window(scene, OD: float, n_elems: int = 2) -> float:
+    """Half-width, in metres, of the window around a station.
+
+        min(n_elems * (2 * OD), stinger spacing / 2)
+
+    WHY AN ELEMENT COUNT AND NOT A LENGTH. `station_strains` uses half the
+    roller spacing, which is a length while the mesh is ruled in diameters,
+    so the number of elements its maximum is taken over runs from about 2.5
+    to 36 across a diameter-and-spacing sweep -- a factor of fourteen,
+    correlated with both of those as inputs. A maximum over more elements
+    reads higher, so that is a bias a regression will learn as physics.
+
+    WHY THE CAP. `n_elems = 2` is a half-width of `4 * OD`, so two adjacent
+    windows would overlap once `8 * OD > spacing` and the same element could
+    be the maximum for two different rollers. The cap keeps every window
+    centred on its own roller and touching at worst; it binds only for the
+    largest pipes at the tightest spacings, where it costs a fraction of an
+    element and keeps cases that would otherwise have to be thrown away.
+    """
+    return min(n_elems * 2.0 * OD, scene.spacing / 2.0)
+
+
+def station_values(position, scene, half: float, names=None) -> dict:
+    """`{station: (eps_total, |M|, eps_membrane, kappa, n_elems)}`.
+
+    One pass, one window, four quantities, so they cannot be read off
+    different sets of elements. `eps_total` is the kernel's extreme fibre --
+    membrane AND bending, since it is computed as `eps_axial + r_o*kappa` --
+    and `eps_membrane` with `kappa` are that same element's decomposition,
+    carried by `solve.passage` rather than reconstructed here.
+
+    EACH QUANTITY TAKES ITS OWN WORST ELEMENT. The element with the largest
+    strain in a window is not always the one with the largest moment, and
+    reporting the moment of the worst-strain element would be a third thing
+    that is neither. `n_elems` is the window's element count, recorded so
+    the window rule can be audited instead of trusted.
+
+    A station with no element in its window is ABSENT, not zero.
+    """
+    rows = _rows(position)
+    moms = _moment_rows(position)
+    parts = {i: (ea, ka) for (i, _s, ea, ka)
+             in getattr(position.result, 'parts', ())}
+    strain_idx = {i: (s + position.shift, e)
+                  for (i, s, e) in position.result.strains}
+    out = {}
+    for st in scene.stations:
+        if names is not None and st.name not in names:
+            continue
+        near = [(i, e) for i, (s_sta, e) in strain_idx.items()
+                if abs(s_sta - st.s_arc) < half]
+        if not near:
+            continue
+        i_worst, eps = max(near, key=lambda r: r[1])
+        m_near = [m for (s_sta, _s_mat, m) in moms
+                  if abs(s_sta - st.s_arc) < half]
+        ea, ka = parts.get(i_worst, (float('nan'), float('nan')))
+        out[st.name] = (eps, max(m_near) if m_near else float('nan'),
+                        ea, ka, len(near))
+    return out
+
+
+def station_reactions(position, scene, names=None) -> dict:
+    """`{station: (force in N, active)}` from the solve's own slot forces.
+
+    PUSH POSITIVE, and an inactive slot reads 0.0 because a released roller
+    applies nothing -- that is a measured zero, not a missing value.
+
+    NOT TRUSTWORTHY AT THE TERMINAL STATION OR ITS NEIGHBOUR. The terminal
+    stinger station bears the lay tension and is bidirectional because it
+    stands for the catenary continuation rather than a real roller (D6), so
+    it reads a large negative force and the roller inboard of it reads the
+    opposing couple -- measured at +1336 and -1159 kN on a 32 in pipe at 4 m
+    spacing. The same opposed pair appears at the vessel end around the
+    FIXED anchor. Those are boundary conditions reporting themselves, not
+    roller loads, and only the stations well inboard of either end carry a
+    reaction a roller designer should read.
+    """
+    out = {}
+    for (name, f, act) in getattr(position.result, 'reactions', ()):
+        if names is not None and name not in names:
+            continue
+        out[name] = (float(f), bool(act))
     return out
 
 

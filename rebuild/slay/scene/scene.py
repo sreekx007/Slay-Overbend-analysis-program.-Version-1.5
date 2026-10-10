@@ -46,7 +46,21 @@ class Scene:
     stations: tuple
     extent: tuple
     elastic_zones: tuple
-    spacing: float
+    spacing: float                  # the STINGER roller pitch
+    spacing_vr: float = None        # the VESSEL pitch; None means 'same'
+
+    @property
+    def vessel_spacing(self) -> float:
+        """The vessel pitch, resolved.
+
+        `spacing_vr` is OPTIONAL and `None` means the vessel shares the
+        stinger pitch, which is what every Scene built before 10 Oct 2026
+        did and what every validated number was computed with. Anything
+        rebuilding the stations from a Scene must read THIS and not
+        `spacing`, or it re-spaces the vessel deck at the stinger pitch --
+        see `all_bidirectional`.
+        """
+        return self.spacing if self.spacing_vr is None else self.spacing_vr
 
     # -- station access ---------------------------------------------------
     @property
@@ -101,6 +115,7 @@ def build_scene(R: float = None,
                 n_sr: int = None,
                 n_vr: int = None,
                 spacing: float = None,
+                spacing_vr: float = None,
                 radii: dict = None,
                 margin: float = 0.0,
                 margin_vessel: float = 0.0,
@@ -141,7 +156,7 @@ def build_scene(R: float = None,
 
     path = LayPath(R=R)
     stations = roller_stations(path, n_sr=n_sr, n_vr=n_vr, spacing=spacing,
-                               radii=radii)
+                               spacing_vr=spacing_vr, radii=radii)
 
     if margin < 0:
         raise ValueError(f'margin must not be negative, got {margin}')
@@ -169,7 +184,8 @@ def build_scene(R: float = None,
                      (s_hi - elastic_length, s_hi))
 
     return Scene(path=path, stations=tuple(stations), extent=extent,
-                 elastic_zones=elastic_zones, spacing=spacing)
+                 elastic_zones=elastic_zones, spacing=spacing,
+                 spacing_vr=spacing_vr)
 
 
 def all_bidirectional(scene: Scene) -> Scene:
@@ -189,7 +205,17 @@ def all_bidirectional(scene: Scene) -> Scene:
     """
     n_sr = len([s for s in scene.stations if s.name.startswith('SR')]) - 1
     n_vr = len([s for s in scene.stations if s.name.startswith('VR')])
+    # BOTH PITCHES, and `vessel_spacing` rather than `spacing`. This
+    # function rebuilds the stations, so passing the stinger pitch alone
+    # would re-space the VESSEL DECK at the stinger pitch and return a scene
+    # that is NOT geometrically identical -- in the one place the docstring
+    # above promises it is, and inside the step that builds the geometry
+    # every lay tension is reacted by. Nothing downstream would complain:
+    # the model still meshes and still solves, on a different vessel.
     st = roller_stations(scene.path, n_sr=n_sr, n_vr=n_vr,
-                         spacing=scene.spacing, one_sided=frozenset())
+                         spacing=scene.spacing,
+                         spacing_vr=scene.vessel_spacing,
+                         one_sided=frozenset())
     return Scene(path=scene.path, stations=tuple(st), extent=scene.extent,
-                 elastic_zones=scene.elastic_zones, spacing=scene.spacing)
+                 elastic_zones=scene.elastic_zones, spacing=scene.spacing,
+                 spacing_vr=scene.spacing_vr)

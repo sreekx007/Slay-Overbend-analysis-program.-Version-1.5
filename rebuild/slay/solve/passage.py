@@ -99,6 +99,19 @@ class Result:
     residual: float = 0.0
     strains: tuple = ()        # (element index, s_mid, eps_max)
     moments: tuple = ()        # (element index, s_mid, M) in N.m
+    # (element index, s_mid, eps_axial, kappa) -- the DECOMPOSITION of the
+    # same `eps_max`, not a second measurement of it. The kernel computes
+    # the extreme fibre as `eps_axial + r_o * kappa` and returns all three
+    # in one dict; `strains` kept only the sum, so a consumer wanting the
+    # membrane and bending parts had to re-derive them from M and the
+    # section -- a second answer to something already computed.
+    parts: tuple = ()
+    # (station name, force in N, was the slot active) -- push positive.
+    reactions: tuple = ()
+    # (dof, force in N) at the FIXED station, which is what closes the
+    # equilibrium check: the anchor is not a contact slot, so a sum over
+    # `reactions` alone does not balance the applied load.
+    anchor_reactions: tuple = ()
     runner: object = field(default=None, repr=False)
 
     @property
@@ -207,6 +220,11 @@ def solve(problem, state_in: SolveState = None, *,
     anchors = [s.u_out(U) for s in slots]
 
     res = Result(U=U, active=tuple(active))
+    # The penalty the last Newton iteration used, kept so the reactions can
+    # be read after the loop. `p_val` is scoped to the loop body and would
+    # be whatever the last iteration left behind -- true in CPython and not
+    # a thing to rely on, so it is carried deliberately.
+    p_last = None
     lam_done, dlam = 0.0, 1.0 / n_increments
     dlam_min = dlam * CUTBACK_FLOOR
     rc = 0.0
@@ -235,6 +253,7 @@ def solve(problem, state_in: SolveState = None, *,
                 # nothing against any other basis.
                 p_scale = float(K.diagonal().max())
                 p_val = p_scale * pen_mult
+                p_last = p_val
                 Kl = lil_matrix(K)
 
                 # CONNECTORS, ASSEMBLED OUTSIDE THE KERNEL MESH. A
@@ -344,7 +363,16 @@ def solve(problem, state_in: SolveState = None, *,
 
     res.U, res.residual = U, rc
     res.active, res.released = tuple(active), tuple(sorted(released))
-    res.strains, res.runner = _strains(problem, ms, mdl, U, ps, index_of)
+    # REPORTED AT THE CONVERGED STATE, with `lam = 1.0` and the last penalty
+    # the Newton loop actually used. `lam_done` has reached 1.0 by here
+    # whenever the solve converged, and reading the ramped target at any
+    # smaller value would report a partially-applied reaction.
+    if p_last is not None:
+        res.reactions = ctc.slot_reactions(slots, active, U, p_last,
+                                           anchors, 1.0)
+        res.anchor_reactions = ctc.anchor_reactions(anchor_dofs, U, p_last)
+    res.strains, res.parts, res.runner = _strains(
+        problem, ms, mdl, U, ps, index_of)
     res.moments = _moments(problem, ms, U, th, ps, index_of)
     return res, SolveState(U=U, theta=th, plastic=ps, active=tuple(active))
 
@@ -586,8 +614,16 @@ def _section_moment(ms, ie, eps0, kap, ps, g):
 
 
 def _strains(problem, ms, mdl, U, ps, index_of):
-    """(element index, s at the midpoint, eps_max) per element, plus the
-    runner the kernel needs to produce them."""
+    """`(rows, parts, runner)`, where `rows` is (element index, s at the
+    midpoint, eps_max) per element and `parts` is (index, s, eps_axial,
+    kappa) for the same elements in the same order.
+
+    THE TWO COME OUT OF ONE KERNEL CALL AND CANNOT DISAGREE. `eps_max` is
+    `max(|eps_axial + r_o*kappa|, |eps_axial - r_o*kappa|)`, so the strain
+    this program reports has always been TOTAL -- membrane plus bending --
+    and anything that adds a membrane term to it counts that term twice.
+    `parts` is carried so the split can be read rather than reconstructed.
+    """
     r = fe.FEARunner(mdl)
     r.U = U.copy()
     r.U_steps = [U.copy()]
@@ -595,12 +631,14 @@ def _strains(problem, ms, mdl, U, ps, index_of):
                    'U': U.copy()}]]
     r.plastic_state = ps
     s_of = {i: s for (i, s, _y) in problem.nodes}
-    rows = []
+    rows, parts = [], []
     for (idx, n1, n2, _owner, _line) in problem.elements:
         eid = index_of[idx]
         try:
             st = r.get_element_strains(eid)
         except Exception:
             continue
-        rows.append((idx, 0.5 * (s_of[n1] + s_of[n2]), float(st['eps_max'])))
-    return tuple(rows), r
+        s_mid = 0.5 * (s_of[n1] + s_of[n2])
+        rows.append((idx, s_mid, float(st['eps_max'])))
+        parts.append((idx, s_mid, float(st['eps_axial']), float(st['kappa'])))
+    return tuple(rows), tuple(parts), r

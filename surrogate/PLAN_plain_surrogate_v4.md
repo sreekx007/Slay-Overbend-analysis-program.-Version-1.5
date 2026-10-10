@@ -229,8 +229,10 @@ the worst it saw **at any position** of the passage.
 A fixed element count is the point: the previous dataset's half-spacing
 window held between 2.5 and 35.7 elements depending on OD and spacing — a
 factor of 14, correlated with two of the features, which is the kind of bias
-a model learns as physics. ±2 elements is 5 elements everywhere the cap does
-not bite.
+a model learns as physics. ±2 elements is **4 element midpoints** everywhere
+the cap does not bite — the station sits on a node, not at an element centre,
+so the window holds two elements each side. (Corrected from 5 after measuring
+it: 4 at NPS 16 / 9 m.)
 
 **The cap replaces excluding cells, and it costs almost nothing.** Two
 elements is `4 × OD`, so adjacent windows would overlap where `8 × OD >
@@ -262,9 +264,32 @@ self-weight plus the vertical component of the applied tension. That check is
 free and it is the only thing that distinguishes a correct reaction from a
 plausible one.
 
-Sign convention: **push positive**. A one-sided roller releases when its
-reaction goes below `−RELEASE_N`, so an active one should push; the terminal
-station is bidirectional and may pull.
+Sign convention: **push positive**, confirmed by measurement: SR2 reads
++91.9 / +255.0 / +349.0 kN at 0 / 120 / 240 MT, so a roller carries more as
+the tension rises, and the terminal station reads negative because it hangs
+from the catenary it stands for.
+
+**The gate was run and it closes.** Vertical residual over slots plus the
+fixed anchor plus the applied load: **0.11% to 0.62%** of the applied load
+across four cases spanning 0–240 MT and 16 in to 32 in. That is the penalty
+method's convergence tolerance, not an error in the reactions.
+
+**Two things the gate turned up, both now recorded in the code:**
+
+*The reaction is not a roller load at the terminal station or its neighbour.*
+The terminal bears the lay tension and is bidirectional because it stands for
+the catenary continuation rather than a real roller (D6), so it reads a large
+negative force and the roller inboard of it carries the opposing couple —
+measured at **+1336 and −1159 kN** on 32 in at 4 m spacing. The same opposed
+pair appears at the vessel end around the FIXED anchor (+243 / −263 kN).
+Those are boundary conditions reporting themselves. SR1–SR3 are well inboard
+of both, which is another reason the target rollers are the right ones.
+
+*`react_SR1 = 0` is a measured zero, not a missing value.* SR1 sits at the
+tangency on the deck line and **releases** in some layouts — observed at
+R = 70 / 0 MT and at 4 m / 32 in. A released roller applies nothing, so its
+reaction is zero; `active_SRn` carries which it is, and the results document
+must report how often SR1 is released.
 
 ### Per-station diagnostics, recorded beside each target
 
@@ -385,4 +410,5 @@ sweep, and up to 11 contact slots at the tight spacings.
 
 | | |
 |---|---|
+| 10 Oct 2026 | **All five library changes landed, 18 tests, suite 804 green.** The nine anchors are bit-identical before and after by a full-precision fingerprint of strain, moment, shift, all twelve station strains, the zone and every station's position (sha256 `bf6d69d984e6d37e`). The `all_bidirectional` trap was proven to have teeth: with the fix reverted, the test fails with VR5 at −20.0 m instead of −45.0 — 25 m of vessel deck silently deleted. Reaction equilibrium closes to 0.11–0.62%. Window corrected from 5 element midpoints to 4. |
 | 10 Oct 2026 | Plan written after review. Axes, features and the nine targets settled. Five library changes identified with the silent failure each risks — the `bidirectional()` vessel re-spacing being the one that would not have complained. Window rule changed from excluding overlapped cells to capping the half-width, keeping 180 cases. Travel 5 × OD passed per call so `PLAIN_TRAVEL_OD` and the published §1 numbers are untouched. Nothing run. |

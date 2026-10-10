@@ -123,6 +123,7 @@ def roller_stations(path: LayPath,
                     n_sr: int = None,
                     n_vr: int = None,
                     spacing: float = None,
+                    spacing_vr: float = None,
                     radii: dict = None,
                     one_sided: frozenset = None) -> list:
     """Every station, ordered by ascending arc length (vessel to stinger tip).
@@ -136,10 +137,21 @@ def roller_stations(path: LayPath,
     `config.one_sided_rollers`. Not the pre-resolved constant: that is fixed
     at import against config's own n_sr, so building a scene with a larger
     n_sr would silently leave the extra stinger rollers bidirectional.
+
+    TWO SPACINGS, AND `spacing_vr` DEFAULTS TO `spacing` (10 Oct 2026).
+    `spacing` is the STINGER pitch; `spacing_vr` is the vessel pitch. They
+    were one number until a study needed to vary the stinger pitch while
+    holding the vessel deck fixed -- the vessel side is a boundary condition
+    there, not a variable, and re-spacing it with the stinger would change
+    the feed geometry at the same time as the thing under test.
+
+    Omitting `spacing_vr` reproduces the single-spacing layout EXACTLY, which
+    is what every validated number in `docs/validation/` was computed with.
     """
     n_sr = config.N_SR if n_sr is None else n_sr
     n_vr = config.N_VR if n_vr is None else n_vr
     spacing = config.ROLLER_SPACING if spacing is None else spacing
+    spacing_vr = spacing if spacing_vr is None else spacing_vr
     radii = radii or {}
     if one_sided is None:
         # RESOLVED FOR THE REQUESTED n_sr, not read off the pre-resolved
@@ -165,7 +177,7 @@ def roller_stations(path: LayPath,
     # Vessel side, furthest first so the list ascends in s.
     for j in range(n_vr, 0, -1):
         name = f'VR{j}'
-        s = -j * spacing
+        s = -j * spacing_vr
         x, y = path.position(s)
         out.append(Station(
             name=name, s_arc=s, x=x, y=y,
