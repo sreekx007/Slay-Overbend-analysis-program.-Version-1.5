@@ -250,6 +250,44 @@ non-yielding body at the pipeline's modulus must vanish, and does: Xb
 
 ---
 
+### Machine-learning datasets — `surrogate/` and `docs/dataset/`
+
+Two, and they are not versions of each other.
+
+`docs/dataset/` is the 30 September 2026 matrix from `tools/dataset.py`:
+plain pipe, GD-TP and components, OFAT plus Latin hypercube, 200 cases. **It
+predates the 7 October campaign and its numbers are void** — L101, L105,
+L106, the strain guard and L107 all landed after it, the ledger re-ran all
+fifty published cases and the dataset was not re-run. Six of its 85 plain
+rows carry `status = partial 1/2`, which is an L101 truncation recorded as a
+status. It is kept unedited as the artifact it is and nothing is scored by
+it.
+
+`surrogate/` is the later, narrower one: **plain pipelay only**, over five
+INDEPENDENT axes — stinger radius, roller spacing, pipe OD, pipe wall and
+lay tension. The old design tied OD to wall in seven fixed pairs, so it
+holds no information about wall thickness at fixed diameter; decoupling the
+two is the substantive difference, not the re-run. 525 cases in four blocks,
+with the held-out block reserved before any case ran rather than split off
+afterwards.
+
+| File | What |
+|---|---|
+| `surrogate/PLAN_plain_surrogate_dataset.md` | the design, written before any case ran |
+| `surrogate/RESULTS_plain_surrogate_dataset.md` | what the run produced, and the source the CSV is generated from |
+| `surrogate/make_plain_dataset.py` | the runner; appends one JSON object per case |
+| `surrogate/plain_runs.jsonl` | the checkpoint, 68 fields per row |
+
+**The step rule is the opposite of the one a component case gets, and that is
+deliberate.** A component passage refines the step because the envelope sits
+at an edge crossing and a whole-element step walks over it (worth 16%). Plain
+pipe has no edge, and a half-element step instead buys the slot-interpolation
+jitter that `slide.py --verify` measures at 4.40% on SR1 — numerical, with no
+trend, and a surrogate would learn it as noise. So plain pipe runs at
+**2 × OD**, which is also what the published §1 tables use.
+
+---
+
 ## 4. Registers — the project's memory
 
 | File | Holds | Guarded by |

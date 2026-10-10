@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 116
+# entries: 121
 
 - id: L001
   area: kernel
@@ -3299,7 +3299,7 @@
     GPa. `sweep.repose` (L116) had landed one commit earlier and a re-pose
     refactor is exactly the kind that can move a number without failing
     anything, so it was ruled out by measurement rather than by argument.
-  detect: docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt
+  detect: '-'
   refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, docs/simple/RESULTS_EASB_PV_SWEEP_2026-10-09.txt, tools/study_easb_cases.py, tools/stiffness_rig.py, rebuild/slay/define/simple.py]
   date: 2026-10-09
 
@@ -3382,6 +3382,146 @@
     the frame's geometry decides what that is worth in bending across the
     span. Anything that treats kB as a stand-in for the assembly's stiffness
     is reading it wrong.
-  detect: docs/simple/RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt
+  detect: '-'
   refs: [docs/validation/VALIDATION_v3.0_2026-10-06.md, docs/simple/RESULTS_EASB_PCPL_SWEEP_2026-10-09.txt, tools/study_easb_cases.py, tools/stiffness_rig.py, rebuild/slay/model/parts.py, rebuild/slay/model/assemble.py]
   date: 2026-10-09
+
+- id: L120
+  area: measure
+  class: finding
+  symptom: >-
+    A plain-pipe machine-learning matrix already existed -- 85 rows in
+    `docs/dataset/dataset_plain.csv`, 30 September 2026 -- and nobody had
+    noticed it was void. The 7 October campaign (L101 truncating passages,
+    L105 lay tension bolted to one piece of steel, L106 no travel cutback,
+    the strain guard, L107 the wrong tension) re-ran all fifty published
+    cases in the validation ledger and did not touch the dataset. Six of its
+    85 plain rows still carry `status = partial 1/2`, which IS an L101
+    truncation recorded as a status.
+  cause: >-
+    The ledger has a version banner and a re-run discipline; the dataset had
+    neither. Nothing in the repository connected "every published number was
+    re-run" to "and so was every dataset row". The baseline case measures
+    the drift at 0.4085% then against 0.4070% now on identical inputs and
+    step -- small, and not the point: the six truncated rows are where the
+    old program and this one have no reason to agree at all.
+  cause_detail: >-
+    THE SECOND DEFECT IN THAT DATASET WAS IN ITS DESIGN AND IS NOT A
+    STALENESS PROBLEM. Outside diameter and wall thickness were a SINGLE
+    axis of seven fixed (OD, WT) pairs, so D/t ran only 15.3 to 21.3 and the
+    matrix holds no information about wall thickness at fixed diameter. A
+    surrogate fitted on it cannot answer "same pipe, heavier wall". The new
+    dataset decouples them, and the marginal curve that was unobtainable
+    before is the one worth having: strain FALLS 1.47x as the wall goes 8 to
+    31.8 mm while the bending moment RISES 3.6x.
+  rule: >-
+    THE EXCESS OVER PURE BENDING IS ORDERED BY ROLLER SPACING, measured on
+    76 zero-tension cases where `eps = D/2R` is exact with no solver in it.
+    Mean excess by spacing: +7.5% at 6 m, +10.8% at 7.5, +15.8% at 9,
+    +22.1% at 10.5, +25.6% at 12, +35.7% at 14 -- monotone across all six
+    groups, a factor of 4.8 end to end, Spearman rho +0.731 over the 76.
+    Not a confounder: within the SINGLE diameter 406.4 mm it still orders at
+    rho +0.811, and excess correlates NEGATIVELY with OD (-0.304) while the
+    narrow-spacing groups carry the LARGER mean diameters, so the trend is
+    if anything understated.
+  rule_detail: >-
+    THIS IS A LEAD ON SEC. 1'S LARGEST DISAGREEMENT AND IS RECORDED AS A
+    LEAD. The ledger reads our excess over pure bending on TABLE XI at
+    +18.8 / +21.8 / +34.7% against Paper 1's own Abaqus column at
+    +8 / +14 / +17% -- "roughly twice as much strain at a roller as the
+    benchmark does, measured against a reference neither model can argue
+    with." Those three cases were run at 9 M SPACING. At 6 m the excess
+    averages +7.5%, which is where Paper 1's +8% sits. So part of the
+    doubling may be a spacing mismatch rather than a model difference -- and
+    the repository is not internally consistent about what the paper says:
+    `study_table_x.py` and `study_table_xi.py` default to 9 m while
+    `slide_plain.py` documents and defaults to 8 m. PAPER 1'S STATED SPACING
+    FOR TABLE XI WAS NOT CONFIRMED FROM THE PAPER, so no ledger number is
+    changed on the strength of this.
+  rule_detail_2: >-
+    THE STEP RULE FOR PLAIN PIPE IS THE OPPOSITE OF THE ONE A COMPONENT CASE
+    GETS, and the dataset confirms it from the other side. A component
+    passage refines the step because the envelope sits at an edge crossing
+    and a whole-element step walks over it, worth 16%. Plain pipe has no
+    edge: a half-element step only buys the slot-interpolation jitter that
+    `slide.py --verify` measures at 0.83% on SR2 and 4.40% on SR1, which is
+    numerical, has no trend, and a surrogate would learn as noise in the
+    target. Run at 2 x OD, 331 of 518 cases have `start_strain` EXACTLY
+    equal to the envelope and the mean gain over a whole passage is +0.26%
+    -- station-space strain is invariant under a whole-element shift, so for
+    plain pipe a passage adds almost nothing over a single position.
+  rule_detail_3: >-
+    TWO TRAPS FOR A CONSUMER OF THE ROWS, both found by writing the results
+    up rather than by running it. (1) LAY TENSION IS AN AXIS IN ABSOLUTE MT,
+    so the same 200 MT that is routine on a 24 in pipe is 1.35x yield on a
+    6 in one: 6 of 518 cases exceed `j2`'s sigma_y0 in pure membrane and 11
+    more sit between 0.8 and 1.0 of it. `C0118` reads 2.0406% strain at
+    R = 250 m, the MILDEST radius sampled, and carries the LOWEST bending
+    moment in the dataset, 2.2 kN.m -- a section at its membrane capacity
+    has nothing left to carry bending with, so in that corner the two
+    targets INVERT and a moment-based surrogate reports the mildest case in
+    the set exactly where the strain is highest. (2) `peak_strain` is the
+    zone-restricted envelope (DROP_AT_TIP = 3, SR5 and beyond excluded)
+    while the per-station columns carry all twelve stations: in 510 of 518
+    rows an excluded tip roller, almost always SR6, reads HIGHER than the
+    scored peak, by a mean of +14.9% and up to +67.5%.
+  rule_detail_4: >-
+    A DESIGN COST, PAID KNOWINGLY AND RECORDED. Varying OD and WT
+    independently needs a feasibility window (10 <= D/t <= 60, keeping 47 of
+    56 combinations), and rejecting an infeasible draw by redrawing the PAIR
+    keeps the other three axes exactly stratified -- R, spacing and tension
+    come out flat to within a few counts -- but breaks the uniformity of the
+    two coupled columns: 168.3 mm appears 38 times against 323.9 mm's 89,
+    and 31.8 mm wall 40 times against 11.0 mm's 76. The extremes are what
+    gets rejected, so they are under-represented by about a factor of two.
+    The fix, if it matters, is to stratify over the 47 FEASIBLE PAIRS as one
+    axis instead of two axes with rejection.
+  detect: '-'
+  refs: [surrogate/PLAN_plain_surrogate_dataset.md, surrogate/RESULTS_plain_surrogate_dataset.md, surrogate/make_plain_dataset.py, docs/dataset/DATASET.md, docs/validation/VALIDATION_v3.0_2026-10-06.md, tools/slide.py, tools/study_table_xi.py, tools/slide_plain.py]
+  date: 2026-10-10
+
+- id: L121
+  area: process
+  class: defect
+  symptom: >-
+    Four register entries were committed over two days (L117-L120) and the
+    register's own guard was failing the whole time. `# entries:` still said
+    116 against 120, and L118, L119 and L120 each put a FILE PATH in
+    `detect`, a field whose contract is local test names. Two tests in
+    `test_build_lessons.py` were red, and three of the four commits went out
+    without the suite being run at all.
+  cause: >-
+    "NO CODE CHANGED, SO NO TESTS NEED RUNNING" -- stated in two of those
+    commit messages as a reason to skip the gate. It is false here, and
+    falsifiably so: `docs/BUILD_LESSONS.yaml` is MACHINE REFERENCE and is
+    schema-checked, count-checked and cross-reference-checked by
+    `test_build_lessons.py`, and `docs/TRIAL_LOG.yaml` likewise. A
+    docs-only change can and did break the suite.
+  cause_detail: >-
+    THE HEADER DRIFT IS THE EXACT FAILURE L093 PUT THAT TEST THERE TO STOP.
+    The register said 62 against 93 entries on 6 Oct; the check was added
+    because a register that disagrees with its own summary is worse than no
+    summary. It then drifted again, by four, in the hands of the agent that
+    knows why the check exists. The lesson is not "remember the header" --
+    it is that a hand-maintained count in a file that something else counts
+    will drift, and the only reason it is survivable is that a test counts
+    it on every run.
+  rule: >-
+    RUN THE SUITE ON A DOCS-ONLY COMMIT WHENEVER IT TOUCHES EITHER YAML
+    REGISTER. `check_layers` is not sufficient and was the only gate run on
+    those commits: it polices import layering in `rebuild/slay` and knows
+    nothing about the registers. The cheap targeted form is
+    `pytest rebuild/tests/test_build_lessons.py rebuild/tests/test_trial_log.py`,
+    which runs in 0.12 s, and there is no excuse at that price.
+  rule_detail: >-
+    `detect` IS FOR LOCAL TEST NAMES, and `-` is the sanctioned value when
+    no test guards the entry -- which is the right answer for a measurement
+    finding, where the evidence is an artifact and belongs in `refs` (where
+    it already was in all three entries). A file path in `detect` reads as a
+    guard that does not exist, which is precisely the "story about something
+    that used to be caught" the field's docstring warns against. Fixed by
+    setting `-` on L118, L119 and L120 and leaving their results files in
+    `refs`.
+  detect: test_the_header_count_matches, test_every_named_test_still_exists
+  refs: [docs/BUILD_LESSONS.yaml, rebuild/tests/test_build_lessons.py, rebuild/tests/test_trial_log.py]
+  date: 2026-10-10
