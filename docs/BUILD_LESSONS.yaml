@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 126
+# entries: 127
 
 - id: L001
   area: kernel
@@ -3791,4 +3791,51 @@
     honest, rather than looking as though nothing happened.
   detect: '-'
   refs: [docs/BUILD_LESSONS.yaml]
+  date: 2026-10-10
+
+- id: L127
+  area: process
+  class: defect
+  symptom: >-
+    A 12-hour dataset run was launched with `nohup python3 ... &` inside a
+    FOREGROUND tool call. The process was reaped when that call returned,
+    so it died after about four minutes and seventeen of fifteen hundred
+    cases. Two hours later the row count was still 35 and I had reported the
+    run healthy TWICE in between.
+  cause: >-
+    TWO SEPARATE MISTAKES, and the second is the one that cost the time. The
+    launch mechanism was wrong: a background tool call is the harness-tracked
+    way to run something across turns, and `nohup ... &` inside a foreground
+    call is not -- the 525-case run earlier the same day survived two hours
+    precisely because it used the former.
+  cause_detail: >-
+    AND THE LIVENESS CHECK COULD NOT FAIL. `pgrep -f make_plain_dataset_v4`
+    matches its own shell's command line, because the pattern appears in the
+    command being run. So it always found a "runner" and always printed a
+    pid. It reported pid 357 on one turn and pid 1781 on the next -- a
+    changing pid for a process that is supposed to be the same one is the
+    tell, and I read it as alive both times. A check that returns the answer
+    you want whether or not the thing is true is worse than no check: it
+    converts an outage into a confident status report.
+  rule: >-
+    LONG WORK GOES IN A BACKGROUND TOOL CALL, never `nohup &` inside a
+    foreground one. Where the work outlasts the background time cap, give
+    the runner a `--budget` shorter than the cap so it stops CLEANLY on its
+    own and relaunch it, rather than letting it be killed mid-case.
+  rule_detail: >-
+    LIVENESS IS PROVED BY PROGRESS, NOT BY A PROCESS LIST. The honest check
+    is the output file's mtime against the clock -- here `12:03:18` against
+    `14:09:58`, which says "dead for two hours" and cannot be fooled by a
+    pattern matching itself. A row count that has not moved between two
+    turns means stopped, whatever `ps` says. If a process check is wanted
+    anyway, exclude the checker (`pgrep -f pattern | grep -v $$`) or match
+    on something the command line does not contain.
+  rule_detail_2: >-
+    NOTHING WAS LOST BUT TIME, because the runner is append-only and
+    resumable by `case_id`: relaunching picked up at row 35 with the
+    completed rows intact. That is the property that made a two-hour outage
+    an annoyance rather than a restart, and it is the reason to build it in
+    before a long run rather than after one.
+  detect: '-'
+  refs: [surrogate/make_plain_dataset_v4.py]
   date: 2026-10-10
