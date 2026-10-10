@@ -18,7 +18,7 @@
 #   date       when recorded
 #
 # version: 1
-# entries: 125
+# entries: 126
 
 - id: L001
   area: kernel
@@ -3744,4 +3744,51 @@
     that quantity is COMPUTED, not where it is stored.
   detect: test_the_decomposition_reproduces_the_strain_it_came_from
   refs: [nlfea_v4.py, rebuild/slay/solve/passage.py, surrogate/PLAN_plain_surrogate_v4.md, rebuild/tests/test_station_targets.py]
+  date: 2026-10-10
+
+- id: L126
+  area: process
+  class: defect
+  symptom: >-
+    A commit message was written through an UNQUOTED heredoc (`<<MSG`), so
+    bash ran every backticked span in it as a command substitution. Six
+    identifiers vanished from the message before git ever saw it --
+    `clear_after`, `scene_for`, `buffer_length`, `margin_vessel`,
+    `study.sweep._required_stations` and `tools/slide.py` -- leaving
+    sentences like "It is the mesh. sizes the VESSEL BUFFER as well as the
+    sweep ( -> -> )". The commit was pushed before the stderr was read.
+  cause: >-
+    `<<MSG` interpolates; `<<'MSG'` does not. Every other heredoc in this
+    session's work used the quoted form for exactly this reason and this one
+    did not, and bash reported it -- "clear_after: command not found" six
+    times, and "tools/slide.py: Permission denied" where it tried to EXECUTE
+    the file -- on stderr, which was piped through `tail -2` to show the push
+    result.
+  cause_detail: >-
+    THE DAMAGE LANDS WHERE IT COSTS MOST. This project's commit messages are
+    its durable record of why a change was made, and they name code in
+    backticks on nearly every line -- so the substitution deletes precisely
+    the identifiers that make a message reconstructable and leaves the prose
+    around them looking intact. A reader six months on sees a grammatical
+    sentence with a hole in it and cannot tell what was removed.
+  rule: >-
+    EVERY heredoc carrying prose uses a QUOTED delimiter: `<<'MSG'`, not
+    `<<MSG`. That includes commit messages, register entries, documents and
+    results files. When a value genuinely has to be interpolated, compute it
+    into the text with Python or `printf` and keep the heredoc quoted --
+    never the other way round.
+  rule_detail: >-
+    AND READ THE STDERR BEFORE THE PUSH SUCCEEDS. The six "command not found"
+    lines appeared above the push confirmation in the same output. Piping a
+    commit-and-push chain through `tail` hides the first half of it, which is
+    the half that says whether the message survived.
+  rule_detail_2: >-
+    NOT FIXED BY REWRITING HISTORY. The mangled commit was already pushed, so
+    it is left in place and the corrected text is carried in the FOLLOWING
+    commit, which says what it replaces. An amend plus a force-push would
+    have rewritten a branch the user may have pulled, to tidy a message --
+    the wrong trade. The record now has a gap and a correction, which is
+    honest, rather than looking as though nothing happened.
+  detect: '-'
+  refs: [docs/BUILD_LESSONS.yaml]
   date: 2026-10-10
